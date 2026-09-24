@@ -1,6 +1,7 @@
 import type { ExtractionScope, ScopeDocument } from '../extraction-scope'
 import type { ExtractStep } from '../recipe-schema'
-import { selectHtml, selectJson, takeFromHtml, takeFromJson } from '../selection'
+import { selectHtml, selectJson, selectRegex, takeFromHtml, takeFromJson } from '../selection'
+import { hasPlaceholder, renderText } from '../template'
 import { NoMatchError } from '../step-flow'
 
 /**
@@ -20,15 +21,29 @@ import { NoMatchError } from '../step-flow'
 export function extractFromDocument (step: ExtractStep, scope: ExtractionScope): void {
   const document = documentFor(step, scope)
   const take = step.take ?? 'text'
+  const selector = renderSelector(step.selector, scope)
   let values: unknown[]
-  if (step.kind === 'jsonpath') {
-    if (document.kind !== 'json') throw new Error(`jsonpath needs a JSON document; the current document is ${document.kind}`)
-    values = selectJson(document.data, step.selector).map(node => takeFromJson(node, take))
-  } else if (step.kind === 'css') {
-    if (document.kind !== 'html') throw new Error(`css needs an HTML document; the current document is ${document.kind}`)
-    values = selectHtml(document.html, step.selector).map(match => takeFromHtml(match, take))
-  } else {
-    throw new Error('xpath works on a live page only; use css on fetched HTML')
+  switch (step.kind) {
+    case 'jsonpath': {
+      if (document.kind !== 'json') throw new Error(`jsonpath needs a JSON document; the current document is ${document.kind}`)
+      values = selectJson(document.data, selector).map(node => takeFromJson(node, take))
+
+      break
+    }
+    case 'css': {
+      if (document.kind !== 'html') throw new Error(`css needs an HTML document; the current document is ${document.kind}`)
+      values = selectHtml(document.html, selector).map(match => takeFromHtml(match, take))
+
+      break
+    }
+    case 'regex': {
+      values = selectRegex(textOf(document), selector)
+
+      break
+    }
+    default: {
+      throw new Error('xpath works on a live page only; use css on fetched HTML')
+    }
   }
   if (step.many === true) {
     if (step.id !== undefined) scope.set(step.id, values)
@@ -37,6 +52,27 @@ export function extractFromDocument (step: ExtractStep, scope: ExtractionScope):
   }
   if (values.length === 0) throw new NoMatchError(step.selector)
   if (step.id !== undefined) scope.set(step.id, values[0])
+}
+
+/**
+ * A selector may carry `{{ }}` placeholders (a trim name, an id): they render
+ * against the scope before the selector runs.
+ *
+ * @param selector - The recipe's selector.
+ * @param scope - The current scope.
+ * @returns The selector to run.
+ */
+export function renderSelector (selector: string, scope: ExtractionScope): string {
+  return hasPlaceholder(selector) ? renderText(selector, path => scope.lookup(path)) : selector
+}
+
+/** The text a regex extract reads: markup, text, or JSON re-serialised (a list of texts joined by newlines). */
+function textOf (document: ScopeDocument): string {
+  if (document.kind === 'html') return document.html
+  if (document.kind === 'text') return document.text
+  if (Array.isArray(document.data) && document.data.every(entry => typeof entry === 'string')) return document.data.join('\n')
+
+  return typeof document.data === 'string' ? document.data : JSON.stringify(document.data)
 }
 
 function documentFor (step: ExtractStep, scope: ExtractionScope): ScopeDocument {
@@ -48,6 +84,11 @@ function documentFor (step: ExtractStep, scope: ExtractionScope): ScopeDocument 
   }
   const source = scope.get(step.from)
   if (source === undefined) throw new Error(`"${step.from}" is not bound`)
+  if (step.kind === 'regex') {
+    if (typeof source === 'string') return { kind: 'text', text: source }
+
+    return { kind: 'json', data: source }
+  }
   if (step.kind !== 'jsonpath') {
     if (typeof source !== 'string') throw new Error(`"${step.from}" is not HTML text; use kind "jsonpath" for data`)
 

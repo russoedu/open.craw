@@ -27,7 +27,7 @@ export function uppercase (value: unknown): string {
 }
 
 export function replace (value: unknown, pattern: string, replacement: string, flags = 'g'): string {
-  return asText('replace', value).replace(compile('replace', pattern, flags), () => replacement)
+  return asText('replace', value).replace(compile('replace', pattern, flags), (...match: unknown[]) => expand(replacement, match))
 }
 
 /**
@@ -51,6 +51,24 @@ export function regex (value: unknown, pattern: string, group?: number, flags = 
 
 export function split (value: unknown, separator: string): string[] {
   return asText('split', value).split(separator)
+}
+
+/**
+ * Expands `$1`..`$9` and `$&` in a replacement, the way `String#replace` does
+ * with a string replacement. Done by hand so the replacement is never
+ * interpreted as a pattern of its own.
+ *
+ * @param replacement - The recipe's replacement text.
+ * @param match - The match arguments: whole match, then groups.
+ * @returns The expanded text.
+ */
+function expand (replacement: string, match: unknown[]): string {
+  return replacement.replaceAll(/\$(\d|&)/g, (token, group: string) => {
+    if (group === '&') return String(match[0])
+    const value = match[Number(group)]
+
+    return typeof value === 'string' ? value : token
+  })
 }
 
 function compile (op: string, pattern: string, flags: string): RegExp {

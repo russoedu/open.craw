@@ -68,7 +68,7 @@ optional `when` template that must render truthy for the step to run.
 | `evaluate` | web | value | `script`, JavaScript run in the page. Trusted recipes only. |
 | `screenshot` | web | – | `path` |
 | `request` | api | document | `method?`, `url`, `query?`, `headers?`, `body?`, `as: 'json' \| 'html' \| 'text'` |
-| `extract` | both | value or list | `selector`, `kind: 'css' \| 'xpath' \| 'jsonpath'`, `take`, `many?`, `from?` |
+| `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex'`, `take`, `many?`, `from?` |
 | `set` | both | value | `value` (template or literal) |
 | `forEach` | both | – | `over` (a list id), `as` (variable), `steps`, `emit?: true \| { output }` |
 | `paginate` | both | – | `next`, `until?` (template), `maxPages?`, `steps` |

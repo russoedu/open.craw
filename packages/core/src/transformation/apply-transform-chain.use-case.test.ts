@@ -22,6 +22,8 @@ describe('applyTransformChain', () => {
   it('chains string and number ops', async () => {
     expect(await run(' 1.299,00 € ', { op: 'trim' }, { op: 'regex', pattern: String.raw`([\d.,]+)` }, { op: 'currency', locale: 'de-DE' })).toEqual({ amount: 1299 })
     expect(await run('Blue Shoe', { op: 'lowercase' }, { op: 'replace', pattern: ' ', replacement: '-' })).toBe('blue-shoe')
+    expect(await run("'Air SR' 58kWh", { op: 'replace', pattern: "^'([^']+)' ", replacement: '$1: ' })).toBe('Air SR: 58kWh')
+    expect(await run('ab', { op: 'replace', pattern: 'b', replacement: '[$&]' })).toBe('a[b]')
     expect(await run('a,b,c', { op: 'split', separator: ',' }, { op: 'last' })).toBe('c')
   })
 

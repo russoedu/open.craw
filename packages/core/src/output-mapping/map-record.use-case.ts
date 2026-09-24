@@ -71,7 +71,10 @@ async function resolveRule (rule: MappingRule, scope: Record<string, unknown>, s
 
     return await applyTransformChain(value, rule.transform ?? [], context)
   } catch (error) {
-    if (error instanceof MappingFailedError) throw error
+    if (error instanceof MappingFailedError || error instanceof RecordRejectedError) throw error
+    // A rule that says skip-record means "this record is not worth keeping without
+    // this field": a transform that cannot produce it drops the record, not the recipe.
+    if (rule.onMissing === 'skip-record') throw new RecordRejectedError(target, (error as Error).message)
     throw new MappingFailedError(target, (error as Error).message, { cause: error })
   }
 }

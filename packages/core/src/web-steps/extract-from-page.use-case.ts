@@ -1,8 +1,8 @@
 import type { Page } from 'playwright'
-import { extractFromDocument } from '../api-steps'
+import { extractFromDocument, renderSelector } from '../api-steps'
 import type { ExtractionScope } from '../extraction-scope'
 import type { ExtractStep } from '../recipe-schema'
-import { collapse } from '../selection'
+import { collapse, selectRegex } from '../selection'
 import { NoMatchError } from '../step-flow'
 
 /**
@@ -16,9 +16,11 @@ export async function extractFromPage (step: ExtractStep, page: Page, scope: Ext
 
     return
   }
-  const selector = step.kind === 'xpath' ? `xpath=${step.selector}` : step.selector
+  const rendered = renderSelector(step.selector, scope)
   const take = step.take ?? 'text'
-  const raw = await page.locator(selector).evaluateAll(readAll, take)
+  const raw = step.kind === 'regex'
+    ? selectRegex(await page.content(), rendered)
+    : await page.locator(step.kind === 'xpath' ? `xpath=${rendered}` : rendered).evaluateAll(readAll, take)
   const values = take === 'text' ? raw.map(value => (typeof value === 'string' ? collapse(value) : value)) : raw
   if (step.many === true) {
     if (step.id !== undefined) scope.set(step.id, values)

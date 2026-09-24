@@ -77,6 +77,12 @@ describe('mapRecord', () => {
     await expect(mapRecord({ snapshot: { ...webSnapshot, raw_price: 'call us' }, input: badPrice, output, hooks, url: 'https://shop.example/p/1' })).rejects.toThrow(RecordRejectedError)
   })
 
+  it('rejects the record, not the recipe, when a transform fails under a skip-record rule', async () => {
+    const skipping: InputRecipe = { ...web, mapping: { ...web.mapping, price: { from: 'raw_price', transform: [{ op: 'number' }], onMissing: 'skip-record' } } }
+    await expect(mapRecord({ snapshot: { ...webSnapshot, raw_price: 'OTR £' }, input: skipping, output, hooks, url: 'https://shop.example/p/1' })).rejects.toThrow(RecordRejectedError)
+    await expect(mapRecord({ snapshot: { ...webSnapshot, raw_price: 'OTR £' }, input: web, output, hooks, url: 'https://shop.example/p/1' })).rejects.toThrow(MappingFailedError)
+  })
+
   it('validates quality rules and enums', async () => {
     const strict: OutputRecipe = {
       kind:    'output',

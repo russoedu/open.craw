@@ -2,7 +2,7 @@
 
 export const RECIPE_KINDS = ['input', 'output'] as const
 export const CRAWL_MODES = ['web', 'api'] as const
-export const SELECTOR_KINDS = ['css', 'xpath', 'jsonpath'] as const
+export const SELECTOR_KINDS = ['css', 'xpath', 'jsonpath', 'regex'] as const
 /** `take` also accepts `attr:<name>`, which is validated by pattern rather than listed. */
 export const TAKE_KINDS = ['text', 'html', 'value', 'json'] as const
 export const BODY_KINDS = ['json', 'html', 'text'] as const

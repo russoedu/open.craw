@@ -93,6 +93,29 @@ describe('ApiStepRunner', () => {
     expect(snapshot.missing).toBeUndefined()
   })
 
+  it('extracts with regex from the document, a bound text or a list, and renders selector templates', async () => {
+    const withRegex: InputRecipe = {
+      ...recipe,
+      start: [{ url: 'http://shop/p/1' }],
+      steps: [
+        { type: 'request', url: '{{start.url}}' },
+        { type: 'extract', id: 'hrefs', selector: 'href="([^"]+)"', kind: 'regex', many: true },
+        { type: 'extract', id: 'first', selector: 'href="([^"]+)"', kind: 'regex' },
+        { type: 'set', id: 'inline', value: 'var cfg = {"carPath":"https://cms/x.json"};' },
+        { type: 'extract', id: 'carPath', from: 'inline', selector: '"carPath":"([^"]+)"', kind: 'regex' },
+        { type: 'set', id: 'texts', value: ['trim: Air', 'trim: GT-Line'] },
+        { type: 'extract', id: 'trims', from: 'texts', selector: String.raw`trim: (\S+)`, kind: 'regex', many: true },
+        { type: 'set', id: 'wanted', value: 'GT-Line' },
+        { type: 'extract', id: 'chosen', from: 'texts', selector: 'trim: ({{wanted}})', kind: 'regex' },
+        { type: 'set', id: 'data', value: [{ trimname: 'Air', colours: ['White'] }, { trimname: 'GT-Line', colours: ['Grey', 'Green'] }] },
+        { type: 'extract', id: 'colours', from: 'data', selector: "$[?(@.trimname=='{{wanted}}')].colours[*]", kind: 'jsonpath', take: 'json', many: true },
+        { type: 'emit' },
+      ],
+    }
+    const [snapshot] = await crawl(withRegex, fakeSender())
+    expect(snapshot).toMatchObject({ hrefs: ['/x', '/y'], first: '/x', carPath: 'https://cms/x.json', trims: ['Air', 'GT-Line'], chosen: 'GT-Line', colours: ['Grey', 'Green'] })
+  })
+
   it('resolves a relative request URL against the current page', async () => {
     const sender = fakeSender()
     const relative: InputRecipe = {

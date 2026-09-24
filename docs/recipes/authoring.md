@@ -290,6 +290,11 @@ common pattern, both sites in the examples use it:
 | `css` | live page, fetched HTML, HTML fragments | Standard CSS through Playwright (live) or cheerio (static). |
 | `xpath` | live page only | Use `css` on fetched HTML. |
 | `jsonpath` | JSON data, JSON text, lists of JSON texts | jsonpath-plus syntax: `$.items[*].url`, `$[?(@.actors)]`, `$[?(@['@type']=='Movie')].name`. |
+| `regex` | any document as text: markup, text, JSON re-serialised, a list of texts joined by newlines | A JavaScript regular expression (flags `gs`); group 1 is taken when the pattern has one, else the whole match. For values that live in inline scripts (`"carPath":"([^"]+)"`), attributes, or table prose (`Boot capacity</td>\\s*<td>([^<]+)`). |
+
+Every selector is a template: `{{ }}` placeholders render against the scope first, so one step can pick the
+colour set of the current trim (`$[?(@.trimname=='{{trim}}')].colors[*].displayName`) or the row of the
+current item.
 
 ### 4.3 What to take
 
@@ -415,6 +420,10 @@ recipe's, else `fail` for required fields and `null` otherwise:
 
 **A value cannot be coerced** (`"call us"` into a `number`, a relative link into a `url`) follows the same
 missing-value policy: `skip-record` drops the record, anything else stops the recipe.
+
+**A transform throws** (a `number` op on `"OTR £"`, a hook error): the recipe stops, unless the mapping rule
+itself says `onMissing: "skip-record"`, which reads as "without this field the record is worthless" and
+drops just that record. Use it on the price of a table whose header row you cannot select away.
 
 ---
 

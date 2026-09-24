@@ -1,4 +1,5 @@
 export { selectJson } from './json-path.algorithm'
+export { selectRegex } from './regex.algorithm'
 export { selectHtml } from './html-selector.algorithm'
 export type { HtmlMatch } from './html-selector.algorithm'
 export { takeFromHtml, takeFromJson, collapse } from './take-value.mapper'
