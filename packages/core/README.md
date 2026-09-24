@@ -1,7 +1,7 @@
 # @open.craw/core
 
 The recipe-driven crawler engine. See the [repository README](../../README.md) for the concept, the
-[recipe guide](../../docs/recipes.md) for authoring recipes and [`docs/requirements.md`](../../docs/requirements.md)
+[recipe guide](../../docs/recipes/authoring.md) for authoring recipes and [`docs/requirements.md`](../../docs/requirements.md)
 for the specification.
 
 ```sh

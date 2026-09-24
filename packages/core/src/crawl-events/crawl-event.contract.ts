@@ -10,10 +10,10 @@ export type CrawlEvent =
   | (Base & { type: 'recipe:start', mode: 'web' | 'api' }) |
   (Base & { type: 'recipe:finish', emitted: number, rejected: number, duplicates: number, pages: number, durationMs: number, error?: string }) |
   (Base & { type: 'page:visit', url: string, number: number }) |
-  (Base & { type: 'step:start', stepType: string, path: string }) |
-  (Base & { type: 'step:finish', stepType: string, path: string, durationMs: number }) |
-  (Base & { type: 'step:retry', stepType: string, path: string, attempt: number, error: string }) |
-  (Base & { type: 'step:skip', stepType: string, path: string, error: string }) |
+  (Base & { type: 'step:start', stepType: string, stepId?: string, path: string }) |
+  (Base & { type: 'step:finish', stepType: string, stepId?: string, path: string, durationMs: number }) |
+  (Base & { type: 'step:retry', stepType: string, stepId?: string, path: string, attempt: number, error: string }) |
+  (Base & { type: 'step:skip', stepType: string, stepId?: string, path: string, error: string }) |
   (Base & { type: 'record:emit', url: string, key: string | null, data: Record<string, unknown> }) |
   (Base & { type: 'record:reject', url: string, field: string, reason: string }) |
   (Base & { type: 'record:duplicate', url: string, key: string }) |

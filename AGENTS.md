@@ -4,7 +4,7 @@
 
 `open.craw` is an Nx monorepo (generated and maintained with `@mnci/cli`) holding `@open.craw/core`, a
 recipe-driven crawler engine. Read `README.md`, then `docs/requirements.md` (the specification) and
-`docs/recipes.md` (the recipe guide) before changing behaviour.
+`docs/recipes/authoring.md` (the recipe guide) before changing behaviour.
 
 ## Rules that lint enforces
 

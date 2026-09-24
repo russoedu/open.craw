@@ -9,10 +9,11 @@
 //   OPEN_CRAW_INSECURE_TLS=1             accept an intercepting proxy's certificate (sandboxes only)
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createCrawler, jsonLinesSink, loadRecipeSet } from '@open.craw/core'
+import { createCrawler, jsonLinesSink, loadRecipeSet, traceLine } from '@open.craw/core'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : undefined
+const trace = process.argv.includes('--trace')
 const inputs = [['netflix', 'netflix-movies.input.json'], ['imdb', 'imdb-top.input.json']]
   .filter(([name]) => only === undefined || only === name)
   .map(([, file]) => join(here, file))
@@ -25,6 +26,10 @@ const crawler = createCrawler({
     ignoreHTTPSErrors: process.env.OPEN_CRAW_INSECURE_TLS === '1',
   },
   onEvent: (event) => {
+    if (trace) {
+      const line = traceLine(event)
+      if (line !== undefined) console.log(line)
+    }
     if (event.type === 'record:emit') console.log(`${event.recipeId.padEnd(8)} | ${String(event.data.title).padEnd(40)} | ${event.data.genres.join(', ').padEnd(28)} | ${event.data.actors.slice(0, 4).join(', ')}`)
     if (event.type === 'record:reject' || event.type === 'step:skip' || event.type === 'error') console.log(`[${event.type}] ${event.recipeId}: ${event.reason ?? event.error ?? event.message}`)
   },

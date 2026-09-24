@@ -57,22 +57,22 @@ async function runWithPolicy (step: Step, scope: ExtractionScope, walk: StepWalk
   const attempts = policy.policy === 'retry' ? policy.attempts : 1
   for (let attempt = 1; ; attempt += 1) {
     const started = Date.now()
-    walk.events.emit({ type: 'step:start', recipeId: walk.recipe.id, stepType: step.type, path: walk.path })
+    walk.events.emit({ type: 'step:start', recipeId: walk.recipe.id, stepType: step.type, stepId: step.id, path: walk.path })
     try {
       const outcome = await runOne(step, scope, walk)
-      walk.events.emit({ type: 'step:finish', recipeId: walk.recipe.id, stepType: step.type, path: walk.path, durationMs: Date.now() - started })
+      walk.events.emit({ type: 'step:finish', recipeId: walk.recipe.id, stepType: step.type, stepId: step.id, path: walk.path, durationMs: Date.now() - started })
 
       return outcome
     } catch (error) {
       if (error instanceof StepFailure) throw error
       const message = error instanceof Error ? error.message : String(error)
       if (policy.policy === 'retry' && attempt < attempts) {
-        walk.events.emit({ type: 'step:retry', recipeId: walk.recipe.id, stepType: step.type, path: walk.path, attempt: attempt + 1, error: message })
+        walk.events.emit({ type: 'step:retry', recipeId: walk.recipe.id, stepType: step.type, stepId: step.id, path: walk.path, attempt: attempt + 1, error: message })
         await sleep(backoffFor(policy, attempt + 1))
         continue
       }
       if (policy.policy === 'skip') {
-        walk.events.emit({ type: 'step:skip', recipeId: walk.recipe.id, stepType: step.type, path: walk.path, error: message })
+        walk.events.emit({ type: 'step:skip', recipeId: walk.recipe.id, stepType: step.type, stepId: step.id, path: walk.path, error: message })
 
         return 'continue'
       }

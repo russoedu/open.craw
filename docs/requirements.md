@@ -1,7 +1,7 @@
 # Recipe-based, data-driven crawler engine: requirements
 
 This is the specification `@open.craw/core` is built and checked against. The user guide is
-[recipes.md](./recipes.md); the code layout is in [architecture/vertical-feature-slices.md](./architecture/vertical-feature-slices.md).
+[recipes.md](./recipes/authoring.md); the code layout is in [architecture/vertical-feature-slices.md](./architecture/vertical-feature-slices.md).
 
 ## 1. Architecture and philosophy
 
