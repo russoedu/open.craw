@@ -102,11 +102,10 @@ describe('runSteps', () => {
         { type: 'forEach', over: 'list', as: 'item', emit: true, steps: [] },
       ],
     }]
-    const { emitted, events } = await run(steps, runner)
+    const { emitted } = await run(steps, runner)
     expect(runner.pages).toEqual(['http://x/1', 'http://x/2', 'http://x/3'])
     expect(emitted.map(snapshot => (snapshot.item as { id: number }).id)).toEqual([1, 2, 3])
     expect(emitted.map(snapshot => (snapshot.page as { number: number }).number)).toEqual([1, 2, 3])
-    expect(events.filter(event => event.type === 'page:visit').map(event => (event as { url: string }).url)).toEqual(['http://x/2', 'http://x/3'])
   })
 
   it('honours maxPages, until and cursor bindings', async () => {

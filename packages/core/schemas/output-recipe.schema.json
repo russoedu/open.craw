@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "const": "output"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "version": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "description": {
+      "type": "string"
+    },
+    "fields": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[A-Z_][\\w-]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/__schema0"
+      }
+    },
+    "onMissing": {
+      "type": "string",
+      "enum": [
+        "fail",
+        "skip-record",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "kind",
+    "id",
+    "version",
+    "fields"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "number",
+            "integer",
+            "boolean",
+            "date",
+            "datetime",
+            "currency",
+            "url",
+            "enum",
+            "array",
+            "object"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "nullable": {
+          "type": "boolean"
+        },
+        "default": {},
+        "onMissing": {
+          "type": "string",
+          "enum": [
+            "fail",
+            "skip-record",
+            "null",
+            "default"
+          ]
+        },
+        "key": {
+          "type": "boolean"
+        },
+        "generated": {
+          "type": "string",
+          "enum": [
+            "now",
+            "uuid",
+            "sourceUrl",
+            "recipeId"
+          ]
+        },
+        "format": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 3
+        },
+        "values": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "minLength": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxLength": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "items": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema0"
+          }
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$id": "https://open.craw/schemas/output-recipe.schema.json",
+  "title": "open.craw output recipe"
+}
