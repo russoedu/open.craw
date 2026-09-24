@@ -1,0 +1,41 @@
+import type { BodyKind, HttpMethod } from '../recipe-schema'
+
+/** One HTTP request as the api runner sends it, templates already rendered. */
+export interface HttpRequest {
+  method?:    HttpMethod
+  url:        string
+  query?:     Record<string, string>
+  headers?:   Record<string, string>
+  body?:      unknown
+  /** How to read the body; default: from the response content type. */
+  as?:        BodyKind
+  timeoutMs?: number
+}
+
+/** A parsed response body. Structurally the same as a scope document, on purpose. */
+export type HttpBody =
+  | { kind: 'json', data: unknown } |
+  { kind: 'html', html: string } |
+  { kind: 'text', text: string }
+
+export interface HttpResponse {
+  status:  number
+  /** The final URL after redirects. */
+  url:     string
+  headers: Record<string, string>
+  body:    HttpBody
+}
+
+/** The part of the client the api runner needs; tests fake it. */
+export interface HttpSender {
+  send: (request: HttpRequest) => Promise<HttpResponse>
+}
+
+/** A response with a 4xx or 5xx status. */
+export class HttpError extends Error {
+  override readonly name = 'HttpError'
+
+  constructor (readonly status: number, readonly url: string, readonly body: HttpBody) {
+    super(`HTTP ${status} for ${url}`)
+  }
+}

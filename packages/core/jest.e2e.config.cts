@@ -13,6 +13,8 @@ module.exports = {
   roots: ['<rootDir>/e2e'],
   testMatch: ['**/*.e2e.test.ts'],
   testTimeout: 60000,
+  // The suites share one fixture port and one browser install: run them one after another.
+  maxWorkers:  1,
   transform: { '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig] },
   moduleFileExtensions: ['ts', 'js', 'html'],
 }

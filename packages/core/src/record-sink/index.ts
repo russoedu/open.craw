@@ -1,0 +1,6 @@
+export type { RecordSink, SinkSummary } from './record-sink.contract'
+export { memorySink } from './memory-sink.repository'
+export type { MemorySink } from './memory-sink.repository'
+export { jsonLinesSink } from './json-lines-sink.repository'
+export { DedupePolicy } from './dedupe.policy'
+export type { DedupeScope } from './dedupe.policy'
