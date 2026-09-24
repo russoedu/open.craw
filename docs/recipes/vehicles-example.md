@@ -35,8 +35,9 @@ recipe `description` says why.
 - A **`regex` extract kind**: `carPath` sits inside an inline script, Kia's boot volume sits in table text
   after a label. Neither is an element or a JSON path. `regex` runs on the document as text (or on a bound
   text, or a list of texts) and takes group 1.
-- **Selectors are templates**: Kia's colours are chosen with
-  `$[?(@.trimname=='{{trim_base}}')].colors[*].displayName`, one step that adapts to the current row.
+- **Selectors are templates**: a JSONPath such as `$[?(@.trimname=='{{trim_base}}')]` adapts to the
+  current row. Kia's colours were first joined that way; they now use the `lookup` transform, which says
+  what it does (`in colour_data, key trimname, pick colors`) instead of hiding a join in a filter string.
 - A transform failure under a rule marked `onMissing: "skip-record"` now drops the record instead of
   stopping the recipe (a table's header row has "OTR £" where the price should be).
 - The `replace` transform lost `$1` backreferences in a lint-driven rewrite; the Kia version string
@@ -91,9 +92,9 @@ forEach  rows as row, emit
   extract trim_base    from label  regex ^'(GT-Line S|GT-Line|Air)    the colour set to use
   extract drivetrain   from row  td:nth-child(2)
   extract otr          from row  td:nth-child(12)                     onError: skip
-  extract colours      from colour_data  $[?(@.trimname=='{{trim_base}}')].colors[*].displayName
 mapping  version: label with the quotes removed ($1)    price: otr -> currency GBP, onMissing skip-record
          engine: template "{{motor}}, {{label}}" minus the quoted trim    bootVolumeLitres: boot -> integer
+         colours: trim_base -> lookup in colour_data by trimname, pick colors -> jsonpath $[*].displayName
 ```
 
 The three pages are fetched in the order that lets later steps reuse earlier ids: specification and

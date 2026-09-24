@@ -433,7 +433,34 @@ reaches the missing-value policy untouched.
 | `sum`, `count` | – | list | numbers |
 | `template` | `value` | list | renders a template against the scope, ignoring the input |
 | `jsonpath` | `path` | list | runs a JSONPath on the input data |
+| `lookup` | `in` (an id or path in scope), `key`, `pick?` | scalar | finds the first item of the table `in` whose `key` path equals the value (compared as text) and yields `pick` from it, or the whole item; no match gives a missing value. The table may be data, JSON text or a list of JSON texts (one `data-*` attribute per element): §5.2 |
+| `group` | `by` | list | `[{ key, items }]` in first-seen order; items without the path group under `null` |
 | `hook` | `name`, `args?` | list | calls a registered hook with the value so far |
+
+### 5.2 Joining two extractions
+
+Sites split one record across places: the price table lists versions, a colour picker elsewhere on the
+page carries a JSON per trim. `lookup` joins them at mapping time, so the body of the loop stays a plain
+row read:
+
+```json
+{ "type": "extract", "id": "colour_data", "selector": "[data-vrdata]", "kind": "css", "take": "attr:data-vrdata", "many": true },
+{ "type": "forEach", "over": "rows", "as": "row", "emit": true, "steps": [
+  { "type": "extract", "id": "trim_base", "from": "label", "selector": "^'(GT-Line S|GT-Line|Air)", "kind": "regex" }
+]}
+```
+
+```json
+"colours": { "from": "trim_base", "transform": [
+  { "op": "lookup", "in": "colour_data", "key": "trimname", "pick": "colors" },
+  { "op": "jsonpath", "path": "$[*].displayName" }
+]}
+```
+
+`in` is resolved against the scope of the record like a template path, so `colour_data` extracted outside
+the loop is visible. Applied to a list, `lookup` runs per item. `group` goes the other way: one list of
+rows becomes one item per distinct key, for an output field that is an array of objects (`each` over the
+groups).
 
 ---
 

@@ -4,7 +4,7 @@
   "id": "kia-uk",
   "output": "vehicle-configuration",
   "mode": "api",
-  "description": "Kia UK publishes three server-rendered pages per model: /pricing/ (one table row per version: quoted trim, battery, power, gearbox, drivetrain, OTR price), /specification/ (motor, boot litres) and the model page, whose colour pickers carry a data-vrdata JSON per trim. Doors are on none of them, so they stay null.",
+  "description": "Kia UK publishes three server-rendered pages per model: /pricing/ (one table row per version: quoted trim, battery, power, gearbox, drivetrain, OTR price), /specification/ (motor, boot litres) and the model page, whose colour pickers carry a data-vrdata JSON per trim, joined to each row by a lookup on the trim name. Doors are on none of them, so they stay null.",
   "vars": { "model": "ev3" },
   "start": [{ "url": "https://www.kia.com/uk/new-cars/ev3/pricing/" }],
   "session": {
@@ -28,8 +28,7 @@
       { "type": "extract", "id": "trim", "from": "label", "selector": "^'([^']+)'", "kind": "regex", "onError": { "policy": "skip" } },
       { "type": "extract", "id": "trim_base", "from": "label", "selector": "^'(GT-Line S|GT-Line|Air)", "kind": "regex", "onError": { "policy": "skip" } },
       { "type": "extract", "id": "drivetrain", "from": "row", "selector": "td:nth-child(2)", "kind": "css", "take": "text" },
-      { "type": "extract", "id": "otr", "from": "row", "selector": "td:nth-child(12)", "kind": "css", "take": "text", "onError": { "policy": "skip" } },
-      { "type": "extract", "id": "colours", "from": "colour_data", "selector": "$[?(@.trimname=='{{trim_base}}')].colors[*].displayName", "kind": "jsonpath", "take": "json", "many": true }
+      { "type": "extract", "id": "otr", "from": "row", "selector": "td:nth-child(12)", "kind": "css", "take": "text", "onError": { "policy": "skip" } }
     ]}
   ],
   "mapping": {
@@ -41,6 +40,6 @@
     "engine": { "from": ["motor", "label", "drivetrain"], "transform": [{ "op": "template", "value": "{{motor}}, {{label}}" }, { "op": "replace", "pattern": "^undefined, |^, ", "replacement": "" }, { "op": "replace", "pattern": "'[^']+' ", "replacement": "" }] },
     "fuel": { "from": "fuel" },
     "bootVolumeLitres": { "from": "boot", "transform": [{ "op": "integer" }] },
-    "colours": { "from": "colours", "transform": [{ "op": "unique" }] }
+    "colours": { "from": "trim_base", "transform": [{ "op": "lookup", "in": "colour_data", "key": "trimname", "pick": "colors" }, { "op": "jsonpath", "path": "$[*].displayName" }, { "op": "unique" }] }
   }
 }

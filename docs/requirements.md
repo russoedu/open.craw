@@ -147,9 +147,11 @@ type MappingRule =
   `split`, `join`, `first`, `last`, `nth`, `slice`, `concat`, `coalesce`, `default`, `number` (locale aware),
   `integer`, `boolean` (`truthy` list), `currency` (locale aware; currency from the op, else the field),
   `date` (`format`, `timezone`), `absoluteUrl` (base from the op, else `page.url`), `flatten`, `unique`,
-  `sum`, `count`, `template`, `jsonpath`, `hook`.
+  `sum`, `count`, `template`, `jsonpath`, `lookup` (`in`: a table bound in scope as data, JSON text or a
+  list of JSON texts; `key`: the path compared, as text, with the value; `pick?`: the path returned), `group`
+  (`by`: a path; yields `[{ key, items }]` in first-seen order), `hook`.
 - A transform applied to a list applies to each element, except the collection ops (`first`, `last`, `nth`,
-  `slice`, `join`, `concat`, `coalesce`, `flatten`, `unique`, `sum`, `count`), which act on the list.
+  `slice`, `join`, `concat`, `coalesce`, `flatten`, `unique`, `sum`, `count`, `group`), which act on the list.
 - After the chain, the value is coerced and validated against the `FieldSpec`.
 
 ### 4.1 Precedence of policies
