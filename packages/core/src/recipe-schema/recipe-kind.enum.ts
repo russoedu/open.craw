@@ -16,7 +16,7 @@ export const WAIT_UNTIL = ['load', 'domcontentloaded', 'networkidle', 'commit'] 
 export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'] as const
 
 /** Steps that only make sense with a live browser page. */
-export const WEB_ONLY_STEPS = ['goto', 'click', 'fill', 'press', 'scroll', 'wait', 'evaluate', 'screenshot'] as const
+export const WEB_ONLY_STEPS = ['goto', 'click', 'fill', 'press', 'select', 'scroll', 'wait', 'evaluate', 'screenshot'] as const
 /** Steps that only make sense against an HTTP request context. */
 export const API_ONLY_STEPS = ['request'] as const
 

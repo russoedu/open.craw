@@ -1,13 +1,14 @@
 import type { Page } from 'playwright'
 import type { BrowserSession } from '../browser-session'
 import type { EventBus } from '../crawl-events'
-import type { ExtractionScope } from '../extraction-scope'
+import type { ExtractionScope, LiveElement } from '../extraction-scope'
 import type { InputRecipe, PaginateNext, Step } from '../recipe-schema'
 import type { NextPageResult, StepRunner } from '../step-flow'
 import { renderText } from '../template'
 import { evaluateScript } from './evaluate-script.use-case'
 import { extractFromPage } from './extract-from-page.use-case'
-import { appears, click, fill, press, screenshot, scroll, wait } from './interact.use-case'
+import { appears, click, fill, press, screenshot, scroll, select, wait } from './interact.use-case'
+import { snapshotElements } from './snapshot-elements.use-case'
 import { navigate } from './navigate.use-case'
 
 const NEXT_LINK_TIMEOUT_MS = 2000
@@ -35,11 +36,13 @@ export class WebStepRunner implements StepRunner {
     switch (step.type) {
       case 'goto': { return navigate(step, this.page, scope, limits, this.events, this.recipe.id)
       }
-      case 'click': { await click(step, this.page); break
+      case 'click': { await click(step, this.page, scope); break
       }
       case 'fill': { await fill(step, this.page, scope); break
       }
-      case 'press': { await press(step, this.page); break
+      case 'press': { await press(step, this.page, scope); break
+      }
+      case 'select': { await select(step, this.page, scope); break
       }
       case 'scroll': { await scroll(step, this.page); break
       }
@@ -79,6 +82,10 @@ export class WebStepRunner implements StepRunner {
     this.events.emit({ type: 'page:visit', recipeId: this.recipe.id, url: this.page.url(), number: (scope.pageState?.number ?? 1) + 1 })
 
     return { kind: 'url', url: this.page.url() }
+  }
+
+  async elements (selector: string): Promise<LiveElement[]> {
+    return snapshotElements(selector, this.page)
   }
 
   async dispose (): Promise<void> {

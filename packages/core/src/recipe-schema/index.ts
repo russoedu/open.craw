@@ -3,8 +3,8 @@ export { fieldSpecSchema, outputRecipeSchema } from './output-recipe.contract'
 export type { FieldSpec, OutputRecipe } from './output-recipe.contract'
 export { stepSchema, errorPolicySchema, paginateNextSchema } from './step.contract'
 export type {
-  Step, StepType, StepBaseFields, ErrorPolicy, PaginateNext, TakeKind,
-  GotoStep, ClickStep, FillStep, PressStep, ScrollStep, WaitStep, EvaluateStep, ScreenshotStep,
+  Step, StepType, StepBaseFields, TargetFields, ErrorPolicy, PaginateNext, TakeKind,
+  GotoStep, ClickStep, FillStep, PressStep, SelectStep, ScrollStep, WaitStep, EvaluateStep, ScreenshotStep,
   RequestStep, ExtractStep, SetStep, ForEachStep, PaginateStep, EmitStep, HookStep,
 } from './step.contract'
 export { transformRuleSchema, mappingRuleSchema } from './transform-rule.contract'

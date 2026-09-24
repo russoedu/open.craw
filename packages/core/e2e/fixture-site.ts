@@ -69,6 +69,22 @@ function productHtml (item: Product): string {
 <table class="variants">${rows}</table><p class="seller"> ${item.seller} </p></body></html>`
 }
 
+/** Trims of the configurator: value, label, price. The page re-renders `.trim` and `.price` from a `<select>` change. */
+export const TRIMS = [['base', 'Base', '20.000 €'], ['sport', 'Sport', '24.500 €'], ['lux', 'Luxury', '29.900 €']] as const
+
+const CONFIGURATOR = `<!doctype html><html lang="en"><head><title>Configurator</title></head><body>
+<h1>Model X</h1>
+<select id="trim">${TRIMS.map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select>
+<p class="trim">${TRIMS[0][1]}</p><p class="price">${TRIMS[0][2]}</p>
+<script>
+  const prices = ${JSON.stringify(Object.fromEntries(TRIMS.map(([value, label, price]) => [value, { label, price }])))}
+  document.getElementById('trim').addEventListener('change', (event) => {
+    const chosen = prices[event.target.value]
+    document.querySelector('.trim').textContent = chosen.label
+    document.querySelector('.price').textContent = chosen.price
+  })
+</script></body></html>`
+
 const LOGIN_FORM = '<!doctype html><html lang="en"><head><title>Login</title></head><body><form method="post" action="/login"><input id="user" name="user"><input id="pass" name="pass" type="password"><button type="submit">Go</button></form></body></html>'
 const LOGGED_IN = '<!doctype html><html lang="en"><head><title>Account</title></head><body><p id="logged-in">Welcome</p></body></html>'
 
@@ -89,6 +105,7 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
 
     return html(productHtml(product(id)))
   }
+  if (url.pathname === '/configurator') return html(CONFIGURATOR)
   if (url.pathname === '/login' && incoming.method === 'GET') return html(LOGIN_FORM)
   if (url.pathname === '/login' && incoming.method === 'POST') {
     let body = ''

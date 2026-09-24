@@ -158,4 +158,28 @@ describe('runSteps', () => {
     expect(emitted[0]).toMatchObject({ n: 21, doubled: 42, kept: 'yes' })
     expect(emitted[0].skipped).toBeUndefined()
   })
+
+  it('iterates live elements from the runner when forEach has a selector', async () => {
+    const runner = fakeRunner({})
+    const seen: string[] = []
+    runner.elements = async (selector, scope) => {
+      seen.push(selector)
+      expect(scope.has('prefix')).toBe(true)
+
+      return [0, 1].map(index => ({ selector, index, text: `option ${index}`, html: '', attrs: { value: `v${index}` } }))
+    }
+    const steps: Step[] = [
+      { type: 'set', id: 'prefix', value: 'sel' },
+      { type: 'forEach', selector: '{{prefix}} option', as: 'option', emit: true, steps: [{ type: 'set', id: 'label', value: '{{option.text}}={{option.attrs.value}}' }] },
+    ]
+    const { emitted } = await run(steps, runner)
+    expect(seen).toEqual(['sel option'])
+    expect(emitted.map(snapshot => snapshot.label)).toEqual(['option 0=v0', 'option 1=v1'])
+    expect(emitted[1].option).toMatchObject({ selector: 'sel option', index: 1 })
+  })
+
+  it('fails a forEach over a selector when the runner has no elements (api mode)', async () => {
+    const runner = fakeRunner({})
+    await expect(run([{ type: 'forEach', selector: 'option', as: 'o', steps: [] }], runner)).rejects.toThrow('needs a browser')
+  })
 })

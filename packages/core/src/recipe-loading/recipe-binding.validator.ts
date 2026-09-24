@@ -78,7 +78,8 @@ function walkSteps (steps: readonly Step[], path: string, mode: 'web' | 'api', k
     }
     if (step.type === 'extract' && step.from !== undefined && !known.has(step.from)) report(`${at}.from`, `"${step.from}" is not a known id`)
     if (step.type === 'forEach') {
-      if (!known.has(step.over)) report(`${at}.over`, `"${step.over}" is not a known id`)
+      if (step.over !== undefined && !known.has(step.over)) report(`${at}.over`, `"${step.over}" is not a known id`)
+      if (mode === 'api' && step.selector !== undefined) report(`${at}.selector`, 'forEach over selector iterates live elements and needs a browser; use over (a list id) in api mode')
       const emits = step.emit !== undefined
       if (emits && state.emitting) report(at, 'nested inside another emitting construct; only one emit per path')
       const inner = { ...state, emitting: state.emitting || emits, ids: new Set(state.ids) }

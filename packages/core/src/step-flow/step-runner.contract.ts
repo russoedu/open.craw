@@ -1,4 +1,4 @@
-import type { ExtractionScope } from '../extraction-scope'
+import type { ExtractionScope, LiveElement } from '../extraction-scope'
 import type { PaginateNext, Step } from '../recipe-schema'
 
 /** What `paginate` learns from the runner after a page body ran. */
@@ -17,8 +17,10 @@ export type NextPageResult =
  */
 export interface StepRunner {
   /** Runs one leaf step (not forEach, paginate, emit, set or hook). */
-  runLeaf:  (step: Step, scope: ExtractionScope) => Promise<void>
+  runLeaf:   (step: Step, scope: ExtractionScope) => Promise<void>
   /** Finds (and in web mode reaches) the next page. */
-  nextPage: (next: PaginateNext, scope: ExtractionScope) => Promise<NextPageResult>
-  dispose:  () => Promise<void>
+  nextPage:  (next: PaginateNext, scope: ExtractionScope) => Promise<NextPageResult>
+  /** Snapshots every element matching a rendered selector, for `forEach` over `selector`. Web mode only. */
+  elements?: (selector: string, scope: ExtractionScope) => Promise<LiveElement[]>
+  dispose:   () => Promise<void>
 }

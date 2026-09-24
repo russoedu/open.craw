@@ -1,0 +1,22 @@
+{
+  "kind": "input",
+  "id": "configurator-web",
+  "output": "trim",
+  "mode": "web",
+  "start": [{ "url": "http://127.0.0.1:4545/configurator" }],
+  "steps": [
+    { "type": "goto", "url": "{{start.url}}" },
+    { "type": "extract", "id": "model", "selector": "h1", "kind": "css", "take": "text" },
+    { "type": "forEach", "selector": "select#trim option", "as": "option", "emit": true, "steps": [
+      { "type": "select", "selector": "select#trim", "value": "{{option.attrs.value}}" },
+      { "type": "extract", "id": "trim", "selector": ".trim", "kind": "css", "take": "text" },
+      { "type": "extract", "id": "price", "selector": ".price", "kind": "css", "take": "text" }
+    ]}
+  ],
+  "mapping": {
+    "model": { "from": "model" },
+    "trim": { "from": "trim" },
+    "code": { "from": "option.attrs.value" },
+    "price": { "from": "price", "transform": [{ "op": "currency", "locale": "de-DE" }] }
+  }
+}

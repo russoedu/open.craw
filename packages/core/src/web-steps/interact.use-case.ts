@@ -1,28 +1,61 @@
 import type { Locator, Page } from 'playwright'
+import { isLiveElement } from '../extraction-scope'
 import type { ExtractionScope } from '../extraction-scope'
-import type { ClickStep, FillStep, PressStep, ScreenshotStep, ScrollStep, WaitStep } from '../recipe-schema'
-import { renderText } from '../template'
+import type { ClickStep, FillStep, PressStep, ScreenshotStep, ScrollStep, SelectStep, TargetFields, WaitStep } from '../recipe-schema'
+import { render, renderText } from '../template'
 
 const OPTIONAL_TIMEOUT_MS = 2000
 const SCROLL_SETTLE_MS = 300
 
-export async function click (step: ClickStep, page: Page): Promise<void> {
-  const target = page.locator(step.selector).first()
+/**
+ * The element an interaction lands on: the first match of `selector`, or what
+ * `target` renders to - a live element (re-resolved by selector and index, so a
+ * re-render since the loop started does not matter) or a selector string.
+ *
+ * @param step - A step with `selector` or `target`.
+ * @param page - The page.
+ * @param scope - Where `target` is resolved.
+ * @returns The locator.
+ * @throws Error when `target` renders to something that is neither.
+ */
+export function targetOf (step: TargetFields, page: Page, scope: ExtractionScope): Locator {
+  if (step.target === undefined) return page.locator(step.selector ?? '').first()
+  const value = render(step.target, path => scope.lookup(path))
+  if (isLiveElement(value)) return page.locator(value.selector).nth(value.index)
+  if (typeof value === 'string' && value !== '') return page.locator(value).first()
+  throw new Error(`target "${step.target}" is neither a live element nor a selector`)
+}
+
+export async function click (step: ClickStep, page: Page, scope: ExtractionScope): Promise<void> {
+  const target = targetOf(step, page, scope)
   if (step.optional === true && !await appears(target, OPTIONAL_TIMEOUT_MS)) return
   await target.click()
 }
 
 export async function fill (step: FillStep, page: Page, scope: ExtractionScope): Promise<void> {
-  await page.locator(step.selector).first().fill(renderText(step.value, path => scope.lookup(path)))
+  await targetOf(step, page, scope).fill(renderText(step.value, path => scope.lookup(path)))
 }
 
-export async function press (step: PressStep, page: Page): Promise<void> {
-  if (step.selector === undefined) {
+export async function press (step: PressStep, page: Page, scope: ExtractionScope): Promise<void> {
+  if (step.selector === undefined && step.target === undefined) {
     await page.keyboard.press(step.key)
 
     return
   }
-  await page.locator(step.selector).first().press(step.key)
+  await targetOf(step, page, scope).press(step.key)
+}
+
+/** Picks an option of a `<select>` by value, label or index; each is a template. */
+export async function select (step: SelectStep, page: Page, scope: ExtractionScope): Promise<void> {
+  const lookup = (path: string): unknown => scope.lookup(path)
+  const target = targetOf(step, page, scope)
+  if (step.index !== undefined) {
+    await target.selectOption({ index: step.index })
+  } else if (step.label === undefined) {
+    await target.selectOption({ value: renderText(step.value ?? '', lookup) })
+  } else {
+    await target.selectOption({ label: renderText(step.label, lookup) })
+  }
 }
 
 /**

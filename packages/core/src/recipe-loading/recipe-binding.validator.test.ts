@@ -95,4 +95,13 @@ describe('fieldAt', () => {
     expect(fieldAt(output.fields, 'seller.phone')).toBeUndefined()
     expect(fieldAt(output.fields, 'title.x')).toBeUndefined()
   })
+
+  it('rejects forEach over a selector and select in api mode, and accepts them in web mode', () => {
+    const loop: InputRecipe['steps'][number] = { type: 'forEach', selector: 'option', as: 'o', emit: true, steps: [{ type: 'select', selector: 'select', value: '{{o.attrs.value}}' }] }
+    expect(messages({ ...api, steps: [loop] })).toEqual(expect.arrayContaining([
+      'steps.0.selector: forEach over selector iterates live elements and needs a browser; use over (a list id) in api mode',
+      'steps.0.steps.0: "select" needs a browser; this recipe runs in api mode (use session.bootstrap for browser steps)',
+    ]))
+    expect(messages({ ...web, steps: [loop], mapping: { url: { from: 'page.url' }, title: { from: 'o.text' }, price: { from: 'o.attrs.value' } } })).toEqual([])
+  })
 })

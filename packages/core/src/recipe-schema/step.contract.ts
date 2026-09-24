@@ -26,9 +26,13 @@ export interface StepBaseFields {
 }
 
 export interface GotoStep extends StepBaseFields { type: 'goto', url: string, waitUntil?: WaitUntil }
-export interface ClickStep extends StepBaseFields { type: 'click', selector: string, optional?: boolean }
-export interface FillStep extends StepBaseFields { type: 'fill', selector: string, value: string }
-export interface PressStep extends StepBaseFields { type: 'press', key: string, selector?: string }
+/** Where an interaction lands: a selector, or a `target` template that renders to a live element (a `forEach` over `selector`) or to a selector string. */
+export interface TargetFields { selector?: string, target?: string }
+export interface ClickStep extends StepBaseFields, TargetFields { type: 'click', optional?: boolean }
+export interface FillStep extends StepBaseFields, TargetFields { type: 'fill', value: string }
+export interface PressStep extends StepBaseFields, TargetFields { type: 'press', key: string }
+/** Picks an option of a `<select>` by value, label or index. */
+export interface SelectStep extends StepBaseFields, TargetFields { type: 'select', value?: string, label?: string, index?: number }
 export interface ScrollStep extends StepBaseFields { type: 'scroll', to: string, times?: number, untilStable?: boolean }
 export interface WaitStep extends StepBaseFields { type: 'wait', selector?: string, ms?: number, state?: 'networkidle' }
 export interface EvaluateStep extends StepBaseFields { type: 'evaluate', script: string }
@@ -52,13 +56,14 @@ export interface ExtractStep extends StepBaseFields {
   from?:    string
 }
 export interface SetStep extends StepBaseFields { type: 'set', value: unknown }
-export interface ForEachStep extends StepBaseFields { type: 'forEach', over: string, as: string, steps: Step[], emit?: true | { output: string } }
+/** Runs a body per item of a list (`over`) or per live element matching `selector` (web mode; the elements are re-resolved on every use). */
+export interface ForEachStep extends StepBaseFields { type: 'forEach', over?: string, selector?: string, as: string, steps: Step[], emit?: true | { output: string } }
 export interface PaginateStep extends StepBaseFields { type: 'paginate', next: PaginateNext, until?: string, maxPages?: number, steps: Step[] }
 export interface EmitStep extends StepBaseFields { type: 'emit', output?: string }
 export interface HookStep extends StepBaseFields { type: 'hook', name: string, args?: Record<string, unknown> }
 
 export type Step =
-  | GotoStep | ClickStep | FillStep | PressStep | ScrollStep | WaitStep | EvaluateStep | ScreenshotStep |
+  | GotoStep | ClickStep | FillStep | PressStep | SelectStep | ScrollStep | WaitStep | EvaluateStep | ScreenshotStep |
   RequestStep | ExtractStep | SetStep | ForEachStep | PaginateStep | EmitStep | HookStep
 
 export type StepType = Step['type']
@@ -81,10 +86,17 @@ const stepId = z.string().regex(/^[A-Z_]\w*$/i, 'an id is a word: letters, digit
 const base = { id: stepId.optional(), onError: errorPolicySchema.optional(), when: z.string().optional() }
 const stringMap = z.record(z.string(), z.string())
 
+const target = { selector: z.string().min(1).optional(), target: z.string().min(1).optional() }
+const ONE_TARGET = 'give exactly one of selector or target'
+const oneTarget = (step: { selector?: string, target?: string }): boolean => (step.selector === undefined) !== (step.target === undefined)
 const gotoStep = z.strictObject({ ...base, type: z.literal('goto'), url: z.string().min(1), waitUntil: z.enum(WAIT_UNTIL).optional() })
-const clickStep = z.strictObject({ ...base, type: z.literal('click'), selector: z.string().min(1), optional: z.boolean().optional() })
-const fillStep = z.strictObject({ ...base, type: z.literal('fill'), selector: z.string().min(1), value: z.string() })
-const pressStep = z.strictObject({ ...base, type: z.literal('press'), key: z.string().min(1), selector: z.string().optional() })
+const clickStep = z.strictObject({ ...base, ...target, type: z.literal('click'), optional: z.boolean().optional() }).refine(oneTarget, ONE_TARGET)
+const fillStep = z.strictObject({ ...base, ...target, type: z.literal('fill'), value: z.string() }).refine(oneTarget, ONE_TARGET)
+const pressStep = z.strictObject({ ...base, ...target, type: z.literal('press'), key: z.string().min(1) })
+  .refine(step => step.selector === undefined || step.target === undefined, 'give selector or target, not both')
+const selectStep = z.strictObject({ ...base, ...target, type: z.literal('select'), value: z.string().optional(), label: z.string().optional(), index: z.int().nonnegative().optional() })
+  .refine(oneTarget, ONE_TARGET)
+  .refine(step => [step.value, step.label, step.index].filter(choice => choice !== undefined).length === 1, 'give exactly one of value, label or index')
 const scrollStep = z.strictObject({ ...base, type: z.literal('scroll'), to: z.string().min(1), times: z.int().min(1).optional(), untilStable: z.boolean().optional() })
 const waitStep = z.strictObject({ ...base, type: z.literal('wait'), selector: z.string().optional(), ms: z.int().nonnegative().optional(), state: z.literal('networkidle').optional() })
 const evaluateStep = z.strictObject({ ...base, type: z.literal('evaluate'), script: z.string().min(1) })
@@ -115,7 +127,8 @@ const hookStep = z.strictObject({ ...base, type: z.literal('hook'), name: z.stri
 const emitFlag = z.union([z.literal(true), z.strictObject({ output: z.string().min(1) })])
 
 const steps = z.lazy(() => z.array(stepSchema))
-const forEachStep = z.strictObject({ ...base, type: z.literal('forEach'), over: stepId, as: stepId, steps, emit: emitFlag.optional() })
+const forEachStep = z.strictObject({ ...base, type: z.literal('forEach'), over: stepId.optional(), selector: z.string().min(1).optional(), as: stepId, steps, emit: emitFlag.optional() })
+  .refine(step => (step.over === undefined) !== (step.selector === undefined), 'give exactly one of over (a list id) or selector (live elements)')
 const paginateStep = z.strictObject({
   ...base,
   type:     z.literal('paginate'),
@@ -126,6 +139,6 @@ const paginateStep = z.strictObject({
 })
 
 export const stepSchema: z.ZodType<Step> = z.discriminatedUnion('type', [
-  gotoStep, clickStep, fillStep, pressStep, scrollStep, waitStep, evaluateStep, screenshotStep,
+  gotoStep, clickStep, fillStep, pressStep, selectStep, scrollStep, waitStep, evaluateStep, screenshotStep,
   requestStep, extractStep, assignStep, emitStep, hookStep, forEachStep, paginateStep,
 ])

@@ -33,6 +33,8 @@ describe('parseOutputRecipe', () => {
   })
 })
 
+const recipe = (steps: unknown[]): unknown => ({ kind: 'input', id: 'r', output: 'o', mode: 'web', start: [{ url: 'http://x' }], steps, mapping: {} })
+
 describe('parseInputRecipe', () => {
   it('accepts the web and api input recipes', () => {
     const web = parseInputRecipe(fixture('shop-web.input.json'))
@@ -100,5 +102,19 @@ describe('recipeKindOf', () => {
     expect(recipeKindOf({ kind: 'output', broken: true })).toBe('output')
     expect(recipeKindOf({ kind: 'other' })).toBeUndefined()
     expect(recipeKindOf('text')).toBeUndefined()
+  })
+
+  it('requires exactly one of over and selector on forEach, and one target on interactions', () => {
+    const both = () => parseInputRecipe(recipe([{ type: 'forEach', over: 'a', selector: 'option', as: 'o', steps: [] }]))
+    expect(both).toThrow('give exactly one of over (a list id) or selector (live elements)')
+    const neither = () => parseInputRecipe(recipe([{ type: 'forEach', as: 'o', steps: [] }]))
+    expect(neither).toThrow('give exactly one of over')
+    expect(() => parseInputRecipe(recipe([{ type: 'click' }]))).toThrow('give exactly one of selector or target')
+    expect(() => parseInputRecipe(recipe([{ type: 'select', target: '{{o}}' }]))).toThrow('give exactly one of value, label or index')
+    expect(() => parseInputRecipe(recipe([{ type: 'select', target: '{{o}}', value: '1', index: 1 }]))).toThrow('give exactly one of value, label or index')
+    const ok = parseInputRecipe(recipe([
+      { type: 'forEach', selector: 'select#trim option', as: 'o', emit: true, steps: [{ type: 'select', selector: 'select#trim', value: '{{o.attrs.value}}' }, { type: 'click', target: '{{o}}' }, { type: 'press', key: 'Enter' }] },
+    ]))
+    expect(ok.steps[0].type).toBe('forEach')
   })
 })

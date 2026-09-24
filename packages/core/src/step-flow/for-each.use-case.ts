@@ -1,10 +1,12 @@
 import type { ExtractionScope } from '../extraction-scope'
 import type { ForEachStep } from '../recipe-schema'
+import { renderText } from '../template'
 import type { EmitOutcome, StepWalk } from './run-steps.use-case'
 
 /**
- * Runs a body once per item of a list, each in a fresh child scope with the
- * item bound under `as`; emits a record per iteration when asked.
+ * Runs a body once per item of a list (`over`), or once per live element
+ * matching `selector`, each in a fresh child scope with the item bound under
+ * `as`; emits a record per iteration when asked.
  *
  * @param step - The forEach step.
  * @param scope - The scope the list lives in.
@@ -12,8 +14,7 @@ import type { EmitOutcome, StepWalk } from './run-steps.use-case'
  * @returns `stop` when the crawl reached its record limit.
  */
 export async function runForEach (step: ForEachStep, scope: ExtractionScope, walk: StepWalk): Promise<EmitOutcome> {
-  const list = scope.get(step.over)
-  const items = Array.isArray(list) ? list : (list === undefined || list === null ? [] : [list])
+  const items = await itemsOf(step, scope, walk)
   for (const item of items) {
     const child = scope.child()
     child.set(step.as, item)
@@ -26,4 +27,15 @@ export async function runForEach (step: ForEachStep, scope: ExtractionScope, wal
   }
 
   return 'continue'
+}
+
+async function itemsOf (step: ForEachStep, scope: ExtractionScope, walk: StepWalk): Promise<unknown[]> {
+  if (step.selector !== undefined) {
+    if (walk.runner.elements === undefined) throw new Error('forEach over selector iterates live elements and needs a browser; this recipe runs in api mode')
+
+    return walk.runner.elements(renderText(step.selector, path => scope.lookup(path)), scope)
+  }
+  const list = scope.get(step.over ?? '')
+
+  return Array.isArray(list) ? list : (list === undefined || list === null ? [] : [list])
 }
