@@ -1,0 +1,31 @@
+{
+  "kind": "input",
+  "id": "shop-api",
+  "output": "product",
+  "mode": "api",
+  "vars": { "user": "demo", "pass": "demo" },
+  "start": [{ "url": "http://127.0.0.1:4545/api/products?page=1" }],
+  "session": { "bootstrap": { "keep": ["cookies"], "steps": [
+    { "type": "goto", "url": "http://127.0.0.1:4545/login" },
+    { "type": "fill", "selector": "#user", "value": "{{vars.user}}" },
+    { "type": "fill", "selector": "#pass", "value": "{{vars.pass}}" },
+    { "type": "click", "selector": "button[type=submit]" },
+    { "type": "wait", "selector": "#logged-in" }
+  ]}},
+  "steps": [
+    { "type": "paginate", "next": { "jsonpath": "$.nextPage" }, "steps": [
+      { "type": "request", "id": "list", "url": "{{page.url}}", "as": "json" },
+      { "type": "extract", "id": "items", "from": "list", "selector": "$.items[*]", "kind": "jsonpath", "take": "json", "many": true },
+      { "type": "forEach", "over": "items", "as": "item", "emit": true, "steps": [] }
+    ]}
+  ],
+  "mapping": {
+    "url": { "from": "item.url" },
+    "title": { "from": "item.name" },
+    "price": { "from": ["item.priceInt", "item.priceCents"], "transform": [{ "op": "join", "separator": "." }, { "op": "currency" }] },
+    "inStock": { "from": "item.stock", "transform": [{ "op": "integer" }, { "op": "hook", "name": "positive" }] },
+    "images": { "from": "item.images" },
+    "variants": { "each": "item.variants", "fields": { "size": { "from": "size" }, "price": { "from": "price", "transform": [{ "op": "currency" }] } } },
+    "seller.name": { "from": "item.seller" }
+  }
+}

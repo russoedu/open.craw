@@ -1,0 +1,176 @@
+# Recipe-based, data-driven crawler engine: requirements
+
+This is the specification `@open.craw/core` is built and checked against. The user guide is
+[recipes.md](./recipes.md); the code layout is in [architecture/vertical-feature-slices.md](./architecture/vertical-feature-slices.md).
+
+## 1. Architecture and philosophy
+
+**Data-driven core.** One reusable engine owns execution: the Playwright browser lifecycle, HTTP requests, the
+step walk, the transformation pipeline and the output pipeline. It has no knowledge of any site. Everything
+site-specific lives in configuration.
+
+**Three pillars of configuration.**
+
+1. **Input recipes** (`kind: "input"`, a list): where to start, whether to drive a browser (`web`) or call HTTP
+   endpoints (`api`), the ordered steps that acquire raw values, and the mapping from those values to the output.
+2. **One output recipe** (`kind: "output"`): the typed schema of the records the crawl must produce, with
+   quality rules and what to do when a value is missing.
+3. **The id-based transformation layer**: every step that produces a value names it with an `id`; the
+   mapping binds output fields to one or more ids through a chain of pure transforms, with programmatic hooks
+   for the cases JSON cannot express.
+
+**Binding.** An input recipe names its output by id (`"output": "product"`). A run takes one output recipe and
+a list of input recipes bound to it and executes the inputs **one after another**. All inputs bound to the same
+output produce records of the same shape, whatever their source or mode.
+
+**Sessions.** `api` mode reuses Playwright's request context, so a browser-driven bootstrap (a login, a consent
+wall) can hand its cookies and local storage to the API calls unchanged. Nothing else in the engine cares which
+mode produced the session.
+
+**Extension.** Hooks are registered in code by name (`createCrawler({ hooks })`) and referenced from recipes in
+a `hook` step or a `hook` transform. That is the only extension point: recipes stay declarative and shareable.
+
+## 2. Input recipe (`InputRecipe`)
+
+| Field | Meaning |
+|---|---|
+| `id` | Lowercase letters, digits, hyphens. Unique within a run. |
+| `output` | The output recipe id this recipe feeds. |
+| `mode` | `web` (Playwright browser page) or `api` (Playwright request context, no browser). |
+| `start` | One or more `{ url, vars? }`; each start point runs the whole step list. |
+| `vars` | Recipe-level variables, read in templates as `{{vars.name}}`. |
+| `session` | Headers, cookies, user agent, viewport, a saved `storageStatePath`, or a `bootstrap`. |
+| `limits` | `maxRecords`, `delayMs` (before every `goto` / `request`), `timeoutMs`, `concurrency` (reserved, `1`). |
+| `onError` | Default step policy: `fail`, `skip`, or `retry { attempts, backoffMs }`. |
+| `steps` | The acquisition recipe (section 2.2). |
+| `mapping` | Output field path -> mapping rule (section 4). |
+
+### 2.1 Session bootstrap
+
+`session.bootstrap` runs its `steps` in a browser **before** the crawl, then captures what `keep` lists
+(`cookies`, `localStorage`) as a Playwright storage state, optionally saved to `saveTo`. A `web` recipe starts
+its page from that state; an `api` recipe seeds its request context with it. Bootstrap steps are web steps only
+and never emit records.
+
+### 2.2 Steps
+
+Every step has `type`, an optional `id` (the name of the value it produces), an optional `onError` and an
+optional `when` template that must render truthy for the step to run.
+
+| Step | Mode | Produces | Fields |
+|---|---|---|---|
+| `goto` | web | – | `url` (template), `waitUntil?` |
+| `click` | web | – | `selector`, `optional?` |
+| `fill` | web | – | `selector`, `value` (template) |
+| `press` | web | – | `key`, `selector?` |
+| `scroll` | web | – | `to: 'bottom' \| selector`, `times?`, `untilStable?` |
+| `wait` | web | – | one of `selector`, `ms`, `state: 'networkidle'` |
+| `evaluate` | web | value | `script`, JavaScript run in the page. Trusted recipes only. |
+| `screenshot` | web | – | `path` |
+| `request` | api | document | `method?`, `url`, `query?`, `headers?`, `body?`, `as: 'json' \| 'html' \| 'text'` |
+| `extract` | both | value or list | `selector`, `kind: 'css' \| 'xpath' \| 'jsonpath'`, `take`, `many?`, `from?` |
+| `set` | both | value | `value` (template or literal) |
+| `forEach` | both | – | `over` (a list id), `as` (variable), `steps`, `emit?: true \| { output }` |
+| `paginate` | both | – | `next`, `until?` (template), `maxPages?`, `steps` |
+| `emit` | both | record | `output?` |
+| `hook` | both | value | `name`, `args?` |
+
+`take` is `text` (default), `html`, `value`, `json` or `attr:<name>`. `xpath` works on live pages only; on
+fetched HTML use `css`; on JSON use `jsonpath`.
+
+**Templates** are `{{path}}` placeholders resolved against the scope: any id, the current `forEach` variable,
+`vars.*`, `start.url`, `page.url`, `page.number`. A template that is exactly one placeholder yields the raw
+value (a list stays a list). Templates never execute code.
+
+### 2.3 Scope and pagination rules
+
+- `forEach` opens a **fresh child scope per iteration**; `paginate` opens one **per page**. A child scope is
+  dropped when its iteration or page ends: nothing from page 1 is visible on page 2.
+- `page.url`, `page.number` and the current document are scope state, bound in the innermost scope that
+  navigated. In `web` mode `page.url` is the real page URL after the last navigation; in `api` mode it is the
+  final URL of the nearest `request` up the chain, and `start.url` before any request. `extract` without
+  `from` reads the current document of the nearest scope that has one.
+- `paginate.next` is evaluated **after** the page body: `{ selector }` (web: click it), `{ url }` (both: the
+  rendered value becomes the next `page.url`), `{ jsonpath, as? }` (api: evaluated on the current document;
+  without `as` the value is the next URL, relative allowed; with `as` it is bound under that name in the next
+  page's scope so the body builds the URL itself, e.g. a cursor). Pagination stops when `next` yields nothing,
+  when `until` renders truthy, or at `maxPages`.
+- **One emitting construct per path**: an emitting `forEach` may not contain another emitting `forEach` or
+  an `emit`. `emit` snapshots the whole scope chain, child values shadowing parents.
+- `limits.maxRecords` stops the walk cleanly once reached.
+
+## 3. Output recipe (`OutputRecipe`)
+
+| Field | Meaning |
+|---|---|
+| `id`, `version`, `description?` | Identity. |
+| `fields` | Name -> `FieldSpec`. Names have no dots. |
+| `onMissing?` | Recipe default: `fail`, `skip-record` or `null`. Built-in default is `fail` for required fields, `null` otherwise. |
+
+`FieldSpec`: `type` (`string`, `number`, `integer`, `boolean`, `date`, `datetime`, `currency`, `url`, `enum`,
+`array`, `object`), `required?`, `nullable?`, `default?`, `onMissing?` (`fail`, `skip-record`, `null`,
+`default`), `key?` (record identity for de-duplication), `generated?` (`now`, `uuid`, `sourceUrl`,
+`recipeId`; supplied by the engine, never mapped), `format?` (input format for dates; output is ISO 8601),
+`currency?` (ISO 4217), `values?` (enum), `items?` (array element spec), `fields?` (object members), `min?`,
+`max?`, `pattern?`, `minLength?`, `maxLength?`.
+
+A `currency` value is stored as `{ amount: number, currency: string }`. A `date` is `YYYY-MM-DD`, a
+`datetime` an ISO 8601 instant.
+
+## 4. Mapping and transformation
+
+```ts
+type MappingRule =
+  | { from: string | string[], transform?: TransformRule[], onMissing?: MissingPolicy }
+  | { each: string, fields: Record<string, MappingRule>, onMissing?: MissingPolicy }
+```
+
+- The mapping key is an output field path, dotted for nested objects (`seller.name`).
+- `from` is an id or a path into one (`item.href`, `page.url`). With several sources the chain starts on the
+  array of resolved values (`["price_int", "price_cents"]` -> `join`).
+- `each` builds an array of objects from a list id; the nested `from` paths are relative to each list item
+  (`.` is the item itself).
+- Transforms run in order. Built-ins: `trim`, `lowercase`, `uppercase`, `replace`, `regex` (capture group),
+  `split`, `join`, `first`, `last`, `nth`, `slice`, `concat`, `coalesce`, `default`, `number` (locale aware),
+  `integer`, `boolean` (`truthy` list), `currency` (locale aware; currency from the op, else the field),
+  `date` (`format`, `timezone`), `absoluteUrl` (base from the op, else `page.url`), `flatten`, `unique`,
+  `sum`, `count`, `template`, `jsonpath`, `hook`.
+- A transform applied to a list applies to each element, except the collection ops (`first`, `last`, `nth`,
+  `slice`, `join`, `concat`, `coalesce`, `flatten`, `unique`, `sum`, `count`), which act on the list.
+- After the chain, the value is coerced and validated against the `FieldSpec`.
+
+### 4.1 Precedence of policies
+
+1. A step failure resolves step `onError` -> recipe `onError` -> `fail`. `skip` leaves the id unset and
+   continues; `retry` re-runs the step; `fail` aborts the recipe.
+2. A missing mapped value resolves mapping rule `onMissing` -> field `onMissing` -> recipe `onMissing` ->
+   built-in default. `fail` aborts the recipe; `skip-record` rejects the record and continues; `null` and
+   `default` fill the value.
+3. Whether a failed recipe stops the run is a run option (`onRecipeError: 'continue' | 'stop'`, default
+   `continue`), never a recipe concern.
+
+### 4.2 Identity and duplicates
+
+Fields marked `key` form the record identity. De-duplication scope is a run option: `run` (default, across
+all inputs, first record wins), `recipe`, or `off`. A record with no key fields is never de-duplicated.
+Duplicates are reported as events and counted in the report.
+
+## 5. Interfaces
+
+The TypeScript contracts are the zod schemas in `packages/core/src/recipe-schema/`; the JSON Schemas emitted
+from them are in `packages/core/schemas/` and are what a recipe's `$schema` should point at. The public API is
+`packages/core/src/index.ts`:
+
+```ts
+const recipes = await loadRecipeSet({ output: 'recipes/product.output.json', inputs: ['recipes/'] })
+const crawler = createCrawler({ hooks, sink: jsonLinesSink('out.jsonl'), onEvent })
+const report = await crawler.run(recipes)
+await crawler.close()
+```
+
+## 6. Example
+
+The recipes in `packages/core/e2e/recipes/` are the reference example: one `product` output recipe, a `web`
+input recipe that paginates a catalog and visits every product page, and an `api` input recipe that logs in
+through a browser bootstrap and then pages through a JSON endpoint. Both must produce the same records; the
+e2e suite asserts it.
