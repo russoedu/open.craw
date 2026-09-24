@@ -81,9 +81,14 @@ optional `when` template that must render truthy for the step to run.
 fetched HTML use `css`; on JSON use `jsonpath`. A `jsonpath` extract whose `from` is text parses it as JSON; a list of
 texts becomes the array of its parsable entries (the JSON-LD blocks of a page), and the path runs over that array.
 
-**Templates** are `{{path}}` placeholders resolved against the scope: any id, the current `forEach` variable,
-`vars.*`, `start.url`, `page.url`, `page.number`. A template that is exactly one placeholder yields the raw
-value (a list stays a list). Templates never execute code.
+**Templates** are `{{ }}` placeholders resolved against the scope: a path (any id, the current `forEach`
+variable, `vars.*`, `start.url`, `page.url`, `page.number`) or an expression over paths: literals,
+`+ - * / %`, `== != < <= > >=`, `&& || !`, `??`, `a ? b : c`, parentheses and a fixed set of functions
+(`upper lower trim len default round number join first last replace contains split`). A placeholder made
+only of path characters is a path (so `price-1` is a path and `price - 1` a subtraction). A template that
+is exactly one placeholder yields the raw value (a list stays a list). Templates never execute code: the
+expression is parsed into a tree and walked, paths read own properties of plain data only, a function
+value reads as missing, and nesting and length are bounded.
 
 `target` is a template that renders to a live element or to a selector string, so an interaction can land
 on the element a `forEach` over `selector` is visiting.

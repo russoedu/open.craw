@@ -212,8 +212,35 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 lists (`{{item.images[0]}}`). A template that is **exactly one placeholder** yields the value with its type
 (a list stays a list); inside longer text values are stringified, missing ones as empty text.
 
-Truthiness for `when` and `until`: `false`, `0`, `""`, `"false"`, `"0"`, `"null"`, `null`, `undefined` and
-an empty list are false; everything else is true.
+A placeholder may also be an **expression** over such paths:
+
+| Kind | Syntax |
+|---|---|
+| literals | `12`, `1.5`, `'text'`, `"text"`, `true`, `false`, `null` |
+| arithmetic | `+ - * / %`, parentheses. `+` adds two numbers and concatenates anything else (`'p-' + id`). Division by zero and arithmetic on non-numbers give a missing value. Numeric text counts as a number (`qty * price` with `qty` = `"3"`). |
+| comparison | `== != < <= > >=`. `==` is loose (`3 == '3'`, `null == missing`); ordering is numeric when both sides are numbers, else textual. |
+| logic | `&& || !` with recipe truthiness (below); `a ?? b` gives `b` only when `a` is missing (`null` / undefined) |
+| choice | `test ? a : b` |
+| functions | `upper(s)`, `lower(s)`, `trim(s)`, `len(list or text)`, `default(v, fallback)` (missing or blank), `round(n, digits?)`, `number(text)`, `join(list, sep?)`, `first(list)`, `last(list)`, `replace(s, pattern, replacement)` (a regular expression, global), `contains(list or text, needle)`, `split(text, sep?)` |
+
+```json
+{ "type": "set", "id": "next_url", "value": "{{ start.url }}?page={{ page.number + 1 }}" },
+{ "type": "set", "id": "label", "value": "{{ stock > 0 ? 'in stock' : 'sold out' }}" },
+{ "type": "if", "test": "{{ len(links) > 0 && !wall }}", "steps": [] }
+```
+
+Rules that keep this safe and predictable:
+
+- A placeholder made only of path characters (`item.display-name`, `ld.@type`, `price-1`) is a **path**,
+  never an expression: write `{{ price - 1 }}` with spaces for subtraction.
+- Expressions never run code. There is no member call, no `new`, no assignment; a value that is a function
+  (a hook could bind one) reads as missing, and paths read own data only, so `constructor`, `__proto__`,
+  `toString` and the like are missing too. Unknown functions and stray characters fail at parse time with
+  the position.
+- Deep nesting and very long expressions are refused (64 levels, 512 tokens).
+
+Truthiness for `when`, `until`, `test` and the logical operators: `false`, `0`, `""`, `"false"`, `"0"`,
+`"null"`, `null`, `undefined` and an empty list are false; everything else is true.
 
 ### 3.5 Scope: what a step can see
 
