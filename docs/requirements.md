@@ -40,7 +40,7 @@ a `hook` step or a `hook` transform. That is the only extension point: recipes s
 | `start` | One or more `{ url, vars? }`; each start point runs the whole step list. |
 | `vars` | Recipe-level variables, read in templates as `{{vars.name}}`. |
 | `session` | Headers, cookies, user agent, viewport, a saved `storageStatePath`, or a `bootstrap`. |
-| `limits` | `maxRecords`, `delayMs` (before every `goto` / `request`), `timeoutMs`, `concurrency` (reserved, `1`). |
+| `limits` | `maxRecords` (exact, whatever is in flight), `delayMs` (minimum interval between request starts across the recipe), `timeoutMs`, `concurrency` (`forEach` iterations in flight, api mode; default `1`). |
 | `onError` | Default step policy: `fail`, `skip`, or `retry { attempts, backoffMs }`. |
 | `steps` | The acquisition recipe (section 2.2). |
 | `mapping` | Output field path -> mapping rule (section 4). |
@@ -110,7 +110,14 @@ every use, so a page that re-renders after each interaction (a configurator) sti
   ids bound in a branch are visible after it. The engine reports the branch taken as a `step:branch` event.
 - **One emitting construct per path**: an emitting `forEach` may not contain another emitting `forEach` or
   an `emit`. The two branches of an `if` are separate paths. `emit` snapshots the whole scope chain, child values shadowing parents.
-- `limits.maxRecords` stops the walk cleanly once reached.
+- `limits.maxRecords` stops the walk cleanly once reached. Emits are serialised, so the count is exact under
+  concurrency; iterations in flight finish without emitting.
+- **Concurrency** is one gate per recipe run: `concurrency` permits shared by every `forEach` in it (the
+  outermost concurrent loop takes them; a loop inside one of its iterations runs sequentially) plus one
+  throttle (`delayMs` between request starts). Web mode is always sequential: one page.
+- **Resume**: with `CrawlOptions.resume` the engine asks the sink `has(key)` for each mapped record and
+  skips the ones it has (`record:skipped`, counted as `skipped`). `jsonLinesSink(path, { append: true })`
+  writes `_key` per line and reads the keys back on open.
 
 ## 3. Output recipe (`OutputRecipe`)
 

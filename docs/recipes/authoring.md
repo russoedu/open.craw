@@ -119,7 +119,7 @@ fields is never de-duplicated. Duplicates are reported (`record:duplicate`) and 
 | `start` | One or more start points `{ url, vars? }`. Each runs the whole step list from a fresh scope with `start.url` and its `vars`. |
 | `vars` | Values templates read as `{{vars.name}}`. Start-point `vars` override recipe `vars`. |
 | `session` | §2.2. |
-| `limits` | `maxRecords` stops the walk after that many records. `delayMs` is waited before every `goto` and every `request`. `timeoutMs` bounds navigations and requests. `concurrency` is reserved (`1`). |
+| `limits` | `maxRecords` stops the walk after that many records, exactly, whatever runs in parallel. `delayMs` is the minimum interval between two request starts across the recipe. `timeoutMs` bounds navigations and requests. `concurrency` (default `1`) is how many `forEach` iterations may run at once in `api` mode (§3.9). |
 | `onError` | The default policy for every step. §7. |
 | `steps` | The acquisition recipe. §3. |
 | `mapping` | Output field → mapping rule. §5. |
@@ -316,6 +316,22 @@ list is the clean way to test for presence. Both branches run in the scope of th
 value set in `steps` or `else` is visible to the steps after it, and each branch may bind the same id (they
 never both run). A branch may `emit`; the one-emit-per-path rule treats the branches as separate paths.
 The trace shows the branch taken as `⑂ steps.N  then`.
+
+### 3.9 Concurrency
+
+`limits.concurrency: 3` lets a `forEach` run three iterations at once: a listing whose body fetches every
+item's page fans out, three requests in flight, and records come out in completion order rather than list
+order. Rules:
+
+- **api mode only**. A web recipe drives one browser page, so it stays sequential whatever the limit says.
+- The limit is **per recipe run**, not per loop: nested loops share it. The outermost concurrent loop takes
+  the permits; a loop inside one of its iterations runs its body sequentially, so nesting never multiplies
+  the number of requests in flight.
+- `delayMs` is a **rate**, not a per-request pause: the minimum time between two request starts across
+  every iteration. `concurrency: 4, delayMs: 250` means at most four requests per second, in flight or not.
+- `maxRecords` is exact: once reached, iterations still in flight finish but emit nothing more.
+- A failing step under the `fail` policy stops new iterations; the ones in flight settle, then the recipe
+  fails as usual.
 
 ---
 
@@ -535,14 +551,28 @@ JSON path) and then **binds** the inputs to the output (`RecipeBindingError`): e
 output field, every `from` starts with a known id, required fields are covered, web steps stay in web
 recipes, `next.selector` only in web mode, one emitting construct per path.
 
-The report gives, per recipe: `emitted`, `rejected`, `duplicates`, `pages`, `durationMs`, and `error` when
-the recipe stopped. The sink summary says how many records were written and where.
+The report gives, per recipe: `emitted`, `rejected`, `duplicates`, `skipped`, `pages`, `durationMs`, and
+`error` when the recipe stopped. The sink summary says how many records were written and where.
+
+**Resuming.** A long crawl that dies halfway does not have to start over. Open the sink in append mode and
+ask the crawler to resume:
+
+```ts
+const crawler = createCrawler({ sink: jsonLinesSink('out/movies.jsonl', { append: true }), resume: true })
+```
+
+In append mode every line carries the record key as `_key`, and `open` reads the keys already in the file.
+With `resume`, a record whose key the sink has is not written again: it is counted as `skipped` and
+reported as `record:skipped`. The steps still run (the engine has to reach the record to know its key), so
+a resumed run costs the requests but not the duplicates. Any sink can support this by implementing `has(key)`;
+`memorySink` does. `resume` with a sink that cannot answer throws at `createCrawler`.
 
 ### 8.1 Events and the trace
 
 Everything the engine does is an event: `recipe:start` / `recipe:finish`, `page:visit`, `step:start` /
 `step:finish` / `step:retry` / `step:skip` (with the step type, its id and its path such as
-`steps.8.steps.2`), `record:emit` / `record:reject` / `record:duplicate`, `warning`, `error`. `traceLine`
+`steps.8.steps.2`), `step:branch`, `record:emit` / `record:reject` / `record:duplicate` / `record:skipped`,
+`warning`, `error`. `traceLine`
 turns an event into one indented line, so a recipe's route reads as a tree:
 
 ```text
