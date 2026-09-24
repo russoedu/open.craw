@@ -25,6 +25,8 @@ export function traceLine (event: CrawlEvent): string | undefined {
     }
     case 'step:skip': { return `${indent(depthOf(event.path))}↷ ${stepLabel(event)}  skipped: ${event.error}`
     }
+    case 'step:branch': { return `${indent(depthOf(event.path))}⑂ ${event.path}  ${event.branch}`
+    }
     case 'record:emit': { return `${indent(1)}✚ record ${event.key ?? '(no key)'}`
     }
     case 'record:reject': { return `${indent(1)}✖ record rejected: ${event.field}: ${event.reason}`
@@ -38,9 +40,9 @@ export function traceLine (event: CrawlEvent): string | undefined {
   }
 }
 
-/** How deep a step path such as `steps.8.steps.2` sits: one level per nested `steps`. */
+/** How deep a step path such as `steps.8.steps.2` or `steps.1.else.0` sits: one level per nested `steps` or `else`. */
 export function depthOf (path: string): number {
-  return path.split('.').filter(segment => segment === 'steps').length
+  return path.split('.').filter(segment => ['steps', 'else'].includes(segment)).length
 }
 
 function stepLabel (event: { stepType: string, stepId?: string, path: string }): string {

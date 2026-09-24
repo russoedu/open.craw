@@ -182,4 +182,28 @@ describe('runSteps', () => {
     const runner = fakeRunner({})
     await expect(run([{ type: 'forEach', selector: 'option', as: 'o', steps: [] }], runner)).rejects.toThrow('needs a browser')
   })
+
+  it('runs the then or else branch of an if in the same scope', async () => {
+    const runner = fakeRunner({})
+    const steps: Step[] = [
+      { type: 'set', id: 'wall', value: 'yes' },
+      { type: 'if', test: '{{wall}}', steps: [{ type: 'set', id: 'took', value: 'then' }], else: [{ type: 'set', id: 'took', value: 'else' }] },
+      { type: 'if', test: '{{missing}}', steps: [{ type: 'set', id: 'other', value: 'then' }] },
+      { type: 'if', test: '{{missing}}', steps: [], else: [{ type: 'set', id: 'fallback', value: 'else' }, { type: 'emit' }] },
+    ]
+    const { emitted, events, outcome } = await run(steps, runner)
+    expect(outcome).toBe('continue')
+    expect(emitted[0]).toMatchObject({ wall: 'yes', took: 'then', fallback: 'else' })
+    expect(emitted[0].other).toBeUndefined()
+    expect(events.filter(event => event.type === 'step:branch').map(event => event.type === 'step:branch' && [event.path, event.branch])).toEqual([['steps.1', 'then'], ['steps.2', 'else'], ['steps.3', 'else']])
+    expect(events.filter(event => event.type === 'step:finish').map(event => event.type === 'step:finish' && event.path)).toContain('steps.3.else.0')
+  })
+
+  it('propagates stop out of a branch', async () => {
+    const runner = fakeRunner({})
+    const steps: Step[] = [{ type: 'if', test: 'go', steps: [{ type: 'emit' }] }, { type: 'set', id: 'after', value: 1 }]
+    const { emitted, outcome } = await run(steps, runner, { limit: 1 })
+    expect(outcome).toBe('stop')
+    expect(emitted).toHaveLength(1)
+  })
 })

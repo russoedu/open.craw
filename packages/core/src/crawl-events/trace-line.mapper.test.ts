@@ -10,6 +10,10 @@ describe('traceLine', () => {
     expect(traceLine({ type: 'step:start', at, recipeId: 'r', stepType: 'goto', path: 'steps.0' })).toBeUndefined()
   })
 
+  it('shows which branch an if took', () => {
+    expect(traceLine({ type: 'step:branch', at, recipeId: 'r', path: 'steps.1', branch: 'then' })).toBe('  ⑂ steps.1  then')
+  })
+
   it('shows pages, records and the recipe summary', () => {
     expect(traceLine({ type: 'recipe:start', at, recipeId: 'tmdb', mode: 'api' })).toBe('▶ tmdb (api)')
     expect(traceLine({ type: 'page:visit', at, recipeId: 'r', url: 'https://x/p', number: 2 })).toBe('  ⇢ page 2  https://x/p')
@@ -23,5 +27,7 @@ describe('traceLine', () => {
     expect(depthOf('steps.0')).toBe(1)
     expect(depthOf('steps.8.steps.2')).toBe(2)
     expect(depthOf('session.bootstrap.steps.1')).toBe(1)
+    expect(depthOf('steps.1.steps.0')).toBe(2)
+    expect(depthOf('steps.1.else.0.steps.3')).toBe(3)
   })
 })

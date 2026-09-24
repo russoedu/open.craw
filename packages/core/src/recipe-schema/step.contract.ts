@@ -58,13 +58,15 @@ export interface ExtractStep extends StepBaseFields {
 export interface SetStep extends StepBaseFields { type: 'set', value: unknown }
 /** Runs a body per item of a list (`over`) or per live element matching `selector` (web mode; the elements are re-resolved on every use). */
 export interface ForEachStep extends StepBaseFields { type: 'forEach', over?: string, selector?: string, as: string, steps: Step[], emit?: true | { output: string } }
+/** Runs `steps` when `test` renders truthy, else `else`; both in the current scope. */
+export interface IfStep extends StepBaseFields { type: 'if', test: string, steps: Step[], else?: Step[] }
 export interface PaginateStep extends StepBaseFields { type: 'paginate', next: PaginateNext, until?: string, maxPages?: number, steps: Step[] }
 export interface EmitStep extends StepBaseFields { type: 'emit', output?: string }
 export interface HookStep extends StepBaseFields { type: 'hook', name: string, args?: Record<string, unknown> }
 
 export type Step =
   | GotoStep | ClickStep | FillStep | PressStep | SelectStep | ScrollStep | WaitStep | EvaluateStep | ScreenshotStep |
-  RequestStep | ExtractStep | SetStep | ForEachStep | PaginateStep | EmitStep | HookStep
+  RequestStep | ExtractStep | SetStep | ForEachStep | IfStep | PaginateStep | EmitStep | HookStep
 
 export type StepType = Step['type']
 
@@ -129,6 +131,7 @@ const emitFlag = z.union([z.literal(true), z.strictObject({ output: z.string().m
 const steps = z.lazy(() => z.array(stepSchema))
 const forEachStep = z.strictObject({ ...base, type: z.literal('forEach'), over: stepId.optional(), selector: z.string().min(1).optional(), as: stepId, steps, emit: emitFlag.optional() })
   .refine(step => (step.over === undefined) !== (step.selector === undefined), 'give exactly one of over (a list id) or selector (live elements)')
+const ifStep = z.strictObject({ ...base, type: z.literal('if'), test: z.string().min(1), steps, else: steps.optional() })
 const paginateStep = z.strictObject({
   ...base,
   type:     z.literal('paginate'),
@@ -140,5 +143,5 @@ const paginateStep = z.strictObject({
 
 export const stepSchema: z.ZodType<Step> = z.discriminatedUnion('type', [
   gotoStep, clickStep, fillStep, pressStep, selectStep, scrollStep, waitStep, evaluateStep, screenshotStep,
-  requestStep, extractStep, assignStep, emitStep, hookStep, forEachStep, paginateStep,
+  requestStep, extractStep, assignStep, emitStep, hookStep, forEachStep, ifStep, paginateStep,
 ])

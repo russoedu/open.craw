@@ -52,11 +52,15 @@ function variantMoney (price: string): string {
   return money(Number(integer), cents)
 }
 
-function catalogHtml (page: number): string {
+/** Shown on the catalog until accepted; the click sets a cookie and removes it in place, no navigation. */
+const CONSENT = `<div id="consent"><p>Cookies?</p><button id="accept">Accept</button></div>
+<script>document.getElementById('accept').addEventListener('click', () => { document.cookie = 'consent=yes; Path=/'; document.getElementById('consent').remove() })</script>`
+
+function catalogHtml (page: number, consented: boolean): string {
   const links = idsOn(page).map(id => `<a class="product" href="/product/${id}">Product ${id}</a>`).join('\n')
   const next = page < PAGES ? `<a class="next" href="/catalog?page=${page + 1}">next</a>` : ''
 
-  return `<!doctype html><html lang="en"><head><title>Catalog ${page}</title></head><body><h1>Catalog page ${page}</h1>${links}${next}</body></html>`
+  return `<!doctype html><html lang="en"><head><title>Catalog ${page}</title></head><body>${consented ? '' : CONSENT}<h1>Catalog page ${page}</h1>${links}${next}</body></html>`
 }
 
 function productHtml (item: Product): string {
@@ -98,7 +102,7 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
   if (url.pathname === '/catalog') {
     if (page < 1 || page > PAGES) return html('<!doctype html><html lang="en"><body>gone</body></html>', 404)
 
-    return html(catalogHtml(page))
+    return html(catalogHtml(page, (incoming.headers.cookie ?? '').includes('consent=yes')))
   }
   if (url.pathname.startsWith('/product/')) {
     const id = Number(url.pathname.slice('/product/'.length))

@@ -14,6 +14,7 @@ export type CrawlEvent =
   (Base & { type: 'step:finish', stepType: string, stepId?: string, path: string, durationMs: number }) |
   (Base & { type: 'step:retry', stepType: string, stepId?: string, path: string, attempt: number, error: string }) |
   (Base & { type: 'step:skip', stepType: string, stepId?: string, path: string, error: string }) |
+  (Base & { type: 'step:branch', path: string, branch: 'then' | 'else' }) |
   (Base & { type: 'record:emit', url: string, key: string | null, data: Record<string, unknown> }) |
   (Base & { type: 'record:reject', url: string, field: string, reason: string }) |
   (Base & { type: 'record:duplicate', url: string, key: string }) |

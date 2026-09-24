@@ -28,6 +28,8 @@ describe('web recipe (real chromium)', () => {
       }).sort((a, b) => String(a.url).localeCompare(String(b.url)))
       expect(records).toEqual(expectedRecords())
       expect(events.filter(event => event.type === 'step:skip')).toHaveLength(3)
+      // the consent wall is up on the first catalog page only; the cookie set by the click hides it on pages 2 and 3
+      expect(events.flatMap(event => (event.type === 'step:branch' ? [event.branch] : []))).toEqual(['then', 'else', 'else'])
     } finally {
       await crawler.close()
     }

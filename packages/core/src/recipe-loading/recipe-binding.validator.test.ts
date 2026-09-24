@@ -104,4 +104,20 @@ describe('fieldAt', () => {
     ]))
     expect(messages({ ...web, steps: [loop], mapping: { url: { from: 'page.url' }, title: { from: 'o.text' }, price: { from: 'o.attrs.value' } } })).toEqual([])
   })
+
+  it('walks both branches of an if: ids stay known, branches do not conflict, mode rules apply', () => {
+    const decide: InputRecipe['steps'][number] = {
+      type:  'if',
+      test:  '{{wall}}',
+      steps: [{ type: 'click', selector: '#accept' }, { type: 'set', id: 'seen', value: 'yes' }],
+      else:  [{ type: 'set', id: 'seen', value: 'no' }, { type: 'emit' }],
+    }
+    const mapping = { url: { from: 'page.url' }, title: { from: 'seen' }, price: { from: 'seen' } }
+    expect(messages({ ...web, steps: [{ type: 'set', id: 'wall', value: '' }, decide, { type: 'emit' }], mapping })).toEqual([])
+    expect(messages({ ...api, steps: [decide], mapping })).toEqual(expect.arrayContaining([
+      'steps.0.steps.0: "click" needs a browser; this recipe runs in api mode (use session.bootstrap for browser steps)',
+    ]))
+    const nested: InputRecipe['steps'][number] = { type: 'forEach', over: 'wall', as: 'w', emit: true, steps: [decide] }
+    expect(messages({ ...web, steps: [{ type: 'set', id: 'wall', value: '' }, nested], mapping })).toContain('steps.1.steps.0.else.1: inside an emitting forEach; only one emit per path')
+  })
 })

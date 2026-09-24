@@ -8,6 +8,8 @@
   "steps": [
     { "type": "goto", "url": "{{start.url}}" },
     { "type": "paginate", "next": { "selector": "a.next" }, "maxPages": 3, "steps": [
+      { "type": "extract", "id": "wall", "selector": "#consent", "kind": "css", "take": "html", "many": true },
+      { "type": "if", "test": "{{wall}}", "steps": [{ "type": "click", "selector": "#accept" }] },
       { "type": "extract", "id": "links", "selector": "a.product", "kind": "css", "take": "attr:href", "many": true },
       { "type": "forEach", "over": "links", "as": "link", "emit": true, "steps": [
         { "type": "goto", "url": "{{link}}" },

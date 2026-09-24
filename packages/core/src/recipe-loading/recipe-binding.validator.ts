@@ -19,7 +19,8 @@ const API_ONLY = new Set<string>(API_ONLY_STEPS)
  * - step ids are unique along any path;
  * - web-only steps appear only in web recipes or inside a bootstrap, api-only
  *   steps only in api recipes, and `next.selector` only in web mode;
- * - exactly one emitting construct exists on any path.
+ * - exactly one emitting construct exists on any path (the two branches of an
+ *   `if` are separate paths).
  *
  * @param input - A parsed input recipe.
  * @param output - The parsed output recipe it names.
@@ -66,33 +67,51 @@ interface WalkState {
 }
 
 function walkSteps (steps: readonly Step[], path: string, mode: 'web' | 'api', known: Set<string>, report: (path: string, message: string) => void, state: WalkState): void {
-  for (const [index, step] of steps.entries()) {
-    const at = `${path}.${index}`
-    if (mode === 'api' && WEB_ONLY.has(step.type)) report(at, `"${step.type}" needs a browser; this recipe runs in api mode (use session.bootstrap for browser steps)`)
-    if (mode === 'web' && API_ONLY.has(step.type)) report(at, `"${step.type}" is an api step; this recipe runs in web mode`)
-    if (state.bootstrap === true && (step.type === 'emit' || (step.type === 'forEach' && step.emit !== undefined))) report(at, 'a bootstrap produces a session, not records')
-    if (step.id !== undefined) {
-      if (state.ids.has(step.id) || RESERVED.has(step.id)) report(at, `id "${step.id}" is already bound on this path`)
-      state.ids.add(step.id)
-      known.add(step.id)
-    }
-    if (step.type === 'extract' && step.from !== undefined && !known.has(step.from)) report(`${at}.from`, `"${step.from}" is not a known id`)
-    if (step.type === 'forEach') {
+  for (const [index, step] of steps.entries()) walkStep(step, `${path}.${index}`, mode, known, report, state)
+}
+
+function walkStep (step: Step, at: string, mode: 'web' | 'api', known: Set<string>, report: (path: string, message: string) => void, state: WalkState): void {
+  if (mode === 'api' && WEB_ONLY.has(step.type)) report(at, `"${step.type}" needs a browser; this recipe runs in api mode (use session.bootstrap for browser steps)`)
+  if (mode === 'web' && API_ONLY.has(step.type)) report(at, `"${step.type}" is an api step; this recipe runs in web mode`)
+  if (state.bootstrap === true && (step.type === 'emit' || (step.type === 'forEach' && step.emit !== undefined))) report(at, 'a bootstrap produces a session, not records')
+  if (step.id !== undefined) {
+    if (state.ids.has(step.id) || RESERVED.has(step.id)) report(at, `id "${step.id}" is already bound on this path`)
+    state.ids.add(step.id)
+    known.add(step.id)
+  }
+  if (step.type === 'extract' && step.from !== undefined && !known.has(step.from)) report(`${at}.from`, `"${step.from}" is not a known id`)
+  const nested = (): WalkState => ({ ...state, ids: new Set(state.ids) })
+  switch (step.type) {
+    case 'forEach': {
       if (step.over !== undefined && !known.has(step.over)) report(`${at}.over`, `"${step.over}" is not a known id`)
       if (mode === 'api' && step.selector !== undefined) report(`${at}.selector`, 'forEach over selector iterates live elements and needs a browser; use over (a list id) in api mode')
       const emits = step.emit !== undefined
       if (emits && state.emitting) report(at, 'nested inside another emitting construct; only one emit per path')
-      const inner = { ...state, emitting: state.emitting || emits, ids: new Set(state.ids) }
+      const inner = { ...nested(), emitting: state.emitting || emits }
       known.add(step.as)
       inner.ids.add(step.as)
-      walkSteps(step.steps, `${at}.steps`, mode, known, report, inner)
-    } else if (step.type === 'paginate') {
+
+      return walkSteps(step.steps, `${at}.steps`, mode, known, report, inner)
+    }
+    case 'if': {
+      // The branches are exclusive: each sees the ids bound before the `if`, neither sees the other's.
+      walkSteps(step.steps, `${at}.steps`, mode, known, report, nested())
+
+      return walkSteps(step.else ?? [], `${at}.else`, mode, known, report, nested())
+    }
+    case 'paginate': {
       if (mode === 'api' && 'selector' in step.next) report(`${at}.next`, 'next.selector needs a browser; use next.url or next.jsonpath in api mode')
       if (mode === 'web' && 'jsonpath' in step.next) report(`${at}.next`, 'next.jsonpath reads an api document; use next.selector or next.url in web mode')
       if ('jsonpath' in step.next && step.next.as !== undefined) known.add(step.next.as)
-      walkSteps(step.steps, `${at}.steps`, mode, known, report, { ...state, ids: new Set(state.ids) })
-    } else if (step.type === 'emit' && state.emitting) {
-      report(at, 'inside an emitting forEach; only one emit per path')
+
+      return walkSteps(step.steps, `${at}.steps`, mode, known, report, nested())
+    }
+    case 'emit': {
+      if (state.emitting) report(at, 'inside an emitting forEach; only one emit per path')
+
+      return
+    }
+    default: { return
     }
   }
 }

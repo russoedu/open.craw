@@ -29,7 +29,7 @@ export interface StepWalk extends StepWalkOptions {
 }
 
 /**
- * Walks a step list in order. Control flow (`forEach`, `paginate`, `emit`,
+ * Walks a step list in order. Control flow (`forEach`, `if`, `paginate`, `emit`,
  * `set`, `hook`, `when`, error policies) is handled here; leaf steps go to the
  * runner. Mode-agnostic: the same walk drives a browser page or an HTTP context.
  *
@@ -84,6 +84,13 @@ async function runWithPolicy (step: Step, scope: ExtractionScope, walk: StepWalk
 async function runOne (step: Step, scope: ExtractionScope, walk: StepWalk): Promise<EmitOutcome> {
   switch (step.type) {
     case 'forEach': { return runForEach(step, scope, walk)
+    }
+    case 'if': {
+      const branch = isTruthy(render(step.test, lookupIn(scope))) ? 'then' : 'else'
+      walk.events.emit({ type: 'step:branch', recipeId: walk.recipe.id, path: walk.path, branch })
+      const chosen = branch === 'then' ? step.steps : (step.else ?? [])
+
+      return walk.runSteps(chosen, scope, `${walk.path}.${branch === 'then' ? 'steps' : 'else'}`)
     }
     case 'paginate': { return runPaginate(step, scope, walk)
     }
