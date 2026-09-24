@@ -1,0 +1,21 @@
+# Browser end-to-end tests for @open.craw/core. Kept out of ci.yml on purpose:
+# that file is owned and rewritten by `mnci upgrade`, this one is ours.
+name: e2e
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run core:e2e

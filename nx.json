@@ -1,0 +1,125 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "namedInputs": {
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals"
+    ],
+    "production": [
+      "default",
+      "!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)",
+      "!{projectRoot}/tsconfig.spec.json",
+      "!{projectRoot}/jest.config.[jt]s",
+      "!{projectRoot}/src/test-setup.[jt]s",
+      "!{projectRoot}/test-setup.[jt]s"
+    ],
+    "sharedGlobals": [
+      "{workspaceRoot}/eslint.config.mjs",
+      "{workspaceRoot}/tsconfig.base.json",
+      "{workspaceRoot}/package.json"
+    ]
+  },
+  "plugins": [
+    {
+      "plugin": "@nx/js/typescript",
+      "options": {
+        "typecheck": {
+          "targetName": "typecheck"
+        },
+        "build": {
+          "targetName": "build",
+          "configName": "tsconfig.lib.json",
+          "buildDepsName": "build-deps",
+          "watchDepsName": "watch-deps"
+        }
+      }
+    },
+    {
+      "plugin": "@nx/eslint/plugin",
+      "options": {
+        "targetName": "lint"
+      }
+    },
+    {
+      "plugin": "@nx/rollup/plugin",
+      "options": {
+        "buildTargetName": "build",
+        "buildDepsTargetName": "build-deps",
+        "watchDepsTargetName": "watch-deps"
+      }
+    },
+    {
+      "plugin": "@nx/jest/plugin",
+      "options": {
+        "targetName": "test"
+      }
+    }
+  ],
+  "analytics": false,
+  "defaultBase": "main",
+  "release": {
+    "projectsRelationship": "independent",
+    "projects": [
+      "packages/*",
+      "python-packages/*",
+      "!tag:type:go-lib"
+    ],
+    "releaseTag": {
+      "pattern": "{projectName}@{version}"
+    },
+    "git": {
+      "commit": false,
+      "tag": true,
+      "push": true
+    },
+    "version": {
+      "preVersionCommand": "npx nx run-many -t build --projects=packages/*,python-packages/*",
+      "conventionalCommits": true,
+      "fallbackCurrentVersionResolver": "disk"
+    },
+    "changelog": {
+      "workspaceChangelog": false,
+      "projectChangelogs": {
+        "createRelease": "github",
+        "file": false
+      }
+    }
+  },
+  "generators": {
+    "@nx/react:application": {
+      "linter": "none",
+      "unitTestRunner": "jest"
+    },
+    "@nx/react:library": {
+      "linter": "none",
+      "unitTestRunner": "jest"
+    },
+    "@nx/js:library": {
+      "linter": "none",
+      "unitTestRunner": "jest"
+    }
+  },
+  "sync": {
+    "applyChanges": true
+  },
+  "mnci": {
+    "workspaceName": "open.craw",
+    "scope": "@open.craw",
+    "registry": {
+      "kind": "npm"
+    },
+    "agent": "ubuntu-latest",
+    "variableGroup": "Build",
+    "ci": "github",
+    "stack": {
+      "testRunner": "jest"
+    }
+  },
+  "targetDefaults": {
+    "test": {
+      "dependsOn": [
+        "^build"
+      ]
+    }
+  }
+}
