@@ -13,4 +13,6 @@ export interface RecordSink {
   open:  (output: OutputRecipe) => Promise<void>
   write: (record: OutputRecord) => Promise<void>
   close: () => Promise<SinkSummary>
+  /** Whether a record with this key is already there; what a resumed run asks before writing. */
+  has?:  (key: string) => Promise<boolean>
 }

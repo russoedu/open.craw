@@ -3,6 +3,7 @@ import type { CrawlEvent } from '../crawl-events'
 import { ExtractionScope } from '../extraction-scope'
 import { HookRegistry } from '../hooks'
 import type { InputRecipe, PaginateNext, Step } from '../recipe-schema'
+import { RunGate } from './run-gate.policy'
 import { runSteps } from './run-steps.use-case'
 import { StepFailure } from './step-failure.error'
 import type { NextPageResult, StepRunner } from './step-runner.contract'
@@ -45,7 +46,7 @@ function fakeRunner (documents: Record<string, unknown[]>, nextPages: Record<str
   return runner
 }
 
-async function run (steps: Step[], runner: StepRunner, options: { limit?: number, hooks?: HookRegistry, recipe?: InputRecipe } = {}): Promise<{ emitted: Record<string, unknown>[], events: CrawlEvent[], outcome: string }> {
+async function run (steps: Step[], runner: StepRunner, options: { limit?: number, hooks?: HookRegistry, recipe?: InputRecipe, gate?: RunGate } = {}): Promise<{ emitted: Record<string, unknown>[], events: CrawlEvent[], outcome: string }> {
   const emitted: Record<string, unknown>[] = []
   const events: CrawlEvent[] = []
   const scope = new ExtractionScope()
@@ -55,6 +56,7 @@ async function run (steps: Step[], runner: StepRunner, options: { limit?: number
     runner,
     hooks:  options.hooks ?? new HookRegistry(),
     events: new EventBus((event) => { events.push(event) }),
+    gate:   options.gate,
     onEmit: async (emitScope) => {
       emitted.push(emitScope.snapshot())
 
@@ -64,6 +66,8 @@ async function run (steps: Step[], runner: StepRunner, options: { limit?: number
 
   return { emitted, events, outcome }
 }
+
+const loop = (over: string, inner: Step[] = []): Step => ({ type: 'forEach', over, as: 'ms', emit: true, steps: [{ type: 'hook', id: 'waited', name: 'wait', args: { ms: '{{ms}}' } }, ...inner] })
 
 describe('runSteps', () => {
   it('runs forEach in a fresh child scope per item and emits per iteration', async () => {
@@ -205,5 +209,61 @@ describe('runSteps', () => {
     const { emitted, outcome } = await run(steps, runner, { limit: 1 })
     expect(outcome).toBe('stop')
     expect(emitted).toHaveLength(1)
+  })
+
+  describe('with a concurrent gate', () => {
+    const wait = new HookRegistry({
+      wait: async (_input: unknown, args: Record<string, unknown>) => {
+        await new Promise(resolve => setTimeout(resolve, Number(args.ms)))
+
+        return args.ms
+      },
+    })
+    it('runs iterations in parallel up to the permits and emits in completion order', async () => {
+      const started = Date.now()
+      const { emitted } = await run([{ type: 'set', id: 'delays', value: [60, 20, 40] }, loop('delays')], fakeRunner({}), { hooks: wait, gate: new RunGate(3, 0) })
+      expect(emitted.map(snapshot => snapshot.waited)).toEqual([20, 40, 60])
+      expect(Date.now() - started).toBeLessThan(150)
+      const sequential = await run([{ type: 'set', id: 'delays', value: [30, 10, 20] }, loop('delays')], fakeRunner({}), { hooks: wait, gate: new RunGate(1, 0) })
+      expect(sequential.emitted.map(snapshot => snapshot.waited)).toEqual([30, 10, 20])
+    })
+
+    it('stops starting iterations once the emit callback says stop, and lets the running ones finish', async () => {
+      const gate = new RunGate(2, 0)
+      const { emitted, outcome, events } = await run([{ type: 'set', id: 'delays', value: [10, 10, 10, 10, 10, 10] }, loop('delays')], fakeRunner({}), { hooks: wait, gate, limit: 2 })
+      expect(outcome).toBe('stop')
+      expect(emitted.length).toBeGreaterThanOrEqual(2)
+      expect(events.filter(event => event.type === 'step:finish' && event.stepType === 'hook').length).toBeLessThan(6)
+    })
+
+    it('runs a nested loop sequentially inside a concurrent iteration, sharing the throttle', async () => {
+      const gate = new RunGate(2, 0)
+      const steps: Step[] = [
+        { type: 'set', id: 'outer', value: [1, 2] },
+        {
+          type:  'forEach',
+          over:  'outer',
+          as:    'o',
+          steps: [
+            { type: 'set', id: 'inner', value: [10, 5] },
+            { type: 'forEach', over: 'inner', as: 'ms', emit: true, steps: [{ type: 'hook', id: 'waited', name: 'wait', args: { ms: '{{ms}}' } }] },
+          ],
+        },
+      ]
+      const { emitted } = await run(steps, fakeRunner({}), { hooks: wait, gate })
+      // the inner list keeps its order within each outer iteration (10 before 5) because it runs sequentially
+      const perOuter: Record<number, number[]> = {}
+      for (const snapshot of emitted) (perOuter[snapshot.o as number] ??= []).push(snapshot.waited as number)
+      expect(Object.values(perOuter)).toEqual([[10, 5], [10, 5]])
+    })
+
+    it('rethrows the first failure after the running iterations settled', async () => {
+      const runner = fakeRunner({ 'http://x/1': [] })
+      const steps: Step[] = [
+        { type: 'set', id: 'items', value: [1, 2, 3] },
+        { type: 'forEach', over: 'items', as: 'i', steps: [{ type: 'extract', id: 'x', selector: 'h1', kind: 'css' }] },
+      ]
+      await expect(run(steps, runner, { gate: new RunGate(3, 0) })).rejects.toThrow(StepFailure)
+    })
   })
 })

@@ -14,7 +14,7 @@ npx playwright install chromium   # web recipes and browser bootstraps only
 | Export | Purpose |
 |---|---|
 | `loadRecipeSet({ output, inputs })` | Reads, validates and binds recipe files (or decoded JSON). Throws `RecipeValidationError` / `RecipeBindingError` with every problem and its JSON path. |
-| `createCrawler(options)` | Builds an engine: `hooks`, `sink` (`memorySink()` default, `jsonLinesSink(path)`), `onEvent`, `browser` settings, `dedupe` (`run` / `recipe` / `off`), `onRecipeError` (`continue` / `stop`). |
+| `createCrawler(options)` | Builds an engine: `hooks`, `sink` (`memorySink()` default, `jsonLinesSink(path, { append? })`), `onEvent`, `browser` settings, `dedupe` (`run` / `recipe` / `off`), `onRecipeError` (`continue` / `stop`), `resume` (skip keys the sink already has). |
 | `crawler.run(set)` | Runs every input recipe in sequence; returns a `CrawlReport`. |
 | `crawler.close()` | Closes the browser, if one was launched. |
 | `parseInputRecipe`, `parseOutputRecipe`, `inputRecipeJsonSchema`, `outputRecipeJsonSchema` | The contracts, for tooling. |

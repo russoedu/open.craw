@@ -22,6 +22,8 @@ export interface Crawler {
  * @returns The crawler.
  */
 export function createCrawler (options: CrawlOptions = {}): Crawler {
+  const sink = options.sink ?? memorySink()
+  if (options.resume === true && sink.has === undefined) throw new Error('resume needs a sink that can tell which keys it has (jsonLinesSink with append, memorySink, or a custom sink with `has`)')
   const hooks = new HookRegistry(options.hooks)
   const events = new EventBus(options.onEvent)
   let browser: Promise<BrowserClient> | undefined
@@ -36,9 +38,10 @@ export function createCrawler (options: CrawlOptions = {}): Crawler {
       browser:         launch,
       hooks,
       events,
-      sink:            options.sink ?? memorySink(),
+      sink,
       dedupe:          new DedupePolicy(options.dedupe),
       storageStateDir: options.storageStateDir,
+      resume:          options.resume === true,
 
       ignoreHTTPSErrors: options.browser?.ignoreHTTPSErrors,
     }, options.onRecipeError ?? 'continue'),

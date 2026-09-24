@@ -8,7 +8,7 @@ interface Base { at: string, recipeId: string }
 
 export type CrawlEvent =
   | (Base & { type: 'recipe:start', mode: 'web' | 'api' }) |
-  (Base & { type: 'recipe:finish', emitted: number, rejected: number, duplicates: number, pages: number, durationMs: number, error?: string }) |
+  (Base & { type: 'recipe:finish', emitted: number, rejected: number, duplicates: number, skipped: number, pages: number, durationMs: number, error?: string }) |
   (Base & { type: 'page:visit', url: string, number: number }) |
   (Base & { type: 'step:start', stepType: string, stepId?: string, path: string }) |
   (Base & { type: 'step:finish', stepType: string, stepId?: string, path: string, durationMs: number }) |
@@ -18,6 +18,8 @@ export type CrawlEvent =
   (Base & { type: 'record:emit', url: string, key: string | null, data: Record<string, unknown> }) |
   (Base & { type: 'record:reject', url: string, field: string, reason: string }) |
   (Base & { type: 'record:duplicate', url: string, key: string }) |
+  /** A resumed run found the key already in the sink. */
+  (Base & { type: 'record:skipped', url: string, key: string }) |
   (Base & { type: 'warning', message: string, meta?: Record<string, unknown> }) |
   (Base & { type: 'error', message: string, meta?: Record<string, unknown> })
 

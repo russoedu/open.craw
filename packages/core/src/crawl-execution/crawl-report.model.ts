@@ -7,6 +7,8 @@ export interface RecipeReport {
   emitted:    number
   rejected:   number
   duplicates: number
+  /** Records a resumed run found in the sink already. */
+  skipped:    number
   pages:      number
   durationMs: number
   /** Set when the recipe stopped on a failure. */

@@ -18,4 +18,9 @@ export interface CrawlOptions {
   onRecipeError?:   'continue' | 'stop'
   /** Base directory for relative `storageStatePath` and `saveTo` values. */
   storageStateDir?: string
+  /**
+   * Skip records whose key the sink already has (`sink.has`), reporting them as
+   * `skipped`. Needs a sink that can answer, such as `jsonLinesSink(path, { append: true })`.
+   */
+  resume?:          boolean
 }

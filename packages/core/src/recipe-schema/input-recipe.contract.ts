@@ -44,11 +44,11 @@ export interface SessionSpec {
 
 export interface CrawlLimits {
   maxRecords?:  number
-  /** Waited before every `goto` and every `request`. */
+  /** Minimum interval between two request starts across the recipe, whatever runs in parallel. */
   delayMs?:     number
   timeoutMs?:   number
-  /** Reserved; v1 runs everything sequentially. */
-  concurrency?: 1
+  /** How many `forEach` iterations may run at once (api mode; a web recipe drives one page). Default 1. */
+  concurrency?: number
 }
 
 /** Where to start, how to navigate, what to extract, and how it maps to one output recipe. */
@@ -106,7 +106,7 @@ const limitsSchema: z.ZodType<CrawlLimits> = z.strictObject({
   maxRecords:  z.int().positive().optional(),
   delayMs:     z.int().nonnegative().optional(),
   timeoutMs:   z.int().positive().optional(),
-  concurrency: z.literal(1).optional(),
+  concurrency: z.int().min(1).max(64).optional(),
 })
 
 export const inputRecipeSchema: z.ZodType<InputRecipe> = z.strictObject({

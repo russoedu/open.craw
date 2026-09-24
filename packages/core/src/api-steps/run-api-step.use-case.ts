@@ -3,6 +3,7 @@ import type { ExtractionScope } from '../extraction-scope'
 import type { HttpSender } from '../http-session'
 import type { InputRecipe, PaginateNext, Step } from '../recipe-schema'
 import { selectJson } from '../selection'
+import { RunGate } from '../step-flow'
 import type { NextPageResult, StepRunner } from '../step-flow'
 import { renderText } from '../template'
 import { extractFromDocument } from './extract-from-document.use-case'
@@ -14,10 +15,11 @@ export class ApiStepRunner implements StepRunner {
     private readonly client: HttpSender & { dispose?: () => Promise<void> },
     private readonly recipe: InputRecipe,
     private readonly events: EventBus,
+    private readonly gate: RunGate = new RunGate(1, recipe.limits?.delayMs ?? 0),
   ) {}
 
   async runLeaf (step: Step, scope: ExtractionScope): Promise<void> {
-    if (step.type === 'request') return sendRequest(step, scope, this.client, this.recipe.limits ?? {}, this.events, this.recipe.id)
+    if (step.type === 'request') return sendRequest(step, scope, this.client, this.recipe.limits ?? {}, this.gate, this.events, this.recipe.id)
     if (step.type === 'extract') return extractFromDocument(step, scope)
     throw new Error(`"${step.type}" needs a browser; this recipe runs in api mode`)
   }

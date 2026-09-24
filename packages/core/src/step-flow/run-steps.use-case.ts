@@ -6,6 +6,7 @@ import { isTruthy, render } from '../template'
 import { runForEach } from './for-each.use-case'
 import { runPaginate } from './paginate.use-case'
 import { backoffFor, resolveErrorPolicy, sleep } from './retry.policy'
+import type { RunGate } from './run-gate.policy'
 import { StepFailure } from './step-failure.error'
 import type { StepRunner } from './step-runner.contract'
 
@@ -20,12 +21,15 @@ export interface StepWalkOptions {
   events: EventBus
   /** Called with the scope to snapshot for each record; `stop` ends the walk. */
   onEmit: (scope: ExtractionScope, output?: string) => Promise<EmitOutcome>
+  /** Bounds concurrency and request rate; absent means sequential and unthrottled. */
+  gate?:  RunGate
 }
 
 /** The walk as the control-flow steps see it: options plus the current path. */
 export interface StepWalk extends StepWalkOptions {
   path:     string
-  runSteps: (steps: readonly Step[], scope: ExtractionScope, path: string) => Promise<EmitOutcome>
+  /** Runs a nested step list; `overrides` replace walk options for that list (a sequential gate inside a concurrent iteration). */
+  runSteps: (steps: readonly Step[], scope: ExtractionScope, path: string, overrides?: Partial<StepWalkOptions>) => Promise<EmitOutcome>
 }
 
 /**
@@ -44,7 +48,7 @@ export async function runSteps (steps: readonly Step[], scope: ExtractionScope, 
   for (const [index, step] of steps.entries()) {
     if (step.when !== undefined && !isTruthy(render(step.when, lookupIn(scope)))) continue
     const at = `${path}.${index}`
-    const walk: StepWalk = { ...options, path: at, runSteps: (inner, innerScope, innerPath) => runSteps(inner, innerScope, options, innerPath) }
+    const walk: StepWalk = { ...options, path: at, runSteps: (inner, innerScope, innerPath, overrides) => runSteps(inner, innerScope, { ...options, ...overrides }, innerPath) }
     const outcome = await runWithPolicy(step, scope, walk)
     if (outcome === 'stop') return 'stop'
   }

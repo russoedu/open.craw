@@ -3,23 +3,24 @@ import type { ExtractionScope } from '../extraction-scope'
 import type { HttpBody, HttpSender } from '../http-session'
 import type { CrawlLimits, RequestStep } from '../recipe-schema'
 import { render, renderText } from '../template'
-import { sleep } from '../step-flow'
+import type { RunGate } from '../step-flow'
 
 /**
- * Sends a `request` step: renders its templates, waits `delayMs`, sends, then
+ * Sends a `request` step: renders its templates, waits for the gate's throttle, sends, then
  * binds the response as the scope's current document (and under the step id).
  *
  * @param step - The request step.
  * @param scope - The scope to render in and bind into.
  * @param client - The HTTP sender.
  * @param limits - The recipe's limits.
+ * @param gate - Spaces request starts by `delayMs`.
  * @param events - Where to report the visit.
  * @param recipeId - For events.
  */
-export async function sendRequest (step: RequestStep, scope: ExtractionScope, client: HttpSender, limits: CrawlLimits, events: EventBus, recipeId: string): Promise<void> {
+export async function sendRequest (step: RequestStep, scope: ExtractionScope, client: HttpSender, limits: CrawlLimits, gate: RunGate, events: EventBus, recipeId: string): Promise<void> {
   const lookup = (path: string): unknown => scope.lookup(path)
   const url = resolveUrl(renderText(step.url, lookup), scope.pageState?.url)
-  await sleep(limits.delayMs ?? 0)
+  await gate.throttle()
   const response = await client.send({
     method:    step.method,
     url,

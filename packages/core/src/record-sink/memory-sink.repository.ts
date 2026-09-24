@@ -14,6 +14,7 @@ export function memorySink (): MemorySink {
     records,
     open:  async () => {},
     write: async (record) => { records.push(record) },
+    has:   async key => records.some(record => record.key === key),
     close: async (): Promise<SinkSummary> => ({ written: records.length }),
   }
 }

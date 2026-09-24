@@ -13,7 +13,7 @@ export function traceLine (event: CrawlEvent): string | undefined {
   switch (event.type) {
     case 'recipe:start': { return `▶ ${event.recipeId} (${event.mode})`
     }
-    case 'recipe:finish': { return `■ ${event.recipeId}: ${event.emitted} emitted, ${event.rejected} rejected, ${event.duplicates} duplicates, ${event.pages} pages, ${event.durationMs} ms${event.error === undefined ? '' : `\n  ✖ stopped: ${event.error}`}`
+    case 'recipe:finish': { return `■ ${event.recipeId}: ${event.emitted} emitted, ${event.rejected} rejected, ${event.duplicates} duplicates, ${event.skipped > 0 ? `${event.skipped} skipped, ` : ''}${event.pages} pages, ${event.durationMs} ms${event.error === undefined ? '' : `\n  ✖ stopped: ${event.error}`}`
     }
     case 'page:visit': { return `${indent(1)}⇢ page ${event.number}  ${event.url}`
     }
@@ -32,6 +32,8 @@ export function traceLine (event: CrawlEvent): string | undefined {
     case 'record:reject': { return `${indent(1)}✖ record rejected: ${event.field}: ${event.reason}`
     }
     case 'record:duplicate': { return `${indent(1)}≡ duplicate ${event.key}`
+    }
+    case 'record:skipped': { return `${indent(1)}⤼ skipped ${event.key}`
     }
     case 'warning': { return `${indent(1)}! ${event.message}`
     }

@@ -1,0 +1,43 @@
+{
+  "kind": "input",
+  "id": "shop-api-detail",
+  "output": "product",
+  "mode": "api",
+  "vars": { "user": "demo", "pass": "demo" },
+  "start": [{ "url": "http://127.0.0.1:4545/api/products?page=1" }],
+  "limits": { "concurrency": 3, "delayMs": 10 },
+  "session": { "bootstrap": { "keep": ["cookies"], "steps": [
+    { "type": "goto", "url": "http://127.0.0.1:4545/login" },
+    { "type": "fill", "selector": "#user", "value": "{{vars.user}}" },
+    { "type": "fill", "selector": "#pass", "value": "{{vars.pass}}" },
+    { "type": "click", "selector": "button[type=submit]" },
+    { "type": "wait", "selector": "#logged-in" }
+  ]}},
+  "steps": [
+    { "type": "paginate", "next": { "jsonpath": "$.nextPage" }, "steps": [
+      { "type": "request", "id": "list", "url": "{{page.url}}", "as": "json" },
+      { "type": "extract", "id": "items", "from": "list", "selector": "$.items[*]", "kind": "jsonpath", "take": "json", "many": true },
+      { "type": "forEach", "over": "items", "as": "item", "emit": true, "steps": [
+        { "type": "request", "id": "detail", "url": "{{item.url}}", "as": "html" },
+        { "type": "extract", "id": "raw_title", "from": "detail", "selector": "h1", "kind": "css", "take": "text" },
+        { "type": "extract", "id": "raw_price", "from": "detail", "selector": ".price", "kind": "css", "take": "text" },
+        { "type": "extract", "id": "imgs", "from": "detail", "selector": "img.gallery", "kind": "css", "take": "attr:src", "many": true },
+        { "type": "extract", "id": "stock", "from": "detail", "selector": ".stock", "kind": "css", "take": "text", "onError": { "policy": "skip" } },
+        { "type": "extract", "id": "variant_rows", "from": "detail", "selector": "table.variants tr", "kind": "css", "take": "html", "many": true },
+        { "type": "extract", "id": "seller", "from": "detail", "selector": ".seller", "kind": "css", "take": "text" }
+      ]}
+    ]}
+  ],
+  "mapping": {
+    "url": { "from": "item.url" },
+    "title": { "from": "raw_title", "transform": [{ "op": "trim" }] },
+    "price": { "from": "raw_price", "transform": [{ "op": "regex", "pattern": "([\\d.,]+)" }, { "op": "currency", "locale": "de-DE" }] },
+    "inStock": { "from": "stock", "transform": [{ "op": "boolean", "truthy": ["in stock", "available"] }] },
+    "images": { "from": "imgs", "transform": [{ "op": "absoluteUrl" }, { "op": "unique" }] },
+    "variants": { "each": "variant_rows", "fields": {
+      "size": { "from": ".", "transform": [{ "op": "regex", "pattern": "<td class=\"size\">([^<]+)" }] },
+      "price": { "from": ".", "transform": [{ "op": "regex", "pattern": "<td class=\"price\">([^<]+)" }, { "op": "currency", "locale": "de-DE" }] }
+    }},
+    "seller.name": { "from": "seller", "transform": [{ "op": "trim" }] }
+  }
+}

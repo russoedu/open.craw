@@ -3,6 +3,7 @@ import type { BrowserSession } from '../browser-session'
 import type { EventBus } from '../crawl-events'
 import type { ExtractionScope, LiveElement } from '../extraction-scope'
 import type { InputRecipe, PaginateNext, Step } from '../recipe-schema'
+import { RunGate } from '../step-flow'
 import type { NextPageResult, StepRunner } from '../step-flow'
 import { renderText } from '../template'
 import { evaluateScript } from './evaluate-script.use-case'
@@ -21,6 +22,7 @@ export class WebStepRunner implements StepRunner {
     private readonly session: BrowserSession,
     private readonly recipe: InputRecipe,
     private readonly events: EventBus,
+    private readonly gate: RunGate = new RunGate(1, recipe.limits?.delayMs ?? 0),
   ) {
     this.page = session.page
   }
@@ -34,7 +36,7 @@ export class WebStepRunner implements StepRunner {
   async runLeaf (step: Step, scope: ExtractionScope): Promise<void> {
     const limits = this.recipe.limits ?? {}
     switch (step.type) {
-      case 'goto': { return navigate(step, this.page, scope, limits, this.events, this.recipe.id)
+      case 'goto': { return navigate(step, this.page, scope, limits, this.gate, this.events, this.recipe.id)
       }
       case 'click': { await click(step, this.page, scope); break
       }
@@ -65,7 +67,7 @@ export class WebStepRunner implements StepRunner {
     if ('url' in next) {
       const target = renderText(next.url, path => scope.lookup(path))
       if (target === '') return null
-      await navigate({ type: 'goto', url: target }, this.page, scope, this.recipe.limits ?? {}, this.events, this.recipe.id)
+      await navigate({ type: 'goto', url: target }, this.page, scope, this.recipe.limits ?? {}, this.gate, this.events, this.recipe.id)
 
       return { kind: 'url', url: this.page.url() }
     }
