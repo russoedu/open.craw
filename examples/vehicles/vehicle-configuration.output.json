@@ -1,0 +1,24 @@
+{
+  "$schema": "../../packages/core/schemas/output-recipe.schema.json",
+  "kind": "output",
+  "id": "vehicle-configuration",
+  "version": 1,
+  "description": "One buyable configuration of one vehicle model as a manufacturer's UK site offers it: version, trim, price, powertrain, body facts and the colours it can be had in.",
+  "onMissing": "null",
+  "fields": {
+    "make": { "type": "string", "required": true, "key": true },
+    "model": { "type": "string", "required": true, "key": true },
+    "version": { "type": "string", "required": true, "key": true, "description": "The version as the site names it, e.g. 'BYD SEAL 2026' or 'Air SR 58.3kWh 201bhp 1-Speed Auto (FWD)'." },
+    "trim": { "type": "string", "required": true, "key": true, "description": "The trim level: Design, Excellence, Air, GT-Line..." },
+    "configuration": { "type": "string", "nullable": true, "key": true, "description": "The option combination this price is for (colour / interior / wheels), when the site prices combinations." },
+    "price": { "type": "currency", "currency": "GBP", "required": true, "description": "On-the-road price." },
+    "engine": { "type": "string", "nullable": true, "description": "Motor or engine description: power, battery, gearbox, drive." },
+    "fuel": { "type": "enum", "values": ["Electric", "Petrol", "Diesel", "Hybrid", "Plug-in Hybrid"], "required": true },
+    "doors": { "type": "integer", "nullable": true, "min": 2, "max": 6 },
+    "bootVolumeLitres": { "type": "integer", "nullable": true, "min": 50, "max": 3000 },
+    "colours": { "type": "array", "items": { "type": "string" }, "required": true, "minLength": 1, "description": "Every exterior colour available for this version." },
+    "source": { "type": "string", "generated": "recipeId" },
+    "url": { "type": "url", "generated": "sourceUrl" },
+    "scrapedAt": { "type": "datetime", "generated": "now" }
+  }
+}
