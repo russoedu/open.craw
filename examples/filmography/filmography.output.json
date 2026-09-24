@@ -1,0 +1,18 @@
+{
+  "$schema": "../../packages/core/schemas/output-recipe.schema.json",
+  "kind": "output",
+  "id": "filmography",
+  "version": 1,
+  "description": "One film per record from the filmography of the lead actor of an entry movie: who, what, when, as whom.",
+  "fields": {
+    "actor": { "type": "string", "required": true, "key": true },
+    "title": { "type": "string", "required": true, "key": true },
+    "year": { "type": "integer", "nullable": true, "min": 1880, "max": 2100 },
+    "role": { "type": "string", "nullable": true },
+    "entryMovie": { "type": "string", "required": true },
+    "filmUrl": { "type": "url", "required": true },
+    "source": { "type": "string", "generated": "recipeId", "key": true },
+    "url": { "type": "url", "generated": "sourceUrl" },
+    "scrapedAt": { "type": "datetime", "generated": "now" }
+  }
+}
