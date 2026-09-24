@@ -60,9 +60,10 @@ optional `when` template that must render truthy for the step to run.
 | Step | Mode | Produces | Fields |
 |---|---|---|---|
 | `goto` | web | – | `url` (template), `waitUntil?` |
-| `click` | web | – | `selector`, `optional?` |
-| `fill` | web | – | `selector`, `value` (template) |
-| `press` | web | – | `key`, `selector?` |
+| `click` | web | – | `selector` or `target`, `optional?` |
+| `fill` | web | – | `selector` or `target`, `value` (template) |
+| `press` | web | – | `key`, `selector?` or `target?` |
+| `select` | web | – | `selector` or `target`, one of `value`, `label`, `index` |
 | `scroll` | web | – | `to: 'bottom' \| selector`, `times?`, `untilStable?` |
 | `wait` | web | – | one of `selector`, `ms`, `state: 'networkidle'` |
 | `evaluate` | web | value | `script`, JavaScript run in the page. Trusted recipes only. |
@@ -70,7 +71,7 @@ optional `when` template that must render truthy for the step to run.
 | `request` | api | document | `method?`, `url`, `query?`, `headers?`, `body?`, `as: 'json' \| 'html' \| 'text'` |
 | `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex'`, `take`, `many?`, `from?` |
 | `set` | both | value | `value` (template or literal) |
-| `forEach` | both | – | `over` (a list id), `as` (variable), `steps`, `emit?: true \| { output }` |
+| `forEach` | both | – | `over` (a list id) or `selector` (web: live elements), `as` (variable), `steps`, `emit?: true \| { output }` |
 | `paginate` | both | – | `next`, `until?` (template), `maxPages?`, `steps` |
 | `emit` | both | record | `output?` |
 | `hook` | both | value | `name`, `args?` |
@@ -82,6 +83,14 @@ texts becomes the array of its parsable entries (the JSON-LD blocks of a page), 
 **Templates** are `{{path}}` placeholders resolved against the scope: any id, the current `forEach` variable,
 `vars.*`, `start.url`, `page.url`, `page.number`. A template that is exactly one placeholder yields the raw
 value (a list stays a list). Templates never execute code.
+
+`target` is a template that renders to a live element or to a selector string, so an interaction can land
+on the element a `forEach` over `selector` is visiting.
+
+**Live elements.** `forEach` with `selector` (web mode only) snapshots every matching element once, when
+the loop starts, as `{ selector, index, text, html, attrs, value? }`, and binds one snapshot per iteration
+under `as`. The engine keeps no element handle: `target` re-resolves the element by selector and index on
+every use, so a page that re-renders after each interaction (a configurator) still iterates correctly.
 
 ### 2.3 Scope and pagination rules
 

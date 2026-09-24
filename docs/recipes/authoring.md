@@ -173,15 +173,19 @@ Every step has `type`, and may have:
 | Step | Fields | Notes |
 |---|---|---|
 | `goto` | `url` (template), `waitUntil?` (`load`, `domcontentloaded`, `networkidle`, `commit`) | Relative URLs resolve against the current page. Records `page.url`. |
-| `click` | `selector`, `optional?` | First match. With `optional: true` a missing element is skipped after a 2 s wait. |
-| `fill` | `selector`, `value` (template) | |
-| `press` | `key`, `selector?` | A key on an element, or on the page. |
+| `click` | `selector` or `target`, `optional?` | First match. With `optional: true` a missing element is skipped after a 2 s wait. |
+| `fill` | `selector` or `target`, `value` (template) | |
+| `press` | `key`, `selector?` or `target?` | A key on an element, or on the page. |
+| `select` | `selector` or `target`, one of `value`, `label`, `index` | Picks an option of a `<select>`; `value` and `label` are templates. Fires the page's `change` handlers. |
 | `scroll` | `to` (`bottom` or a selector), `times?`, `untilStable?` | `untilStable` keeps scrolling until the page stops growing: infinite lists. |
 | `wait` | one of `selector`, `ms`, `state: "networkidle"` | `selector` waits for visibility. Put a `wait` after `goto` on script-heavy pages before extracting. |
 | `evaluate` | `script` | JavaScript evaluated in the page; the result is bound under `id`. **Trusted recipes only.** |
 | `screenshot` | `path` (template) | Full page. A debugging aid. |
 
 Clicks and key presses can navigate; the engine re-reads the page URL after every web step.
+
+`target` is a template instead of a selector: it renders either to a **live element** (the variable of a
+`forEach` over `selector`, §3.7) or to a selector string. Give one of `selector` and `target`, never both.
 
 ### 3.2 Api steps (HTTP)
 
@@ -195,7 +199,7 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 |---|---|---|
 | `extract` | `selector`, `kind` (`css`, `xpath`, `jsonpath`), `take?`, `many?`, `from?` | §4. |
 | `set` | `value` | A literal, or a template when it is a string. |
-| `forEach` | `over` (a list id), `as` (variable), `steps`, `emit?` | Runs `steps` once per item in a fresh child scope with the item bound as `as`. `emit: true` produces one record per iteration. `over` may name a single value; it is treated as a one-item list. |
+| `forEach` | `over` (a list id) **or** `selector` (web), `as` (variable), `steps`, `emit?` | Runs `steps` once per item in a fresh child scope with the item bound as `as`. `emit: true` produces one record per iteration. `over` may name a single value; it is treated as a one-item list. `selector` iterates the live elements it matches (§3.7). |
 | `paginate` | `next`, `until?` (template), `maxPages?`, `steps` | Runs `steps` per page in a fresh child scope, then follows `next`. §3.6. |
 | `emit` | – | Produces a record from everything in scope. |
 | `hook` | `name`, `args?` | Calls the registered hook; `args` strings are templates. The result is bound under `id`. |
@@ -258,6 +262,43 @@ Two shapes cover most sites:
   ]}
 ]}
 ```
+
+### 3.7 Live elements: driving a configurator
+
+`forEach` with `selector` instead of `over` runs its body once per element the selector matches **on the
+current page**, in web mode only. Each iteration binds a snapshot of the element under `as`:
+
+| Path | Holds |
+|---|---|
+| `{{option.text}}` | text content, whitespace collapsed |
+| `{{option.html}}` | inner HTML |
+| `{{option.attrs.value}}`, `{{option.attrs.data-id}}` | any attribute |
+| `{{option.value}}` | the `value` of an input, option or select |
+| `{{option.selector}}`, `{{option.index}}` | where to find it again |
+
+The snapshot is taken once, when the loop starts, and the engine never holds on to the element itself: a
+`target: "{{option}}"` on `click`, `fill`, `press` or `select` re-resolves the element by selector and
+index at that moment. That is what makes the loop survive a page that re-renders after every interaction,
+which is what a car configurator, a size picker or a tabbed spec sheet does.
+
+The shape for "one record per option of a `<select>`":
+
+```json
+{ "type": "goto", "url": "{{start.url}}" },
+{ "type": "extract", "id": "model", "selector": "h1", "kind": "css" },
+{ "type": "forEach", "selector": "select#trim option", "as": "option", "emit": true, "steps": [
+  { "type": "select", "selector": "select#trim", "value": "{{option.attrs.value}}" },
+  { "type": "extract", "id": "trim", "selector": ".trim", "kind": "css" },
+  { "type": "extract", "id": "price", "selector": ".price", "kind": "css" }
+]}
+```
+
+For a row of buttons or tabs use `{ "type": "click", "target": "{{option}}" }` instead of `select`. Put a
+`wait` after the interaction when the page fetches the new state instead of rewriting it in place.
+
+Limits: the loop iterates the matches present when it started; elements a later interaction adds are not
+visited (nest a second `forEach` for that). Navigating away inside the body and relying on `target` on the
+next iteration fails, because the selector no longer matches on the new page.
 
 ---
 
