@@ -14,12 +14,14 @@ import { resolveStorageState } from './bootstrap-session.use-case'
 import type { RecipeReport } from './crawl-report.model'
 
 export interface RecipeRunDependencies {
-  browser:          () => Promise<BrowserClient>
-  hooks:            HookRegistry
-  events:           EventBus
-  sink:             RecordSink
-  dedupe:           DedupePolicy
-  storageStateDir?: string
+  browser:            () => Promise<BrowserClient>
+  hooks:              HookRegistry
+  events:             EventBus
+  sink:               RecordSink
+  dedupe:             DedupePolicy
+  storageStateDir?:   string
+  /** Accept invalid TLS certificates in api mode too (sandbox proxies); mirrors `browser.ignoreHTTPSErrors`. */
+  ignoreHTTPSErrors?: boolean
 }
 
 /**
@@ -103,7 +105,7 @@ async function openRunner (input: InputRecipe, deps: RecipeRunDependencies): Pro
 
     return new WebStepRunner(browserSession, input, deps.events)
   }
-  const client = await HttpClient.open({ storageState, headers: session?.headers, userAgent: session?.userAgent, timeoutMs: input.limits?.timeoutMs })
+  const client = await HttpClient.open({ storageState, headers: session?.headers, userAgent: session?.userAgent, timeoutMs: input.limits?.timeoutMs, ignoreHTTPSErrors: deps.ignoreHTTPSErrors })
 
   return new ApiStepRunner(client, input, deps.events)
 }

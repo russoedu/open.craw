@@ -39,6 +39,8 @@ export function createCrawler (options: CrawlOptions = {}): Crawler {
       sink:            options.sink ?? memorySink(),
       dedupe:          new DedupePolicy(options.dedupe),
       storageStateDir: options.storageStateDir,
+
+      ignoreHTTPSErrors: options.browser?.ignoreHTTPSErrors,
     }, options.onRecipeError ?? 'continue'),
     async close () {
       const launched = browser

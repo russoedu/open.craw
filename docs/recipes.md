@@ -57,6 +57,7 @@ Every step can have an `id` (the name of the value it produces), an `onError` po
 | `evaluate` | web | Runs `script` in the page and binds the result. Trusted recipes only. |
 | `request` | api | Sends an HTTP request; the response becomes the current document (and the `id`, if given). `as` forces `json`, `html` or `text`. |
 | `extract` | both | Selects from the current document (or the `from` id): `kind` is `css`, `xpath` (live page only) or `jsonpath`; `take` is `text` (default), `html`, `value`, `json` or `attr:href`; `many: true` gives a list. A single `extract` that matches nothing fails, so give it `onError: { "policy": "skip" }` when the element is optional. |
+| | | A `jsonpath` extract whose `from` holds **text** parses it as JSON, and a **list of texts** (every `script[type="application/ld+json"]` of a page, extracted with `many`) becomes an array of the entries that parse: `$[*].actors[*].name` then finds the block that has actors wherever it sits. |
 | `set` | both | Binds a literal or a rendered template. |
 | `forEach` | both | Runs `steps` once per item of the list `over`, with the item bound as `as`. `emit: true` produces one record per iteration. |
 | `paginate` | both | Runs `steps` per page, then follows `next`: `{ "selector" }` (web, clicks it), `{ "url" }` (a template), `{ "jsonpath" }` (api, a URL from the document; add `"as"` to bind a cursor instead). Stops when there is no next page, when `until` is truthy, or at `maxPages`. |

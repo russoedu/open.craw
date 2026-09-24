@@ -93,6 +93,27 @@ describe('ApiStepRunner', () => {
     expect(snapshot.missing).toBeUndefined()
   })
 
+  it('parses JSON-LD text for jsonpath extracts, one block or many', async () => {
+    const ld = '{"@type":"Movie","name":"Heat","actors":[{"name":"Al Pacino"},{"name":"Robert De Niro"}]}'
+    const recipeWithText: InputRecipe = {
+      ...recipe,
+      start: [{ url: 'http://shop/p/1' }],
+      steps: [
+        { type: 'set', id: 'one', value: ld },
+        { type: 'set', id: 'many', value: ['not json', '{"@type":"BreadcrumbList"}', ld] },
+        { type: 'set', id: 'junk', value: ['nope', 'still nope'] },
+        { type: 'extract', id: 'name', from: 'one', selector: '$.name', kind: 'jsonpath', take: 'json' },
+        { type: 'extract', id: 'actors', from: 'many', selector: '$[*].actors[*].name', kind: 'jsonpath', take: 'json', many: true },
+        { type: 'extract', id: 'types', from: 'many', selector: '$[*].@type', kind: 'jsonpath', take: 'json', many: true },
+        { type: 'extract', id: 'nothing', from: 'junk', selector: '$[*].name', kind: 'jsonpath', many: true, onError: { policy: 'skip' } },
+        { type: 'emit' },
+      ],
+    }
+    const [snapshot] = await crawl(recipeWithText, fakeSender())
+    expect(snapshot).toMatchObject({ name: 'Heat', actors: ['Al Pacino', 'Robert De Niro'], types: ['BreadcrumbList', 'Movie'] })
+    expect(snapshot.nothing).toBeUndefined()
+  })
+
   it('binds a cursor with next.jsonpath as, and refuses browser-only steps', async () => {
     const sender = fakeSender()
     const runner = new ApiStepRunner(sender, recipe, new EventBus())

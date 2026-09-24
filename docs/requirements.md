@@ -76,7 +76,8 @@ optional `when` template that must render truthy for the step to run.
 | `hook` | both | value | `name`, `args?` |
 
 `take` is `text` (default), `html`, `value`, `json` or `attr:<name>`. `xpath` works on live pages only; on
-fetched HTML use `css`; on JSON use `jsonpath`.
+fetched HTML use `css`; on JSON use `jsonpath`. A `jsonpath` extract whose `from` is text parses it as JSON; a list of
+texts becomes the array of its parsable entries (the JSON-LD blocks of a page), and the path runs over that array.
 
 **Templates** are `{{path}}` placeholders resolved against the scope: any id, the current `forEach` variable,
 `vars.*`, `start.url`, `page.url`, `page.number`. A template that is exactly one placeholder yields the raw

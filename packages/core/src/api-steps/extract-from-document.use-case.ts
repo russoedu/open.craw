@@ -8,6 +8,11 @@ import { NoMatchError } from '../step-flow'
  * `from`, else the scope's current document. `css` reads HTML, `jsonpath`
  * reads JSON; `xpath` needs a live page and is refused here.
  *
+ * A `jsonpath` extract whose `from` is text parses that text as JSON, and a
+ * list of texts (every `<script type="application/ld+json">` of a page) becomes
+ * an array of the entries that parse, so `$[*].actors[*].name` finds the block
+ * that has actors wherever it sits.
+ *
  * @param step - The extract step.
  * @param scope - Where the document and the result live.
  * @throws NoMatchError when a single extract matches nothing.
@@ -42,8 +47,34 @@ function documentFor (step: ExtractStep, scope: ExtractionScope): ScopeDocument 
     return current
   }
   const source = scope.get(step.from)
-  if (typeof source === 'string') return { kind: 'html', html: source }
   if (source === undefined) throw new Error(`"${step.from}" is not bound`)
+  if (step.kind !== 'jsonpath') {
+    if (typeof source !== 'string') throw new Error(`"${step.from}" is not HTML text; use kind "jsonpath" for data`)
+
+    return { kind: 'html', html: source }
+  }
+  if (typeof source === 'string') return { kind: 'json', data: parseJsonText(source, step.from) }
+  if (Array.isArray(source) && source.every(entry => typeof entry === 'string')) {
+    const parsed = source.map(entry => tryParseJson(entry)).filter(entry => entry !== undefined)
+    if (parsed.length === 0 && source.length > 0) throw new Error(`none of the ${source.length} texts bound to "${step.from}" is JSON`)
+
+    return { kind: 'json', data: parsed }
+  }
 
   return { kind: 'json', data: source }
+}
+
+function parseJsonText (text: string, id: string): unknown {
+  const parsed = tryParseJson(text)
+  if (parsed === undefined) throw new Error(`"${id}" is text but not JSON`)
+
+  return parsed
+}
+
+function tryParseJson (text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    return undefined
+  }
 }
