@@ -19,6 +19,15 @@ describe('selectHtml + takeFromHtml', () => {
     expect(takeFromHtml(selectHtml(html, 'h1')[0], 'attr:missing')).toBeUndefined()
   })
 
+  it('keeps table cells and list items when given a fragment', () => {
+    const row = '<td class="year">1995</td><td class="role"><a href="/movie/949-heat"><bdi>Heat</bdi></a> <span class="character">Vincent</span></td>'
+    expect(takeFromHtml(selectHtml(row, 'td.year')[0], 'text')).toBe('1995')
+    expect(takeFromHtml(selectHtml(row, 'td.role a')[0], 'attr:href')).toBe('/movie/949-heat')
+    const item = '<li class="griditem" title="The Godfather (1972) as Michael"><div data-item-name="The Godfather (1972)"></div></li>'
+    expect(takeFromHtml(selectHtml(item, 'li.griditem')[0], 'attr:title')).toBe('The Godfather (1972) as Michael')
+    expect(takeFromHtml(selectHtml(item, 'div')[0], 'attr:data-item-name')).toBe('The Godfather (1972)')
+  })
+
   it('returns an empty list when nothing matches', () => {
     expect(selectHtml(html, '.nothing')).toEqual([])
   })

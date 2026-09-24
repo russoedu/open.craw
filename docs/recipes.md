@@ -55,7 +55,7 @@ Every step can have an `id` (the name of the value it produces), an `onError` po
 | `goto` | web | Navigates to `url` (a template, relative to the current page). |
 | `click`, `fill`, `press`, `scroll`, `wait`, `screenshot` | web | Interacts with the page. `click` with `optional: true` skips a missing element. |
 | `evaluate` | web | Runs `script` in the page and binds the result. Trusted recipes only. |
-| `request` | api | Sends an HTTP request; the response becomes the current document (and the `id`, if given). `as` forces `json`, `html` or `text`. |
+| `request` | api | Sends an HTTP request; the response becomes the current document (and the `id`, if given). `as` forces `json`, `html` or `text`. A relative `url` resolves against the current page, like a link. |
 | `extract` | both | Selects from the current document (or the `from` id): `kind` is `css`, `xpath` (live page only) or `jsonpath`; `take` is `text` (default), `html`, `value`, `json` or `attr:href`; `many: true` gives a list. A single `extract` that matches nothing fails, so give it `onError: { "policy": "skip" }` when the element is optional. |
 | | | A `jsonpath` extract whose `from` holds **text** parses it as JSON, and a **list of texts** (every `script[type="application/ld+json"]` of a page, extracted with `many`) becomes an array of the entries that parse: `$[*].actors[*].name` then finds the block that has actors wherever it sits. |
 | `set` | both | Binds a literal or a rendered template. |

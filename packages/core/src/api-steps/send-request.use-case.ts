@@ -18,7 +18,7 @@ import { sleep } from '../step-flow'
  */
 export async function sendRequest (step: RequestStep, scope: ExtractionScope, client: HttpSender, limits: CrawlLimits, events: EventBus, recipeId: string): Promise<void> {
   const lookup = (path: string): unknown => scope.lookup(path)
-  const url = renderText(step.url, lookup)
+  const url = resolveUrl(renderText(step.url, lookup), scope.pageState?.url)
   await sleep(limits.delayMs ?? 0)
   const response = await client.send({
     method:    step.method,
@@ -36,6 +36,22 @@ export async function sendRequest (step: RequestStep, scope: ExtractionScope, cl
 
 function renderMap (map: Record<string, string>, lookup: (path: string) => unknown): Record<string, string> {
   return Object.fromEntries(Object.entries(map).map(([key, value]) => [key, renderText(value, lookup)]))
+}
+
+/**
+ * A request URL relative to the current page (`/person/1158`, `?page=2`) resolves
+ * against it, the way a browser resolves a link.
+ *
+ * @param target - The rendered URL.
+ * @param base - The current page URL, if any.
+ * @returns An absolute URL.
+ */
+function resolveUrl (target: string, base: string | undefined): string {
+  try {
+    return new URL(target, base === '' ? undefined : base).href
+  } catch {
+    throw new Error(`"${target}" is not a URL${base === undefined || base === '' ? ' and no page is known to resolve it against' : ` and cannot be resolved against ${base}`}`)
+  }
 }
 
 /** What a step id holds for a document: parsed JSON, or the markup / text. */

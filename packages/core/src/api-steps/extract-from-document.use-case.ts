@@ -71,9 +71,12 @@ function parseJsonText (text: string, id: string): unknown {
   return parsed
 }
 
+/** Comment guards sites wrap inline JSON-LD in: a CDATA marker inside a block comment, or an HTML comment. */
+const GUARDS = /^\s*(?:\/\*\s*<!\[CDATA\[\s*\*\/|<!\[CDATA\[|<!--)\s*|\s*(?:\/\*\s*\]\]>\s*\*\/|\]\]>|-->)\s*$/g
+
 function tryParseJson (text: string): unknown {
   try {
-    return JSON.parse(text) as unknown
+    return JSON.parse(text.replaceAll(GUARDS, '')) as unknown
   } catch {
     return undefined
   }

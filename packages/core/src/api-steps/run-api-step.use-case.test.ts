@@ -93,6 +93,21 @@ describe('ApiStepRunner', () => {
     expect(snapshot.missing).toBeUndefined()
   })
 
+  it('resolves a relative request URL against the current page', async () => {
+    const sender = fakeSender()
+    const relative: InputRecipe = {
+      ...recipe,
+      start: [{ url: 'http://shop/api/products?page=1' }],
+      steps: [
+        { type: 'request', id: 'first', url: '{{start.url}}', as: 'json' },
+        { type: 'request', id: 'second', url: '/api/products?page=2', as: 'json' },
+        { type: 'emit' },
+      ],
+    }
+    await crawl(relative, sender)
+    expect(sender.sent.map(request => request.url)).toEqual(['http://shop/api/products?page=1', 'http://shop/api/products?page=2'])
+  })
+
   it('parses JSON-LD text for jsonpath extracts, one block or many', async () => {
     const ld = '{"@type":"Movie","name":"Heat","actors":[{"name":"Al Pacino"},{"name":"Robert De Niro"}]}'
     const recipeWithText: InputRecipe = {
@@ -100,17 +115,20 @@ describe('ApiStepRunner', () => {
       start: [{ url: 'http://shop/p/1' }],
       steps: [
         { type: 'set', id: 'one', value: ld },
-        { type: 'set', id: 'many', value: ['not json', '{"@type":"BreadcrumbList"}', ld] },
+        { type: 'set', id: 'many', value: ['not json', '{"@type":"BreadcrumbList"}', `\n/* <![CDATA[ */\n${ld}\n/* ]]> */\n`] },
+        { type: 'set', id: 'guarded', value: `<!-- ${ld} -->` },
         { type: 'set', id: 'junk', value: ['nope', 'still nope'] },
         { type: 'extract', id: 'name', from: 'one', selector: '$.name', kind: 'jsonpath', take: 'json' },
         { type: 'extract', id: 'actors', from: 'many', selector: '$[*].actors[*].name', kind: 'jsonpath', take: 'json', many: true },
         { type: 'extract', id: 'types', from: 'many', selector: '$[*].@type', kind: 'jsonpath', take: 'json', many: true },
         { type: 'extract', id: 'nothing', from: 'junk', selector: '$[*].name', kind: 'jsonpath', many: true, onError: { policy: 'skip' } },
+        { type: 'extract', id: 'guardedName', from: 'guarded', selector: '$.name', kind: 'jsonpath', take: 'json' },
+        { type: 'extract', id: 'movieName', from: 'many', selector: "$[?(@['@type']=='Movie')].name", kind: 'jsonpath', take: 'json' },
         { type: 'emit' },
       ],
     }
     const [snapshot] = await crawl(recipeWithText, fakeSender())
-    expect(snapshot).toMatchObject({ name: 'Heat', actors: ['Al Pacino', 'Robert De Niro'], types: ['BreadcrumbList', 'Movie'] })
+    expect(snapshot).toMatchObject({ name: 'Heat', actors: ['Al Pacino', 'Robert De Niro'], types: ['BreadcrumbList', 'Movie'], guardedName: 'Heat', movieName: 'Heat' })
     expect(snapshot.nothing).toBeUndefined()
   })
 
