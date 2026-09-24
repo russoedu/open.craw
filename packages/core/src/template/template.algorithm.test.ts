@@ -1,4 +1,5 @@
-import { hasPlaceholder, isTruthy, render, renderText, stringify } from './template.algorithm'
+import { hasPlaceholder, render, renderText } from './template.algorithm'
+import { isTruthy, stringify } from './value-text.algorithm'
 
 const scope: Record<string, unknown> = { link: '/p/1', item: { href: '/p/2', tags: ['a', 'b'] }, page: { number: 2 }, empty: '' }
 const lookup = (path: string): unknown => path.split('.').reduce<unknown>((value, key) => (value as Record<string, unknown> | undefined)?.[key], scope)

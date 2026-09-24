@@ -18,7 +18,8 @@ export function segmentsOf (path: string): string[] {
 }
 
 /**
- * Reads a value by path.
+ * Reads a value by path. Only own properties are read, so `constructor`,
+ * `__proto__`, `toString` and the like resolve to `undefined` whatever the data.
  *
  * @param source - Where to read from.
  * @param path - The dotted path; `.` or `''` returns the source itself.
@@ -28,7 +29,7 @@ export function getPath (source: unknown, path: string): unknown {
   let current: unknown = source
   for (const segment of segmentsOf(path)) {
     if (current === null || current === undefined) return undefined
-    if (typeof current !== 'object') return undefined
+    if (typeof current !== 'object' || !Object.hasOwn(current, segment)) return undefined
     current = (current as Record<string, unknown>)[segment]
   }
 

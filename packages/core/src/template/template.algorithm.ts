@@ -1,14 +1,18 @@
 /**
- * `{{ path }}` interpolation for recipe strings. No code is ever executed: a
- * placeholder is a dotted path resolved through the lookup the caller provides.
+ * `{{ }}` interpolation for recipe strings. A placeholder is a dotted path
+ * resolved through the lookup the caller provides, or an expression over such
+ * paths (see `expression.algorithm`). No code is ever executed.
  */
+
+import { evaluateExpression, parseExpression } from './expression.algorithm'
+import { stringify } from './value-text.algorithm'
+import type { Lookup } from './value-text.algorithm'
 
 const PLACEHOLDER = /\{\{([^{}]*)\}\}/g
 const WHOLE = /^\{\{([^{}]*)\}\}$/
 const ANY_PLACEHOLDER = /\{\{[^{}]*\}\}/
-
-/** Resolves a dotted path to a value; `undefined` when unknown. */
-export type Lookup = (path: string) => unknown
+/** A placeholder that is a plain path (hyphens and `@` allowed, as in `item.display-name` or `ld.@type`), or empty: resolved directly. */
+const PLAIN_PATH = /^[\w@$.[\]-]*$/
 
 /**
  * Whether a string contains at least one placeholder.
@@ -31,9 +35,24 @@ export function hasPlaceholder (text: string): boolean {
  */
 export function render (template: string, lookup: Lookup): unknown {
   const whole = WHOLE.exec(template)
-  if (whole !== null) return lookup(whole[1].trim())
+  if (whole !== null) return resolve(whole[1].trim(), lookup)
 
-  return template.replaceAll(PLACEHOLDER, (_, path: string) => stringify(lookup(path.trim())))
+  return template.replaceAll(PLACEHOLDER, (_, inner: string) => stringify(resolve(inner.trim(), lookup)))
+}
+
+/**
+ * The value of one placeholder: a plain path is looked up as is; anything else
+ * is parsed and evaluated as an expression.
+ *
+ * @param inner - The trimmed text between the braces.
+ * @param lookup - Resolves a path.
+ * @returns The value.
+ * @throws Error when an expression does not parse.
+ */
+export function resolve (inner: string, lookup: Lookup): unknown {
+  if (PLAIN_PATH.test(inner)) return lookup(inner)
+
+  return evaluateExpression(parseExpression(inner), lookup)
 }
 
 /**
@@ -45,32 +64,4 @@ export function render (template: string, lookup: Lookup): unknown {
  */
 export function renderText (template: string, lookup: Lookup): string {
   return stringify(render(template, lookup))
-}
-
-/**
- * Truthiness as recipes mean it: `when` and `until` conditions.
- *
- * @param value - Any rendered value.
- * @returns `false` for `undefined`, `null`, `''`, `0`, `false`, `'false'`, `'0'`, `'null'` and an empty list.
- */
-export function isTruthy (value: unknown): boolean {
-  if ([undefined, null, false, 0].includes(value as null)) return false
-  if (typeof value === 'string') return !['', 'false', '0', 'null', 'undefined'].includes(value.trim().toLowerCase())
-  if (Array.isArray(value)) return value.length > 0
-
-  return true
-}
-
-/**
- * The text form of a value for interpolation.
- *
- * @param value - Any value.
- * @returns A string; objects and arrays as JSON.
- */
-export function stringify (value: unknown): string {
-  if (value === undefined || value === null) return ''
-  if (typeof value === 'string') return value
-  if (typeof value === 'object') return JSON.stringify(value)
-
-  return String(value)
 }

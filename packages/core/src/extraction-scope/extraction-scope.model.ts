@@ -8,6 +8,8 @@
  * default) is scope state too, bound in the innermost scope that navigated.
  */
 
+import { getPath } from '../template'
+
 /** A fetched or rendered document a later `extract` can read. */
 export type ScopeDocument =
   | { kind: 'json', data: unknown } |
@@ -95,13 +97,9 @@ export class ExtractionScope {
    */
   lookup (path: string): unknown {
     const [head, ...rest] = path.replaceAll(/\[(\d+)\]/g, '.$1').split('.')
-    let value: unknown = head === 'page' && !this.has('page') ? pageSnapshotOf(this.pageState) : this.get(head)
-    for (const segment of rest) {
-      if (value === null || value === undefined || typeof value !== 'object') return undefined
-      value = (value as Record<string, unknown>)[segment]
-    }
+    const root: unknown = head === 'page' && !this.has('page') ? pageSnapshotOf(this.pageState) : this.get(head)
 
-    return value
+    return getPath(root, rest.join('.'))
   }
 }
 
