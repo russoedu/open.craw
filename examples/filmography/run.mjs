@@ -24,12 +24,10 @@ const crawler = createCrawler({
   sink:    jsonLinesSink(join(here, 'out', 'filmography.jsonl')),
   browser: { ignoreHTTPSErrors: process.env.OPEN_CRAW_INSECURE_TLS === '1' },
   onEvent: (event) => {
-    if (trace) {
-      const line = traceLine(event)
-      if (line !== undefined) console.log(line)
-    }
+    const line = trace ? traceLine(event) : undefined
+    if (line !== undefined) console.log(line)
     if (event.type === 'record:emit') console.log(`${event.recipeId.padEnd(10)} | ${String(event.data.actor).padEnd(14)} | ${String(event.data.year ?? '----').padEnd(4)} | ${String(event.data.title).padEnd(34)} | ${event.data.role ?? ''}`)
-    if (event.type === 'record:reject' || event.type === 'error') console.log(`[${event.type}] ${event.recipeId}: ${event.reason ?? event.message}`)
+    if (['record:reject', 'error'].includes(event.type)) console.log(`[${event.type}] ${event.recipeId}: ${event.reason ?? event.message}`)
   },
 })
 try {
