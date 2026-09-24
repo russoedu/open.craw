@@ -1,0 +1,32 @@
+{
+  "$schema": "../../packages/core/schemas/input-recipe.schema.json",
+  "kind": "input",
+  "id": "imdb",
+  "output": "movie",
+  "mode": "web",
+  "description": "IMDb's Top 250 chart, visited with a real browser: the chart links to title pages, and every title page carries a JSON-LD block with name, genre and actor. IMDb sits behind AWS WAF, so a plain HTTP client is challenged; a normal browser session from a normal IP is not.",
+  "start": [{ "url": "https://www.imdb.com/chart/top/" }],
+  "session": {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
+    "headers": { "accept-language": "en-US,en;q=0.9" }
+  },
+  "limits": { "maxRecords": 5, "delayMs": 1500, "timeoutMs": 45000 },
+  "steps": [
+    { "type": "goto", "url": "{{start.url}}", "waitUntil": "domcontentloaded" },
+    { "type": "wait", "selector": "a.ipc-title-link-wrapper" },
+    { "type": "extract", "id": "links", "selector": "a.ipc-title-link-wrapper", "kind": "css", "take": "attr:href", "many": true },
+    { "type": "forEach", "over": "links", "as": "link", "emit": true, "steps": [
+      { "type": "goto", "url": "{{link}}", "waitUntil": "domcontentloaded" },
+      { "type": "wait", "selector": "script[type=\"application/ld+json\"]" },
+      { "type": "extract", "id": "ld", "selector": "script[type=\"application/ld+json\"]", "kind": "css", "take": "text", "many": true },
+      { "type": "extract", "id": "name", "from": "ld", "selector": "$[*].name", "kind": "jsonpath", "take": "json" },
+      { "type": "extract", "id": "genre", "from": "ld", "selector": "$[*].genre", "kind": "jsonpath", "take": "json" },
+      { "type": "extract", "id": "actors", "from": "ld", "selector": "$[*].actor[*].name", "kind": "jsonpath", "take": "json", "many": true }
+    ]}
+  ],
+  "mapping": {
+    "title": { "from": "name", "transform": [{ "op": "trim" }, { "op": "replace", "pattern": "&apos;", "replacement": "'" }, { "op": "replace", "pattern": "&amp;", "replacement": "&" }] },
+    "genres": { "from": "genre", "transform": [{ "op": "flatten" }] },
+    "actors": { "from": "actors", "transform": [{ "op": "replace", "pattern": "&apos;", "replacement": "'" }] }
+  }
+}
