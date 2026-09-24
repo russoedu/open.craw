@@ -200,6 +200,7 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 | `extract` | `selector`, `kind` (`css`, `xpath`, `jsonpath`), `take?`, `many?`, `from?` | §4. |
 | `set` | `value` | A literal, or a template when it is a string. |
 | `forEach` | `over` (a list id) **or** `selector` (web), `as` (variable), `steps`, `emit?` | Runs `steps` once per item in a fresh child scope with the item bound as `as`. `emit: true` produces one record per iteration. `over` may name a single value; it is treated as a one-item list. `selector` iterates the live elements it matches (§3.7). |
+| `if` | `test` (template), `steps`, `else?` | Runs `steps` when `test` renders truthy, otherwise `else`, **in the current scope**: ids bound in a branch are visible after it. §3.8. |
 | `paginate` | `next`, `until?` (template), `maxPages?`, `steps` | Runs `steps` per page in a fresh child scope, then follows `next`. §3.6. |
 | `emit` | – | Produces a record from everything in scope. |
 | `hook` | `name`, `args?` | Calls the registered hook; `args` strings are templates. The result is bound under `id`. |
@@ -299,6 +300,22 @@ For a row of buttons or tabs use `{ "type": "click", "target": "{{option}}" }` i
 Limits: the loop iterates the matches present when it started; elements a later interaction adds are not
 visited (nest a second `forEach` for that). Navigating away inside the body and relying on `target` on the
 next iteration fails, because the selector no longer matches on the new page.
+
+### 3.8 Decisions
+
+`when` skips one step. `if` chooses between two step lists and is the tool for "do this only on the
+first page", "the layout differs for sold-out items", "dismiss the wall if it is up":
+
+```json
+{ "type": "extract", "id": "wall", "selector": "#consent", "kind": "css", "take": "html", "many": true },
+{ "type": "if", "test": "{{wall}}", "steps": [{ "type": "click", "selector": "#accept" }] }
+```
+
+`test` uses the same truthiness as `when` (§3.4); an extract with `many: true` never fails, so its empty
+list is the clean way to test for presence. Both branches run in the scope of the `if`, not a child: a
+value set in `steps` or `else` is visible to the steps after it, and each branch may bind the same id (they
+never both run). A branch may `emit`; the one-emit-per-path rule treats the branches as separate paths.
+The trace shows the branch taken as `⑂ steps.N  then`.
 
 ---
 

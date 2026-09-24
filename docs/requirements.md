@@ -72,6 +72,7 @@ optional `when` template that must render truthy for the step to run.
 | `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex'`, `take`, `many?`, `from?` |
 | `set` | both | value | `value` (template or literal) |
 | `forEach` | both | – | `over` (a list id) or `selector` (web: live elements), `as` (variable), `steps`, `emit?: true \| { output }` |
+| `if` | both | – | `test` (template), `steps`, `else?`; the chosen branch runs in the current scope |
 | `paginate` | both | – | `next`, `until?` (template), `maxPages?`, `steps` |
 | `emit` | both | record | `output?` |
 | `hook` | both | value | `name`, `args?` |
@@ -105,8 +106,10 @@ every use, so a page that re-renders after each interaction (a configurator) sti
   without `as` the value is the next URL, relative allowed; with `as` it is bound under that name in the next
   page's scope so the body builds the URL itself, e.g. a cursor). Pagination stops when `next` yields nothing,
   when `until` renders truthy, or at `maxPages`.
+- `if` evaluates `test` with `when`'s truthiness and runs `steps` or `else` in the **same scope** (no child):
+  ids bound in a branch are visible after it. The engine reports the branch taken as a `step:branch` event.
 - **One emitting construct per path**: an emitting `forEach` may not contain another emitting `forEach` or
-  an `emit`. `emit` snapshots the whole scope chain, child values shadowing parents.
+  an `emit`. The two branches of an `if` are separate paths. `emit` snapshots the whole scope chain, child values shadowing parents.
 - `limits.maxRecords` stops the walk cleanly once reached.
 
 ## 3. Output recipe (`OutputRecipe`)
