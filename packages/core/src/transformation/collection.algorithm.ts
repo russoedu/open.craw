@@ -1,7 +1,8 @@
 import { describe, trim } from './string.algorithm'
 import { TransformError } from './transform.error'
 
-function asList (op: string, value: unknown): unknown[] {
+/** The input as a list: a list as is, a missing value as empty; anything else fails the op. */
+export function asList (op: string, value: unknown): unknown[] {
   if (Array.isArray(value)) return value
   if (value === undefined || value === null) return []
   throw new TransformError(op, `expects a list, got ${describe(value)}`, value)

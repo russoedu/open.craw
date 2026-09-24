@@ -1,6 +1,6 @@
 import type { ExtractionScope, ScopeDocument } from '../extraction-scope'
 import type { ExtractStep } from '../recipe-schema'
-import { selectHtml, selectJson, selectRegex, takeFromHtml, takeFromJson } from '../selection'
+import { parseJsonText, selectHtml, selectJson, selectRegex, takeFromHtml, takeFromJson, tryParseJson } from '../selection'
 import { hasPlaceholder, renderText } from '../template'
 import { NoMatchError } from '../step-flow'
 
@@ -103,22 +103,4 @@ function documentFor (step: ExtractStep, scope: ExtractionScope): ScopeDocument 
   }
 
   return { kind: 'json', data: source }
-}
-
-function parseJsonText (text: string, id: string): unknown {
-  const parsed = tryParseJson(text)
-  if (parsed === undefined) throw new Error(`"${id}" is text but not JSON`)
-
-  return parsed
-}
-
-/** Comment guards sites wrap inline JSON-LD in: a CDATA marker inside a block comment, or an HTML comment. */
-const GUARDS = /^\s*(?:\/\*\s*<!\[CDATA\[\s*\*\/|<!\[CDATA\[|<!--)\s*|\s*(?:\/\*\s*\]\]>\s*\*\/|\]\]>|-->)\s*$/g
-
-function tryParseJson (text: string): unknown {
-  try {
-    return JSON.parse(text.replaceAll(GUARDS, '')) as unknown
-  } catch {
-    return undefined
-  }
 }

@@ -17,6 +17,10 @@ export type TransformRule =
   { op: 'flatten' } | { op: 'unique' } | { op: 'sum' } | { op: 'count' } |
   { op: 'template', value: string } |
   { op: 'jsonpath', path: string } |
+  /** Finds the item of a table (an id or path in scope) whose `key` path equals the input; yields `pick` from it, or the item. */
+  { op: 'lookup', in: string, key: string, pick?: string } |
+  /** Groups a list by a path into `[{ key, items }]`, first-seen order. */
+  { op: 'group', by: string } |
   { op: 'hook', name: string, args?: Record<string, unknown> }
 
 export type TransformOp = TransformRule['op']
@@ -60,6 +64,8 @@ export const transformRuleSchema: z.ZodType<TransformRule> = z.discriminatedUnio
   z.strictObject({ op: z.literal('count') }),
   z.strictObject({ op: z.literal('template'), value: z.string() }),
   z.strictObject({ op: z.literal('jsonpath'), path: z.string().min(1) }),
+  z.strictObject({ op: z.literal('lookup'), in: z.string().min(1), key: z.string().min(1), pick: z.string().min(1).optional() }),
+  z.strictObject({ op: z.literal('group'), by: z.string().min(1) }),
   z.strictObject({ op: z.literal('hook'), name: z.string().min(1), args: args.optional() }),
 ])
 

@@ -4,7 +4,13 @@ import { applyTransformChain } from './apply-transform-chain.use-case'
 import type { TransformContext } from './transform-registry.store'
 import { TransformError } from './transform.error'
 
-const scope: Record<string, unknown> = { raw_price: ' 1.299,00 € ', page: { url: 'https://shop.example/p/1' } }
+const scope: Record<string, unknown> = {
+  raw_price:   ' 1.299,00 € ',
+  page:        { url: 'https://shop.example/p/1' },
+  colour_data: ['{"trimname":"Air","colors":[{"displayName":"Red"},{"displayName":"Blue"}]}', 'not json', '{"trimname":"GT-Line","colors":[{"displayName":"Black"}]}'],
+  sizes:       [{ id: 3, label: 'L' }, { id: 4, label: 'XL' }],
+  table_text:  '[{"code":"a","n":1},{"code":"b","n":2}]',
+}
 const context: TransformContext = {
   recipeId: 'r',
   scope,
@@ -46,6 +52,27 @@ describe('applyTransformChain', () => {
     expect(await run('04/03/2026', { op: 'date', format: 'DD/MM/YYYY' })).toEqual(new Date('2026-03-04T00:00:00Z'))
     expect(await run('In stock', { op: 'boolean', truthy: ['in stock'] })).toBe(true)
     expect(await run('12.7', { op: 'integer' })).toBe(12)
+  })
+
+  it('looks a value up in a table bound in scope: data, JSON text, or a list of JSON texts', async () => {
+    expect(await run('Air', { op: 'lookup', in: 'colour_data', key: 'trimname', pick: 'colors' }, { op: 'jsonpath', path: '$[*].displayName' })).toEqual(['Red', 'Blue'])
+    expect(await run('GT-Line', { op: 'lookup', in: 'colour_data', key: 'trimname' })).toEqual({ trimname: 'GT-Line', colors: [{ displayName: 'Black' }] })
+    expect(await run('Sport', { op: 'lookup', in: 'colour_data', key: 'trimname', pick: 'colors' })).toBeUndefined()
+    expect(await run('4', { op: 'lookup', in: 'sizes', key: 'id', pick: 'label' })).toBe('XL')
+    expect(await run(['a', 'b', 'c'], { op: 'lookup', in: 'table_text', key: 'code', pick: 'n' })).toEqual([1, 2, undefined])
+    expect(await run('a', { op: 'lookup', in: 'missing_table', key: 'code' })).toBeUndefined()
+    expect(await run(undefined, { op: 'lookup', in: 'sizes', key: 'id' })).toBeUndefined()
+  })
+
+  it('groups a list by a path in first-seen order', async () => {
+    const rows = [{ trim: 'Air', colour: 'Red' }, { trim: 'GT', colour: 'Black' }, { trim: 'Air', colour: 'Blue' }, { colour: 'None' }]
+    expect(await run(rows, { op: 'group', by: 'trim' })).toEqual([
+      { key: 'Air', items: [rows[0], rows[2]] },
+      { key: 'GT', items: [rows[1]] },
+      { key: null, items: [rows[3]] },
+    ])
+    expect(await run(rows, { op: 'group', by: 'trim' }, { op: 'jsonpath', path: '$[*].key' })).toEqual(['Air', 'GT', null])
+    await expect(run('x', { op: 'group', by: 'trim' })).rejects.toThrow(TransformError)
   })
 
   it('calls hooks, sync or async, with the value so far', async () => {

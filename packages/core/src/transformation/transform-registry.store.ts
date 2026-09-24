@@ -3,9 +3,10 @@ import type { TransformOp, TransformRule } from '../recipe-schema'
 import { selectJson } from '../selection'
 import type { Lookup } from '../template'
 import { render } from '../template'
-import { coalesce, concat, count, first, flatten, join, last, nth, slice, sum, unique } from './collection.algorithm'
+import { asList, coalesce, concat, count, first, flatten, join, last, nth, slice, sum, unique } from './collection.algorithm'
 import { parseCurrency } from './currency.algorithm'
 import { parseDate } from './date.algorithm'
+import { group, lookup } from './lookup.algorithm'
 import { parseBoolean, parseInteger, parseNumber } from './number.algorithm'
 import { lowercase, regex, replace, split, trim, uppercase } from './string.algorithm'
 import { absoluteUrl } from './url.algorithm'
@@ -67,6 +68,8 @@ export const BUILT_IN_TRANSFORMS: { [Op in TransformOp]: Registered<Op> } = {
   count:       list(value => count(value)),
   template:    list((_, rule, context) => render(rule.value, context.lookup)),
   jsonpath:    list((value, rule) => selectJson(value, rule.path)),
+  lookup:      scalar((value, rule, context) => lookup(value, context.lookup(rule.in), rule.key, rule.pick)),
+  group:       list((value, rule) => group(asList('group', value), rule.by)),
   hook:        list((value, rule, context) => context.hooks.resolve(rule.name)(value, rule.args ?? {}, { recipeId: context.recipeId, scope: context.scope, log: context.log })),
 }
 
