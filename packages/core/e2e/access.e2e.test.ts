@@ -1,5 +1,7 @@
 import type { Server } from 'node:http'
 import { join } from 'node:path'
+import { chromium } from 'playwright'
+import type { Browser } from 'playwright'
 import { createCrawler, loadRecipeSet, memorySink, RecipeSet } from '../src/index'
 import type { AccessConfig, CrawlEvent } from '../src/index'
 import { browserConfig, expectedRecords, FIXTURE_PORT, startFixtureSite, stopFixtureSite } from './fixture-site'
@@ -123,4 +125,61 @@ describe('access profiles (real chromium, local forward proxy)', () => {
       await crawler.close()
     }
   }, 60000)
+
+  describe('remote browser over CDP', () => {
+    const DEBUG_PORT = 9333
+    let remote: Browser
+    let remoteProxy: ForwardProxy
+    beforeAll(async () => {
+      remoteProxy = await startForwardProxy(undefined, PROXY_PORT + 1)
+      remote = await chromium.launch({ ...browserConfig(), args: [`--remote-debugging-port=${DEBUG_PORT}`], proxy: { server: `http://127.0.0.1:${PROXY_PORT + 1}` } })
+    })
+    afterAll(async () => {
+      await remote.close()
+      await stopForwardProxy(remoteProxy)
+    })
+    beforeEach(() => { remoteProxy.hits.length = 0 })
+
+    const cdp: AccessConfig = { profiles: { cloud: { kind: 'cdp', endpoint: `http://127.0.0.1:${DEBUG_PORT}` } }, default: 'cloud' }
+
+    it('runs a web recipe and its bootstrap in the remote browser', async () => {
+      const set = await loadRecipeSet({ output: join(recipes, 'product.output.json'), inputs: [join(recipes, 'shop-web.input.json')] })
+      const bootstrap = {
+        keep:  ['cookies' as const],
+        steps: [
+          { type: 'goto' as const, url: `http://127.0.0.1:${FIXTURE_PORT}/login` },
+          { type: 'fill' as const, selector: '#user', value: 'demo' },
+          { type: 'fill' as const, selector: '#pass', value: 'demo' },
+          { type: 'click' as const, selector: 'button[type=submit]' },
+          { type: 'wait' as const, selector: '#logged-in' },
+        ],
+      }
+      const input = { ...set.inputs[0], session: { ...set.inputs[0].session, bootstrap } }
+      const sink = memorySink()
+      const events: CrawlEvent[] = []
+      const crawler = createCrawler({ browser: browserConfig(), sink, access: cdp, onEvent: (event) => { events.push(event) } })
+      try {
+        const report = await crawler.run(new RecipeSet(set.output, [input]))
+        expect(report.recipes[0].error).toBeUndefined()
+        expect(stripDates(sink.records)).toEqual(expectedRecords())
+      } finally {
+        await crawler.close()
+      }
+      expect(events.find(event => event.type === 'access:lease')).toMatchObject({ profile: 'cloud', kind: 'cdp', server: `http://127.0.0.1:${DEBUG_PORT}` })
+      expect(remoteProxy.hits.some(hit => hit.method === 'POST' && hit.url.endsWith('/login'))).toBe(true)
+      expect(remoteProxy.hits.filter(hit => hit.url.includes('/product/'))).toHaveLength(6)
+      expect(proxy.hits).toHaveLength(0)
+    }, 120000)
+
+    it('refuses an api recipe on a remote-browser profile', async () => {
+      const set = await loadRecipeSet({ output: join(recipes, 'product.output.json'), inputs: [join(recipes, 'shop-api.input.json')] })
+      const crawler = createCrawler({ browser: browserConfig(), access: cdp, hooks: { positive: () => true } })
+      try {
+        const report = await crawler.run(set)
+        expect(report.recipes[0].error).toContain('runs in api mode, but access profile "cloud" is a remote browser')
+      } finally {
+        await crawler.close()
+      }
+    }, 60000)
+  })
 })

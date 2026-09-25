@@ -198,6 +198,72 @@
             "properties": {
               "kind": {
                 "type": "string",
+                "const": "cdp"
+              },
+              "endpoint": {
+                "type": "string",
+                "minLength": 1
+              },
+              "headers": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "session": {
+                "type": "object",
+                "properties": {
+                  "idFormat": {
+                    "type": "string",
+                    "pattern": "^(alnum|digits|hex)([1-9]\\d?)$"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "blockResources": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "media",
+                    "font",
+                    "stylesheet",
+                    "script",
+                    "texttrack",
+                    "xhr",
+                    "fetch",
+                    "eventsource",
+                    "websocket",
+                    "manifest",
+                    "other"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "endpoint"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
                 "const": "plugin"
               },
               "name": {

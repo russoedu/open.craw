@@ -33,6 +33,7 @@ export interface ProbeResult {
  */
 export async function probeUrl (url: string, options: { browser: boolean } & CommonOptions): Promise<ProbeResult> {
   const lease = await new AccessBroker(await resolveAccess(options)).lease({ recipeId: 'probe' })
+  if (lease.cdp !== undefined) throw new Error(`access profile "${lease.profile}" is a remote browser; probe fetches over HTTP and needs a proxy profile`)
   const client = await HttpClient.open({
     userAgent:         options.userAgent ?? BROWSER_USER_AGENT,
     ignoreHTTPSErrors: options.insecureTls || lease.ignoreHTTPSErrors === true,

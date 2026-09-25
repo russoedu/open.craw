@@ -1,4 +1,4 @@
-import { AccessBroker } from './access-broker.use-case'
+import { AccessBroker, redactEndpoint } from './access-broker.use-case'
 import { AccessConfigError } from './access-config.error'
 import type { AccessPlugin } from './access-plugin.contract'
 
@@ -92,5 +92,15 @@ describe('AccessBroker', () => {
     const access = broker({ profiles: { p: { kind: 'proxy', server: 'http://h:1', password: '{{env.NOT_SET}}' } } })
     await expect(access.lease({ recipeId: 'r', profile: 'p' })).rejects.toThrow('access profile "p" password needs the environment variable NOT_SET')
     await expect(access.lease({ recipeId: 'imdb', profile: 'uk' })).rejects.toThrow('recipe "imdb" asks for access profile "uk", but the access config has only "p"')
+  })
+
+  it('leases a remote browser with a rendered endpoint, and redacts it for events', async () => {
+    const access = broker({ profiles: { cloud: { kind: 'cdp', endpoint: "wss://brd-customer-{{env.BRD_CUSTOMER}}{{country ? '-country-' + lower(country) : ''}}:{{env.BRD_PASSWORD}}@brd.superproxy.io:9222", headers: { Authorization: 'Bearer {{env.PROXY_PASS}}' }, blockResources: ['image'] } } })
+    const lease = await access.lease({ recipeId: 'r', profile: 'cloud', country: 'GB' })
+    expect(lease).toMatchObject({ profile: 'cloud', kind: 'cdp', cdp: { endpoint: 'wss://brd-customer-hl_123-country-gb:secret@brd.superproxy.io:9222', headers: { Authorization: 'Bearer p4ss' } }, blockResources: ['image'] })
+    expect(lease.proxy).toBeUndefined()
+    expect(redactEndpoint(lease.cdp?.endpoint ?? '')).toBe('wss://brd.superproxy.io:9222')
+    expect(redactEndpoint('wss://production-sfo.browserless.io/chromium?token=abc')).toBe('wss://production-sfo.browserless.io/chromium')
+    expect(redactEndpoint('not a url')).toBe('(endpoint)')
   })
 })

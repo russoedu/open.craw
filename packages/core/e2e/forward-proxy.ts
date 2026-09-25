@@ -39,17 +39,18 @@ function credentialsOf (incoming: IncomingMessage): { username: string, password
 /**
  * Starts the proxy.
  *
- * @param password - The only password it accepts.
+ * @param password - The only password it accepts; `undefined` for an open proxy that logs every caller as `anonymous`.
+ * @param port - Where it listens.
  * @returns The server and its hit log.
  */
-export async function startForwardProxy (password: string): Promise<ForwardProxy> {
+export async function startForwardProxy (password: string | undefined, port = PROXY_PORT): Promise<ForwardProxy> {
   const hits: ProxyHit[] = []
   const seen = new Set<string>()
   const blocked = new Set<string>()
   let blockNext = false
   const server = createServer((incoming, outgoing) => {
-    const credentials = credentialsOf(incoming)
-    if (credentials?.password !== password) {
+    const credentials = password === undefined ? { username: 'anonymous', password } : credentialsOf(incoming)
+    if (credentials === undefined || credentials.password !== password) {
       outgoing.writeHead(407, { 'proxy-authenticate': CHALLENGE })
       outgoing.end()
 
@@ -82,8 +83,8 @@ export async function startForwardProxy (password: string): Promise<ForwardProxy
     incoming.pipe(upstream)
   })
   server.on('connect', (incoming: IncomingMessage, client: Duplex, head: Buffer) => {
-    const credentials = credentialsOf(incoming)
-    if (credentials?.password !== password) {
+    const credentials = password === undefined ? { username: 'anonymous', password } : credentialsOf(incoming)
+    if (credentials === undefined || credentials.password !== password) {
       client.end(`HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: ${CHALLENGE}\r\n\r\n`)
 
       return
@@ -101,7 +102,7 @@ export async function startForwardProxy (password: string): Promise<ForwardProxy
   })
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
-    server.listen(PROXY_PORT, '127.0.0.1', resolve)
+    server.listen(port, '127.0.0.1', resolve)
   })
 
   return { server, hits, blockNextUser: () => { blockNext = true } }

@@ -23,7 +23,12 @@ export interface SessionOptions {
 
 /** One browser context with one page: the unit a recipe runs in. */
 export class BrowserSession {
-  constructor (readonly context: BrowserContext, readonly page: Page) {}
+  /**
+   * @param context - The browser context.
+   * @param page - Its page.
+   * @param closer - How to end the session; closing the context by default. A remote browser disconnects instead.
+   */
+  constructor (readonly context: BrowserContext, readonly page: Page, private readonly closer?: () => Promise<void>) {}
 
   /** The cookies and storage this session holds now, in the shape an HTTP client or a later run can reuse. */
   storageState (): Promise<StorageState> {
@@ -31,7 +36,7 @@ export class BrowserSession {
   }
 
   async close (): Promise<void> {
-    await this.context.close()
+    await (this.closer === undefined ? this.context.close() : this.closer())
   }
 }
 
@@ -66,6 +71,34 @@ export class BrowserClient {
     })
 
     return new BrowserClient(browser, config)
+  }
+
+  /**
+   * A session in a remote browser, over the Chrome DevTools Protocol. The
+   * provider's own context is reused when it offers one (several providers
+   * pin the proxy and fingerprint to it); cookies, headers, blocked resources
+   * and the viewport are applied to it. Closing the session disconnects,
+   * which ends it on the provider's side.
+   *
+   * @param cdp - The endpoint and connection headers.
+   * @param options - What the session starts from. `userAgent` cannot change on an existing context and is ignored.
+   * @param timeoutMs - For the connection and every action.
+   * @returns The session.
+   */
+  static async connectOverCDP (cdp: { endpoint: string, headers?: Record<string, string> }, options: SessionOptions = {}, timeoutMs?: number): Promise<BrowserSession> {
+    const browser = await chromium.connectOverCDP(cdp.endpoint, { headers: cdp.headers, timeout: timeoutMs })
+    const context = browser.contexts()[0] ?? await browser.newContext()
+    if (timeoutMs !== undefined) context.setDefaultTimeout(timeoutMs)
+    const cookies = [...(options.storageState?.cookies ?? []), ...(options.cookies ?? [])]
+    if (cookies.length > 0) await context.addCookies(cookies)
+    if (options.headers !== undefined) await context.setExtraHTTPHeaders(options.headers)
+    if (options.blockResources !== undefined && options.blockResources.length > 0) await blockResources(context, new Set(options.blockResources))
+    const page = await context.newPage()
+    if (options.viewport !== undefined) await page.setViewportSize(options.viewport)
+
+    return new BrowserSession(context, page, async () => {
+      await browser.close()
+    })
   }
 
   private constructor (private readonly browser: Browser, private readonly config: BrowserSessionConfig) {}

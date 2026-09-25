@@ -1,5 +1,5 @@
 import { accessConfigSchema } from './access-profile.contract'
-import type { AccessConfig, AccessProfile, PoolProfile, ProxyProfile, ProxySettings } from './access-profile.contract'
+import type { AccessConfig, AccessProfile, CdpProfile, PoolProfile, ProxyProfile, ProxySettings } from './access-profile.contract'
 import type { AccessLease, AccessPlugin, LeaseRequest } from './access-plugin.contract'
 import { ACCESS_PRESETS } from './access-preset.store'
 import { AccessConfigError } from './access-config.error'
@@ -67,6 +67,8 @@ export class AccessBroker {
 
         return leasePool(name, profile, request, this.env, cursor)
       }
+      case 'cdp': { return leaseCdp(name, profile, request, this.env)
+      }
       case 'plugin': {
         const plugin = this.plugins.get(profile.name) as AccessPlugin
         const context: AccessTemplateContext = { env: this.env, country: request.country, recipe: { id: request.recipeId } }
@@ -110,6 +112,34 @@ function leasePool (name: string, profile: PoolProfile, request: LeaseRequest, e
   }
 
   return { profile: name, kind: 'pool', proxy, session: String(index), headers: renderHeaders(profile.headers, context, `access profile "${name}" headers`), ignoreHTTPSErrors: profile.ignoreHTTPSErrors, blockResources: profile.blockResources }
+}
+
+function leaseCdp (name: string, profile: CdpProfile, request: LeaseRequest, env: Env): AccessLease {
+  const where = `access profile "${name}"`
+  const base: AccessTemplateContext = { env, country: request.country, recipe: { id: request.recipeId } }
+  const params = Object.fromEntries(Object.entries(profile.params ?? {}).map(([key, value]) => [key, renderAccessText(value, base, `${where} params.${key}`)]))
+  const session = newSessionId(profile.session?.idFormat)
+  const context: AccessTemplateContext = { ...base, params, session }
+  const cdp = { endpoint: renderAccessText(profile.endpoint, context, `${where} endpoint`), headers: renderHeaders(profile.headers, context, `${where} headers`) }
+
+  return { profile: name, kind: 'cdp', cdp, session, blockResources: profile.blockResources }
+}
+
+/**
+ * An endpoint as events may show it: scheme, host and path, without the
+ * credentials or tokens remote-browser URLs carry.
+ *
+ * @param endpoint - A proxy server or CDP endpoint.
+ * @returns The redacted form.
+ */
+export function redactEndpoint (endpoint: string): string {
+  try {
+    const url = new URL(endpoint)
+
+    return `${url.protocol}//${url.host}${url.pathname === '/' ? '' : url.pathname}`
+  } catch {
+    return '(endpoint)'
+  }
 }
 
 /** Load-time checks that do not need the environment. */

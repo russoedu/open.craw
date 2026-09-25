@@ -23,6 +23,8 @@ export interface AccessLease {
   headers?:           Record<string, string>
   ignoreHTTPSErrors?: boolean
   blockResources?:    BlockableResource[]
+  /** A remote browser to connect to instead of launching one (web recipes and bootstraps only). */
+  cdp?:               { endpoint: string, headers?: Record<string, string> }
   /** Called when the run ends or rotates away from this lease. */
   release?:           () => Promise<void>
 }

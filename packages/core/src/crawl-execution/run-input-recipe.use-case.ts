@@ -1,6 +1,7 @@
+import { AccessConfigError, redactEndpoint } from '../access'
 import type { AccessBroker, AccessLease } from '../access'
 import { ApiStepRunner } from '../api-steps'
-import type { BrowserClient } from '../browser-session'
+import { BrowserClient } from '../browser-session'
 import type { EventBus } from '../crawl-events'
 import { ExtractionScope } from '../extraction-scope'
 import type { HookRegistry } from '../hooks'
@@ -11,7 +12,7 @@ import type { DedupePolicy, RecordSink } from '../record-sink'
 import { RunGate, runSteps } from '../step-flow'
 import type { EmitOutcome, StepRunner } from '../step-flow'
 import { WebStepRunner } from '../web-steps'
-import { accessOptions, resolveStorageState } from './bootstrap-session.use-case'
+import { accessOptions, readSavedState, resolveStorageState, runBootstrap } from './bootstrap-session.use-case'
 import { RotatingRunner } from './rotating-runner.use-case'
 import type { LeasedRunner } from './rotating-runner.use-case'
 import type { RecipeReport } from './crawl-report.model'
@@ -149,7 +150,8 @@ export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, 
 async function leaseAccess (input: InputRecipe, deps: RecipeRunDependencies, attempt: number): Promise<AccessLease> {
   const wanted = input.session?.access
   const lease = await deps.access.lease({ recipeId: input.id, profile: wanted?.profile, country: wanted?.country, sticky: wanted?.sticky, attempt })
-  deps.events.emit({ type: 'access:lease', recipeId: input.id, profile: lease.profile, kind: lease.kind, server: lease.proxy?.server, session: lease.session })
+  const server = lease.proxy?.server ?? (lease.cdp === undefined ? undefined : redactEndpoint(lease.cdp.endpoint))
+  deps.events.emit({ type: 'access:lease', recipeId: input.id, profile: lease.profile, kind: lease.kind, server, session: lease.session })
   if (attempt === 1 && lease.kind === 'direct' && wanted?.country !== undefined) {
     deps.events.emit({ type: 'warning', recipeId: input.id, message: `session.access.country "${wanted.country}" is ignored: no proxy profile applies to this recipe` })
   }
@@ -169,6 +171,7 @@ async function openLeased (input: InputRecipe, deps: RecipeRunDependencies, gate
 }
 
 async function openRunner (input: InputRecipe, deps: RecipeRunDependencies, gate: RunGate, lease: AccessLease): Promise<StepRunner> {
+  if (lease.cdp !== undefined) return openRemoteRunner(input, deps, gate, lease, lease.cdp)
   const storageState = await resolveStorageState(input, deps, lease)
   const session = input.session
   const access = accessOptions(lease, session?.headers)
@@ -188,4 +191,24 @@ async function openRunner (input: InputRecipe, deps: RecipeRunDependencies, gate
   })
 
   return new ApiStepRunner(client, input, deps.events, gate)
+}
+
+/**
+ * A web runner in a remote browser. The bootstrap runs in the same remote
+ * session as the crawl: providers tie the IP and fingerprint to the
+ * connection, so a login in one connection would not carry to another.
+ */
+async function openRemoteRunner (input: InputRecipe, deps: RecipeRunDependencies, gate: RunGate, lease: AccessLease, cdp: NonNullable<AccessLease['cdp']>): Promise<StepRunner> {
+  if (input.mode === 'api') throw new AccessConfigError(`recipe "${input.id}" runs in api mode, but access profile "${lease.profile}" is a remote browser; api recipes need a proxy profile`)
+  const session = input.session
+  const storageState = await readSavedState(input, deps)
+  const browserSession = await BrowserClient.connectOverCDP(cdp, { storageState, cookies: session?.cookies, viewport: session?.viewport, ...accessOptions(lease, session?.headers) }, input.limits?.timeoutMs)
+  try {
+    if (storageState === undefined && session?.bootstrap !== undefined) await runBootstrap(input, browserSession, deps)
+  } catch (error) {
+    await browserSession.close()
+    throw error
+  }
+
+  return new WebStepRunner(browserSession, input, deps.events, gate)
 }

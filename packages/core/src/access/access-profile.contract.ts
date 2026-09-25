@@ -61,6 +61,23 @@ export interface PoolProfile extends ProfileCommon {
   rotate?: 'round-robin' | 'random'
 }
 
+/**
+ * A remote browser reached over the Chrome DevTools Protocol (Bright Data
+ * Browser API, Browserless, Oxylabs, Zyte...): web recipes and bootstraps run
+ * in it, and it handles IPs, fingerprints and challenges. Api recipes cannot
+ * use it.
+ */
+export interface CdpProfile {
+  kind:            'cdp'
+  /** `wss://...` or `http://host:port`; a template, usually carrying the token or credentials. */
+  endpoint:        string
+  /** Headers sent with the connection, such as `Authorization`. Templates. */
+  headers?:        Record<string, string>
+  params?:         Record<string, string>
+  session?:        { idFormat?: string }
+  blockResources?: BlockableResource[]
+}
+
 export interface PluginProfile {
   kind:     'plugin'
   /** The name an `AccessPlugin` was registered under. */
@@ -69,7 +86,7 @@ export interface PluginProfile {
   options?: Record<string, unknown>
 }
 
-export type AccessProfile = DirectProfile | ProxyProfile | PoolProfile | PluginProfile
+export type AccessProfile = DirectProfile | ProxyProfile | PoolProfile | CdpProfile | PluginProfile
 
 /** The runner's access config: named profiles and the one used when a recipe names none. */
 export interface AccessConfig {
@@ -114,9 +131,17 @@ const poolSchema = z.strictObject({
   proxies: z.array(proxySettingsSchema).min(1),
   rotate:  z.enum(['round-robin', 'random']).optional(),
 })
+const cdpSchema = z.strictObject({
+  kind:           z.literal('cdp'),
+  endpoint:       z.string().min(1),
+  headers:        stringMap.optional(),
+  params:         stringMap.optional(),
+  session:        z.strictObject({ idFormat: z.string().regex(SESSION_ID_FORMAT).optional() }).optional(),
+  blockResources: blockResources.optional(),
+})
 const pluginSchema = z.strictObject({ kind: z.literal('plugin'), name: z.string().min(1), options: z.record(z.string(), z.unknown()).optional() })
 
-export const accessProfileSchema: z.ZodType<AccessProfile> = z.union([directSchema, proxySchema, poolSchema, pluginSchema])
+export const accessProfileSchema: z.ZodType<AccessProfile> = z.union([directSchema, proxySchema, poolSchema, cdpSchema, pluginSchema])
 
 export const accessConfigSchema: z.ZodType<AccessConfig> = z.strictObject({
   $schema:  z.string().optional(),
