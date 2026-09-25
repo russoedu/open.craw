@@ -15,17 +15,19 @@ describe('parseArguments', () => {
       dryRun:  true,
       only:    ['a', 'b'],
       headed:  false,
-      hooks:   undefined,
-      options: { browserPath: undefined, insecureTls: true, userAgent: undefined, access: undefined, accessProfile: undefined },
+      options: { browserPath: undefined, insecureTls: true, userAgent: undefined, access: undefined, accessProfile: undefined, plugins: undefined },
     })
     expect(parseArguments(['probe', 'https://x', '--browser', '--browser-path', '/c', '--user-agent', 'ua'])).toEqual({
-      name: 'probe', url: 'https://x', browser: true, options: { browserPath: '/c', insecureTls: false, userAgent: 'ua', access: undefined, accessProfile: undefined },
+      name: 'probe', url: 'https://x', browser: true, options: { browserPath: '/c', insecureTls: false, userAgent: 'ua', access: undefined, accessProfile: undefined, plugins: undefined },
     })
     expect(parseArguments(['probe', 'https://x'], { OPENCRAW_CHROMIUM: '/env' })).toMatchObject({ options: { browserPath: '/env' } })
     expect(parseArguments(['run', 'r/', '--access', 'a.json', '--access-profile', 'uk'])).toMatchObject({ options: { access: 'a.json', accessProfile: 'uk' } })
     expect(parseArguments(['run', 'r/'], { OPENCRAW_ACCESS: 'env.json' })).toMatchObject({ options: { access: 'env.json' } })
-    expect(parseArguments(['run', 'r/', '--hooks', 'h.mjs'], { OPENCRAW_HOOKS: 'env.mjs' })).toMatchObject({ hooks: 'h.mjs' })
-    expect(parseArguments(['run', 'r/'], { OPENCRAW_HOOKS: 'env.mjs' })).toMatchObject({ hooks: 'env.mjs' })
+    expect(parseArguments(['run', 'r/', '--hooks', 'h.mjs'], { OPENCRAW_HOOKS: 'env.mjs' })).toMatchObject({ options: { plugins: 'h.mjs' } })
+    expect(parseArguments(['run', 'r/', '--plugins', 'p.mjs', '--hooks', 'h.mjs'])).toMatchObject({ options: { plugins: 'p.mjs' } })
+    expect(parseArguments(['run', 'r/'], { OPENCRAW_HOOKS: 'env.mjs' })).toMatchObject({ options: { plugins: 'env.mjs' } })
+    expect(parseArguments(['probe', 'https://x'], { OPENCRAW_PLUGINS: 'p.mjs', OPENCRAW_HOOKS: 'h.mjs' })).toMatchObject({ options: { plugins: 'p.mjs' } })
+    expect(parseArguments(['run', 'r/'], { OPENCRAW_PLUGINS: '', OPENCRAW_HOOKS: '' })).toMatchObject({ options: { plugins: undefined } })
   })
 
   it('rejects what makes no sense', () => {

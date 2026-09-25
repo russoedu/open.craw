@@ -28,10 +28,15 @@ export async function probeTool (args: { url: string, browser?: boolean, browser
       userAgent:     args.userAgent,
       access:        process.env.OPENCRAW_ACCESS === '' ? undefined : process.env.OPENCRAW_ACCESS,
       accessProfile: args.access,
+      plugins:       nonEmpty(process.env.OPENCRAW_PLUGINS) ?? nonEmpty(process.env.OPENCRAW_HOOKS),
     })
 
     return { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result as unknown as Record<string, unknown> }
   } catch (error) {
     return { content: [{ type: 'text', text: `probe failed: ${error instanceof Error ? error.message : String(error)}` }], isError: true }
   }
+}
+
+function nonEmpty (value: string | undefined): string | undefined {
+  return value === '' ? undefined : value
 }

@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url'
 import { AccessBroker, BrowserClient, HttpClient } from '@opencraw/core'
 import type { AccessLease } from '@opencraw/core'
 import { resolveAccess } from '../access'
+import { loadPlugins } from '../hooks-module'
 import type { CommonOptions } from '../arguments'
 import type { Terminal } from '../terminal'
 import { findData } from './find-data.algorithm'
@@ -57,7 +58,8 @@ export interface ProbeResult {
  * @throws Error when the fetch itself fails.
  */
 export async function probeUrl (url: string, options: { browser: boolean } & CommonOptions): Promise<ProbeResult> {
-  const lease = await new AccessBroker(await resolveAccess(options)).lease({ recipeId: 'probe' })
+  const plugins = options.plugins === undefined ? undefined : await loadPlugins(options.plugins)
+  const lease = await new AccessBroker(await resolveAccess(options), plugins?.accessPlugins).lease({ recipeId: 'probe' })
   if (lease.cdp !== undefined) throw new Error(`access profile "${lease.profile}" is a remote browser; probe fetches over HTTP and needs a proxy profile`)
   const client = await HttpClient.open({
     userAgent:         options.userAgent ?? BROWSER_USER_AGENT,

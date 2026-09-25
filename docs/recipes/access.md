@@ -300,6 +300,23 @@ const browserbase: AccessPlugin = {
 `release()` runs when the recipe run ends, including after a rotation, so a remote session is never left
 running.
 
+**From the cli and the MCP server**, plugins come from a plugins module: the same file that gives the recipes'
+hooks, with named exports.
+
+```js
+// plugins.mjs
+export const hooks = { positive: input => Number(input) > 0 }
+export const accessPlugins = [rotatingList, browserbase]
+```
+
+```sh
+opencraw run recipes/ --plugins plugins.mjs --access access.json   # or OPENCRAW_PLUGINS=plugins.mjs
+```
+
+`probe` takes `--plugins` too, so it can lease from a plugin profile. The MCP server reads `OPENCRAW_PLUGINS`
+(or `OPENCRAW_HOOKS`) from its own environment, never from a tool call. A profile naming a plugin the module
+does not provide fails before the crawl starts.
+
 ## Not covered yet
 
 Tracked on issue #8:

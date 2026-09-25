@@ -873,7 +873,17 @@ export default {
 opencraw run recipes/ --hooks hooks.mjs      # or OPENCRAW_HOOKS=hooks.mjs
 ```
 
-The MCP server reads `OPENCRAW_HOOKS` from its own environment, never from a tool call: an agent can run
+The same file becomes a **plugins module** when it names its exports: `hooks` (the map), `accessPlugins`
+([access.md](access.md#plugins)) and `captchaSolvers` (§6.1). `--plugins` / `OPENCRAW_PLUGINS` are the same
+option under their own name.
+
+```js
+// plugins.mjs
+export const hooks = { positive: input => Number(input) > 0 }
+export const accessPlugins = [myProxyList]
+```
+
+The MCP server reads `OPENCRAW_PLUGINS` / `OPENCRAW_HOOKS` from its own environment, never from a tool call: an agent can run
 recipes that call your hooks but cannot make the server load a module of its choosing. The module runs as
 your code, with your privileges, like anything you `import`: load only files you trust.
 
