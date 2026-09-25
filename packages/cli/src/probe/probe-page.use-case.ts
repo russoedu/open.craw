@@ -7,10 +7,42 @@ import { probeReport } from './probe-report.mapper'
 const BROWSER_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36'
 const OBSERVE_MS = 4000
 
+/** What fetching and, optionally, rendering a page found. */
+export interface ProbeResult {
+  url:      string
+  status:   number
+  findings: ReturnType<typeof findData>
+  /** JSON responses observed while the page rendered; empty unless `options.browser` was set. */
+  observed: string[]
+}
+
 /**
- * Fetches a page and reports where its data lives. With `browser: true` it
- * also renders the page and lists the JSON responses seen while it settles,
- * which finds endpoints a plain fetch of the initial HTML cannot.
+ * Fetches a page and finds where its data lives. With `browser: true` it also
+ * renders the page and lists the JSON responses seen while it settles, which
+ * finds endpoints a plain fetch of the initial HTML cannot. No `Terminal`
+ * involved: the cli's `probePage` and `@open.craw/mcp`'s probe tool both
+ * build on this, one printing the result, the other returning it as data.
+ *
+ * @param url - The page to probe.
+ * @param options - Browser path, TLS and user agent, plus whether to render.
+ * @returns What was found.
+ * @throws Error when the fetch itself fails.
+ */
+export async function probeUrl (url: string, options: { browser: boolean } & CommonOptions): Promise<ProbeResult> {
+  const client = await HttpClient.open({ userAgent: options.userAgent ?? BROWSER_USER_AGENT, ignoreHTTPSErrors: options.insecureTls })
+  try {
+    const response = await client.send({ url, as: 'html' })
+    const html = response.body.kind === 'html' ? response.body.html : ''
+    const observed = options.browser ? await observeBrowserJson(url, options) : []
+
+    return { url: response.url, status: response.status, findings: findData(html), observed }
+  } finally {
+    await client.dispose()
+  }
+}
+
+/**
+ * Fetches a page and reports where its data lives, to a `Terminal`.
  *
  * @param url - The page to probe.
  * @param options - Browser path, TLS and user agent, plus whether to render.
@@ -18,20 +50,15 @@ const OBSERVE_MS = 4000
  * @returns The exit code: 0, or 1 on a fetch failure.
  */
 export async function probePage (url: string, options: { browser: boolean } & CommonOptions, terminal: Terminal): Promise<number> {
-  const client = await HttpClient.open({ userAgent: options.userAgent ?? BROWSER_USER_AGENT, ignoreHTTPSErrors: options.insecureTls })
   try {
-    const response = await client.send({ url, as: 'html' })
-    const html = response.body.kind === 'html' ? response.body.html : ''
-    const observed = options.browser ? await observeBrowserJson(url, options) : []
-    terminal.out(probeReport(response.url, response.status, findData(html), observed))
+    const result = await probeUrl(url, options)
+    terminal.out(probeReport(result.url, result.status, result.findings, result.observed))
 
     return 0
   } catch (error) {
     terminal.err(`probe failed: ${error instanceof Error ? error.message : String(error)}`)
 
     return 1
-  } finally {
-    await client.dispose()
   }
 }
 
