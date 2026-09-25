@@ -1,5 +1,7 @@
 import type { Server } from 'node:http'
 import { execFile } from 'node:child_process'
+import { mkdtemp, readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { startFixtureSite, stopFixtureSite } from '../../core/e2e/fixture-site'
@@ -40,9 +42,9 @@ describe('open-craw cli', () => {
   }, 60000)
 
   it('run: writes JSON Lines to --out', async () => {
-    const out = join(__dirname, 'out.jsonl')
+    const directory = await mkdtemp(join(tmpdir(), 'cli-e2e-'))
+    const out = join(directory, 'out.jsonl')
     await run('node', [BIN, 'run', recipesDir, '--out', out, '--only', 'shop-web'])
-    const { readFile } = await import('node:fs/promises')
     const content = await readFile(out, 'utf8')
     const lines = content.trim().split('\n')
     expect(lines).toHaveLength(6)

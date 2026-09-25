@@ -9,6 +9,7 @@ export const probeInputShape = {
   browserPath: z.string().optional().describe('A browser binary other than the one Playwright installed. Defaults to OPEN_CRAW_CHROMIUM in the server\'s environment.'),
   insecureTls: z.boolean().optional().describe("Accept an intercepting proxy's certificate. Defaults to OPEN_CRAW_INSECURE_TLS=1 in the server's environment."),
   userAgent:   z.string().optional().describe('The user agent to send.'),
+  access:      z.string().optional().describe('An access profile (a proxy) from the server\'s access config file, OPEN_CRAW_ACCESS.'),
 }
 
 /**
@@ -18,13 +19,15 @@ export const probeInputShape = {
  * @param args - The tool's parsed input.
  * @returns The MCP tool result: the probe findings as JSON text.
  */
-export async function probeTool (args: { url: string, browser?: boolean, browserPath?: string, insecureTls?: boolean, userAgent?: string }): Promise<CallToolResult> {
+export async function probeTool (args: { url: string, browser?: boolean, browserPath?: string, insecureTls?: boolean, userAgent?: string, access?: string }): Promise<CallToolResult> {
   try {
     const result = await probeUrl(args.url, {
-      browser:     args.browser ?? false,
-      browserPath: args.browserPath ?? process.env.OPEN_CRAW_CHROMIUM,
-      insecureTls: args.insecureTls === true || process.env.OPEN_CRAW_INSECURE_TLS === '1',
-      userAgent:   args.userAgent,
+      browser:       args.browser ?? false,
+      browserPath:   args.browserPath ?? process.env.OPEN_CRAW_CHROMIUM,
+      insecureTls:   args.insecureTls === true || process.env.OPEN_CRAW_INSECURE_TLS === '1',
+      userAgent:     args.userAgent,
+      access:        process.env.OPEN_CRAW_ACCESS === '' ? undefined : process.env.OPEN_CRAW_ACCESS,
+      accessProfile: args.access,
     })
 
     return { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result as unknown as Record<string, unknown> }

@@ -1,4 +1,6 @@
-import { BrowserClient, HttpClient } from '@open.craw/core'
+import { AccessBroker, BrowserClient, HttpClient } from '@open.craw/core'
+import type { AccessLease } from '@open.craw/core'
+import { resolveAccess } from '../access'
 import type { CommonOptions } from '../arguments'
 import type { Terminal } from '../terminal'
 import { findData } from './find-data.algorithm'
@@ -17,7 +19,8 @@ export interface ProbeResult {
 }
 
 /**
- * Fetches a page and finds where its data lives. With `browser: true` it also
+ * Fetches a page and finds where its data lives, through the access profile the
+ * options name (direct without one). With `browser: true` it also
  * renders the page and lists the JSON responses seen while it settles, which
  * finds endpoints a plain fetch of the initial HTML cannot. No `Terminal`
  * involved: the cli's `probePage` and `@open.craw/mcp`'s probe tool both
@@ -29,11 +32,17 @@ export interface ProbeResult {
  * @throws Error when the fetch itself fails.
  */
 export async function probeUrl (url: string, options: { browser: boolean } & CommonOptions): Promise<ProbeResult> {
-  const client = await HttpClient.open({ userAgent: options.userAgent ?? BROWSER_USER_AGENT, ignoreHTTPSErrors: options.insecureTls })
+  const lease = await new AccessBroker(await resolveAccess(options)).lease({ recipeId: 'probe' })
+  const client = await HttpClient.open({
+    userAgent:         options.userAgent ?? BROWSER_USER_AGENT,
+    ignoreHTTPSErrors: options.insecureTls || lease.ignoreHTTPSErrors === true,
+    proxy:             lease.proxy,
+    headers:           lease.headers,
+  })
   try {
     const response = await client.send({ url, as: 'html' })
     const html = response.body.kind === 'html' ? response.body.html : ''
-    const observed = options.browser ? await observeBrowserJson(url, options) : []
+    const observed = options.browser ? await observeBrowserJson(url, options, lease) : []
 
     return { url: response.url, status: response.status, findings: findData(html), observed }
   } finally {
@@ -62,10 +71,10 @@ export async function probePage (url: string, options: { browser: boolean } & Co
   }
 }
 
-async function observeBrowserJson (url: string, options: CommonOptions): Promise<string[]> {
+async function observeBrowserJson (url: string, options: CommonOptions, lease: AccessLease): Promise<string[]> {
   const browser = await BrowserClient.launch({ executablePath: options.browserPath, ignoreHTTPSErrors: options.insecureTls })
   try {
-    const session = await browser.newSession({ userAgent: options.userAgent })
+    const session = await browser.newSession({ userAgent: options.userAgent, proxy: lease.proxy, headers: lease.headers, ignoreHTTPSErrors: lease.ignoreHTTPSErrors })
     const seen: string[] = []
     session.page.on('response', (response) => {
       if ((response.headers()['content-type'] ?? '').includes('json')) seen.push(`${response.status()} ${response.url()}`)

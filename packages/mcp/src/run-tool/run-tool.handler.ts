@@ -1,7 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { RecipeBindingError, RecipeSet, RecipeValidationError, createCrawler, jsonLinesSink, memorySink } from '@open.craw/core'
 import type { CrawlReport } from '@open.craw/core'
-import { loadForRun } from '@open.craw/cli'
+import { loadForRun, resolveAccess } from '@open.craw/cli'
 import { z } from 'zod'
 
 const RECORD_CAP = 50
@@ -18,6 +18,7 @@ export const runInputShape = {
   browserPath: z.string().optional().describe('A browser binary other than the one Playwright installed. Defaults to OPEN_CRAW_CHROMIUM in the server\'s environment.'),
   insecureTls: z.boolean().optional().describe("Accept an intercepting proxy's certificate. Defaults to OPEN_CRAW_INSECURE_TLS=1 in the server's environment."),
   userAgent:   z.string().optional().describe('The user agent to send.'),
+  access:      z.string().optional().describe('An access profile (a proxy) from the server\'s access config file, OPEN_CRAW_ACCESS, used by every recipe that names none. The error for an unknown name lists the profiles.'),
 }
 
 interface RunArgs {
@@ -31,6 +32,7 @@ interface RunArgs {
   browserPath?: string,
   insecureTls?: boolean,
   userAgent?:   string
+  access?:      string
 }
 
 /** What the `run` tool returns. */
@@ -59,16 +61,22 @@ export async function runTool (args: RunArgs): Promise<CallToolResult> {
     return { content: [{ type: 'text', text: args.only !== undefined && args.only.length > 0 ? `no input recipe matches "only": ${args.only.join(', ')}` : 'no input recipes found' }], isError: true }
   }
 
+  let crawler: ReturnType<typeof createCrawler>
   const sink = args.dryRun === true || args.out === undefined ? memorySink() : jsonLinesSink(args.out, { append: args.append })
-  const crawler = createCrawler({
-    sink,
-    resume:  args.resume,
-    browser: {
-      headless:          args.headed !== true,
-      executablePath:    args.browserPath ?? process.env.OPEN_CRAW_CHROMIUM,
-      ignoreHTTPSErrors: args.insecureTls === true || process.env.OPEN_CRAW_INSECURE_TLS === '1',
-    },
-  })
+  try {
+    crawler = createCrawler({
+      sink,
+      access:  await resolveAccess({ insecureTls: false, access: serverAccessFile(), accessProfile: args.access }),
+      resume:  args.resume,
+      browser: {
+        headless:          args.headed !== true,
+        executablePath:    args.browserPath ?? process.env.OPEN_CRAW_CHROMIUM,
+        ignoreHTTPSErrors: args.insecureTls === true || process.env.OPEN_CRAW_INSECURE_TLS === '1',
+      },
+    })
+  } catch (error) {
+    return { content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }], isError: true }
+  }
   try {
     const inputs = args.dryRun === true ? set.inputs.map(input => ({ ...input, limits: { ...input.limits, maxRecords: 1 } })) : set.inputs
     const report = await crawler.run(new RecipeSet(set.output, inputs))
@@ -83,6 +91,13 @@ export async function runTool (args: RunArgs): Promise<CallToolResult> {
   } finally {
     await crawler.close()
   }
+}
+
+/** The access config file the server was started with; the tool picks a profile from it, never a file. */
+function serverAccessFile (): string | undefined {
+  const file = process.env.OPEN_CRAW_ACCESS
+
+  return file === undefined || file === '' ? undefined : file
 }
 
 function loadErrorText (error: unknown): string {

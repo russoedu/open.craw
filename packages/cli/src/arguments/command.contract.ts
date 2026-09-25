@@ -1,11 +1,15 @@
 /** Options every command shares. */
 export interface CommonOptions {
   /** A browser binary other than the one Playwright installed. */
-  browserPath?: string
+  browserPath?:   string
   /** Accept an intercepting proxy's certificate. */
-  insecureTls:  boolean
+  insecureTls:    boolean
   /** A user agent for requests and the browser. */
-  userAgent?:   string
+  userAgent?:     string
+  /** An access config file (proxy profiles); `OPEN_CRAW_ACCESS` when not given. */
+  access?:        string
+  /** The access profile to use by default, overriding the config's `default`. */
+  accessProfile?: string
 }
 
 export type Command =

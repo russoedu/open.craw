@@ -1,5 +1,6 @@
 import { RecipeBindingError, RecipeSet, RecipeValidationError, createCrawler, jsonLinesSink, memorySink, traceLine } from '@open.craw/core'
 import type { CrawlEvent } from '@open.craw/core'
+import { resolveAccess } from '../access'
 import type { Command } from '../arguments'
 import type { Terminal } from '../terminal'
 import { loadForRun } from './load-for-run.use-case'
@@ -30,9 +31,18 @@ export async function runRecipes (command: Extract<Command, { name: 'run' }>, te
     return 1
   }
 
+  let access
+  try {
+    access = await resolveAccess(command.options)
+  } catch (error) {
+    terminal.err(error instanceof Error ? error.message : String(error))
+
+    return 1
+  }
   const sink = command.dryRun || (command.out === undefined) ? memorySink() : jsonLinesSink(command.out, { append: command.append })
   const crawler = createCrawler({
     sink,
+    access,
     resume:  command.resume,
     debug:   command.dryRun,
     browser: {

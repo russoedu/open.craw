@@ -24,22 +24,27 @@ Options for both
   --browser-path <p>  A browser binary other than the one Playwright installed (or OPEN_CRAW_CHROMIUM).
   --insecure-tls      Accept an intercepting proxy's certificate (or OPEN_CRAW_INSECURE_TLS=1).
   --user-agent <ua>   The user agent to send.
+  --access <file>     An access config: proxy profiles, credentials as {{env.NAME}} (or OPEN_CRAW_ACCESS).
+  --access-profile <name>
+                      The access profile to use when a recipe names none.
   --help, --version`
 
 const OPTIONS = {
-  'out':          { type: 'string' },
-  'append':       { type: 'boolean' },
-  'resume':       { type: 'boolean' },
-  'only':         { type: 'string', multiple: true },
-  'dry-run':      { type: 'boolean' },
-  'trace':        { type: 'boolean' },
-  'headed':       { type: 'boolean' },
-  'browser':      { type: 'boolean' },
-  'browser-path': { type: 'string' },
-  'insecure-tls': { type: 'boolean' },
-  'user-agent':   { type: 'string' },
-  'help':         { type: 'boolean', short: 'h' },
-  'version':      { type: 'boolean', short: 'v' },
+  'out':            { type: 'string' },
+  'append':         { type: 'boolean' },
+  'resume':         { type: 'boolean' },
+  'only':           { type: 'string', multiple: true },
+  'dry-run':        { type: 'boolean' },
+  'trace':          { type: 'boolean' },
+  'headed':         { type: 'boolean' },
+  'browser':        { type: 'boolean' },
+  'browser-path':   { type: 'string' },
+  'insecure-tls':   { type: 'boolean' },
+  'user-agent':     { type: 'string' },
+  'access':         { type: 'string' },
+  'access-profile': { type: 'string' },
+  'help':           { type: 'boolean', short: 'h' },
+  'version':        { type: 'boolean', short: 'v' },
 } as const
 
 /**
@@ -56,9 +61,11 @@ export function parseArguments (argv: readonly string[], env: Record<string, str
   if (values.version === true) return { name: 'version' }
   const [name, ...rest] = positionals
   const options: CommonOptions = {
-    browserPath: values['browser-path'] ?? env.OPEN_CRAW_CHROMIUM,
-    insecureTls: values['insecure-tls'] === true || env.OPEN_CRAW_INSECURE_TLS === '1',
-    userAgent:   values['user-agent'],
+    browserPath:   values['browser-path'] ?? env.OPEN_CRAW_CHROMIUM,
+    insecureTls:   values['insecure-tls'] === true || env.OPEN_CRAW_INSECURE_TLS === '1',
+    userAgent:     values['user-agent'],
+    access:        values.access ?? (env.OPEN_CRAW_ACCESS === '' ? undefined : env.OPEN_CRAW_ACCESS),
+    accessProfile: values['access-profile'],
   }
   switch (name) {
     case undefined: { return { name: 'help' }

@@ -69,6 +69,8 @@ Use it before writing an input recipe, to find the shape a site's data actually 
 |---|---|
 | `--browser-path <path>` | A browser binary other than the one Playwright installed (or `OPEN_CRAW_CHROMIUM`). |
 | `--insecure-tls` | Accept an intercepting proxy's certificate (or `OPEN_CRAW_INSECURE_TLS=1`). |
+| `--access <file>` | An access config: proxy profiles, with credentials as `{{env.NAME}}` (or `OPEN_CRAW_ACCESS`). See [access.md](../../docs/recipes/access.md). |
+| `--access-profile <name>` | The profile used by recipes that name none, overriding the config's `default`. `probe` uses it for its fetch. |
 | `--user-agent <ua>` | The user agent to send. |
 
 ## Building

@@ -26,6 +26,10 @@ This does **not** auto-author recipes from a sentence. The four tools are the sa
 `probe`/`run` call's `browserPath`/`insecureTls`, so a sandbox without Playwright's own bundled browser
 does not need every tool call to repeat them.
 
+`OPEN_CRAW_ACCESS` points at an access config ([access.md](../../docs/recipes/access.md)): proxy profiles, with
+credentials as `{{env.NAME}}` read from the server's environment. The `probe` and `run` tools then take an
+`access` argument naming a profile. The file and the credentials never pass through a tool call.
+
 ## Tools
 
 ### `probe`
@@ -40,6 +44,7 @@ endpoints only a script fetches after load.
 | `url` | The page to fetch. |
 | `browser?` | Also render it in a browser (slower, a few seconds). |
 | `browserPath?`, `insecureTls?`, `userAgent?` | As in the cli. |
+| `access?` | An access profile from the server's `OPEN_CRAW_ACCESS` config. |
 
 Returns `{ url, status, findings: { jsonLd, inlineJson, jsonUrls, scriptHosts, apiLinks }, observed }`.
 
@@ -66,6 +71,7 @@ Crawls the recipes at the given paths.
 | `only?` | Run only these input recipe ids. |
 | `dryRun?` | One record per input recipe instead of a full crawl — for checking a recipe under construction. |
 | `headed?`, `browserPath?`, `insecureTls?`, `userAgent?` | As in the cli. |
+| `access?` | The access profile for recipes that name none, from the server's `OPEN_CRAW_ACCESS` config. |
 
 Returns `{ report: CrawlReport, records?, truncated? }`. `records`/`truncated` are present only when `out`
 was not given, and `records` is capped at 50 even then.
