@@ -29,6 +29,8 @@ mode produced the session.
 
 **Extension.** Hooks are registered in code by name (`createCrawler({ hooks })`) and referenced from recipes in
 a `hook` step or a `hook` transform. That is the only extension point: recipes stay declarative and shareable.
+The cli (`--hooks <module>`) and the MCP server (`OPENCRAW_HOOKS` in its environment) load them from a
+JavaScript module whose default export is the name -> function map.
 
 ## 2. Input recipe (`InputRecipe`)
 
@@ -88,9 +90,10 @@ optional `when` template that must render truthy for the step to run.
 | `wait` | web | – | one of `selector`, `ms`, `state: 'networkidle'` |
 | `evaluate` | web | value | `script`, JavaScript run in the page. Trusted recipes only. |
 | `screenshot` | web | – | `path` |
-| `request` | api | document | `method?`, `url`, `query?`, `headers?`, `body?`, `as: 'json' \| 'html' \| 'text'` |
+| `request` | api | document | `method?`, `url`, `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'html' \| 'text'` |
 | `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex'`, `take`, `many?`, `from?` |
 | `set` | both | value | `value` (template or literal) |
+| `collect` | both | – | `into` (a list id bound in an enclosing scope), `value` (template or literal); appends, so values outlive the `forEach` iteration or `paginate` page that found them |
 | `forEach` | both | – | `over` (a list id) or `selector` (web: live elements), `as` (variable), `steps`, `emit?: true \| { output }` |
 | `if` | both | – | `test` (template), `steps`, `else?`; the chosen branch runs in the current scope |
 | `paginate` | both | – | `next`, `until?` (template), `maxPages?`, `steps` |
@@ -153,13 +156,14 @@ every use, so a page that re-renders after each interaction (a configurator) sti
 | `onMissing?` | Recipe default: `fail`, `skip-record` or `null`. Built-in default is `fail` for required fields, `null` otherwise. |
 
 `FieldSpec`: `type` (`string`, `number`, `integer`, `boolean`, `date`, `datetime`, `currency`, `url`, `enum`,
-`array`, `object`), `required?`, `nullable?`, `default?`, `onMissing?` (`fail`, `skip-record`, `null`,
+`array`, `object`, `json`), `required?`, `nullable?`, `default?`, `onMissing?` (`fail`, `skip-record`, `null`,
 `default`), `key?` (record identity for de-duplication), `generated?` (`now`, `uuid`, `sourceUrl`,
 `recipeId`; supplied by the engine, never mapped), `format?` (input format for dates; output is ISO 8601),
 `currency?` (ISO 4217), `values?` (enum), `items?` (array element spec), `fields?` (object members), `min?`,
 `max?`, `pattern?`, `minLength?`, `maxLength?`.
 
-A `currency` value is stored as `{ amount: number, currency: string }`. A `date` is `YYYY-MM-DD`, a
+An `object` keeps only its declared `fields`; a `json` field keeps any JSON value verbatim and takes no
+`fields` or `items`. A `currency` value is stored as `{ amount: number, currency: string }`. A `date` is `YYYY-MM-DD`, a
 `datetime` an ISO 8601 instant.
 
 ## 4. Mapping and transformation
@@ -174,11 +178,12 @@ type MappingRule =
 - `from` is an id or a path into one (`item.href`, `page.url`). With several sources the chain starts on the
   array of resolved values (`["price_int", "price_cents"]` -> `join`).
 - `each` builds an array of objects from a list id; the nested `from` paths are relative to each list item
-  (`.` is the item itself).
+  (`.` is the item itself). A `lookup`'s `in` and a `template`'s paths inside those rules look in the item
+  first, then in the record.
 - Transforms run in order. Built-ins: `trim`, `lowercase`, `uppercase`, `replace`, `regex` (capture group),
   `split`, `join`, `first`, `last`, `nth`, `slice`, `concat`, `coalesce`, `default`, `number` (locale aware),
   `integer`, `boolean` (`truthy` list), `currency` (locale aware; currency from the op, else the field),
-  `date` (`format`, `timezone`), `absoluteUrl` (base from the op, else `page.url`), `flatten`, `unique`,
+  `date` (`format`, `timezone`), `absoluteUrl` (base from the op, else `page.url`), `urlEncode`, `flatten`, `unique`,
   `sum`, `count`, `template`, `jsonpath`, `lookup` (`in`: a table bound in scope as data, JSON text or a
   list of JSON texts; `key`: the path compared, as text, with the value; `pick?`: the path returned), `group`
   (`by`: a path; yields `[{ key, items }]` in first-seen order), `hook`.

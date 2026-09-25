@@ -48,7 +48,7 @@ typo never silently does nothing.
 
 | Key | Meaning |
 |---|---|
-| `type` | `string`, `number`, `integer`, `boolean`, `date`, `datetime`, `currency`, `url`, `enum`, `array`, `object`. |
+| `type` | `string`, `number`, `integer`, `boolean`, `date`, `datetime`, `currency`, `url`, `enum`, `array`, `object`, `json`. |
 | `required` | Missing value fails the recipe (unless a policy says otherwise). Default `false`. |
 | `nullable` | A missing value becomes `null` instead of failing. |
 | `default` | Used when the value is missing and the resolved policy is `default` (it is, automatically, when a default exists and nothing else is said). |
@@ -59,7 +59,7 @@ typo never silently does nothing.
 | `currency` | ISO 4217 code for `currency` fields. Fills in when the value carries none. |
 | `values` | Allowed values for `enum`. |
 | `items` | Element spec for `array`. |
-| `fields` | Member specs for `object`. |
+| `fields` | Member specs for `object`. A `json` field takes none. |
 | `min`, `max` | Numeric bounds. |
 | `minLength`, `maxLength` | String length or array length bounds. |
 | `pattern` | A regular expression the string must match. |
@@ -81,7 +81,32 @@ text is predictable, strict where a wrong value would poison the data.
 | `url` | an absolute URL string | normalised. A relative link is an error: use the `absoluteUrl` transform first. |
 | `enum` | text among `values` | the text. |
 | `array` | a list, or a single value (wrapped) | a list; each item coerced by `items`. |
-| `object` | an object | only the declared `fields`, each coerced. |
+| `object` | an object | only the declared `fields`, each coerced. **Undeclared keys are dropped.** |
+| `json` | any JSON value: an object of any shape, a list, text, a number, a boolean | the value, **verbatim**: every key kept, however nested, nothing coerced. Only what JSON cannot hold (`NaN`, `Infinity`, a `Date`, a function) is an error. |
+
+`object` is for a shape you know: it validates it and keeps nothing else. `json` is for a payload whose
+shape you don't know or don't want to fix: archival, a schema that evolves, "land it now, parse it later".
+It still takes `required`, `nullable`, `onMissing`, `default` and `key` like any other field, and it takes
+no `fields` or `items`. Landing a whole API response as one field:
+
+```json
+{ "kind": "output", "id": "configuration-raw", "version": 1, "fields": {
+  "configurationId": { "type": "string", "key": true, "required": true },
+  "fetchedFrom":     { "type": "url", "generated": "sourceUrl" },
+  "payload":         { "type": "json", "required": true }
+}}
+```
+
+```json
+"steps": [
+  { "type": "request", "id": "configuration", "url": "{{start.url}}", "as": "json" },
+  { "type": "emit" }
+],
+"mapping": {
+  "configurationId": { "from": "configuration.id" },
+  "payload":         { "from": "configuration" }
+}
+```
 
 ### 1.3 Keys and duplicates
 
@@ -196,12 +221,23 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 |---|---|---|
 | `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `html`, `text`) | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides. 4xx/5xx fail the step. |
 
+`body` is templated **all the way down**: a string body is one template, and in an object or list body
+every string inside it is one, at any depth. A string that is exactly one placeholder keeps the value's type
+(`"limit": "{{vars.limit}}"` sends a number). Numbers, booleans and `null` go as they are. An object or list
+body is sent as JSON:
+
+```json
+{ "type": "request", "id": "token", "url": "https://auth.example/oauth2/token", "method": "POST", "as": "json",
+  "body": { "grant_type": "client_credentials", "client_id": "{{vars.clientId}}", "client_secret": "{{vars.clientSecret}}" } }
+```
+
 ### 3.3 Steps of both modes
 
 | Step | Fields | Notes |
 |---|---|---|
 | `extract` | `selector`, `kind` (`css`, `xpath`, `jsonpath`), `take?`, `many?`, `from?` | §4. |
 | `set` | `value` | A literal, or a template when it is a string. |
+| `collect` | `into` (an id), `value` | Appends `value` (a literal, or a template when it is a string) to the list `into` holds, in whichever enclosing scope binds it; a list value is appended item by item, a missing one adds nothing. `into` must be bound first, usually `{ "type": "set", "id": "all", "value": [] }` before the loop: the binding validator checks. The way to carry values out of `forEach` iterations or `paginate` pages (§3.6). |
 | `forEach` | `over` (a list id) **or** `selector` (web), `as` (variable), `steps`, `emit?` | Runs `steps` once per item in a fresh child scope with the item bound as `as`. `emit: true` produces one record per iteration. `over` may name a single value; it is treated as a one-item list. `selector` iterates the live elements it matches (§3.7). |
 | `if` | `test` (template), `steps`, `else?` | Runs `steps` when `test` renders truthy, otherwise `else`, **in the current scope**: ids bound in a branch are visible after it. §3.8. |
 | `paginate` | `next`, `until?` (template), `maxPages?`, `steps` | Runs `steps` per page in a fresh child scope, then follows `next`. §3.6. |
@@ -224,7 +260,7 @@ A placeholder may also be an **expression** over such paths:
 | comparison | `== != < <= > >=`. `==` is loose (`3 == '3'`, `null == missing`); ordering is numeric when both sides are numbers, else textual. |
 | logic | `&& || !` with recipe truthiness (below); `a ?? b` gives `b` only when `a` is missing (`null` / undefined) |
 | choice | `test ? a : b` |
-| functions | `upper(s)`, `lower(s)`, `trim(s)`, `len(list or text)`, `default(v, fallback)` (missing or blank), `round(n, digits?)`, `number(text)`, `join(list, sep?)`, `first(list)`, `last(list)`, `replace(s, pattern, replacement)` (a regular expression, global), `contains(list or text, needle)`, `split(text, sep?)` |
+| functions | `upper(s)`, `lower(s)`, `trim(s)`, `len(list or text)`, `default(v, fallback)` (missing or blank), `round(n, digits?)`, `number(text)`, `join(list, sep?)`, `first(list)`, `last(list)`, `replace(s, pattern, replacement)` (a regular expression, global), `contains(list or text, needle)`, `split(text, sep?)`, `urlEncode(s)` (percent-encodes one URL component: `{{start.url}}/config/{{urlEncode(id)}}` turns `#` into `%23`, a space into `%20`) |
 
 ```json
 { "type": "set", "id": "next_url", "value": "{{ start.url }}?page={{ page.number + 1 }}" },
@@ -256,6 +292,8 @@ Truthiness for `when`, `until`, `test` and the logical operators: `false`, `0`, 
 - `page.url` / `page.number` and the current document are scope state, bound in the innermost scope that
   navigated. In `web` mode `page.url` is the real page URL; in `api` mode it is the final URL of the nearest
   `request`, and `start.url` before any request.
+- A value found inside a child scope dies with it, unless a `collect` step appends it to a list bound in an
+  enclosing scope (§3.6).
 - Exactly **one emitting construct per path**: an emitting `forEach` may not contain an `emit` or another
   emitting `forEach`. The binding validator rejects it.
 - `limits.maxRecords` stops the walk cleanly, wherever it is in the tree.
@@ -293,6 +331,27 @@ Two shapes cover most sites:
   ]}
 ]}
 ```
+
+**Collect first, then fan out.** Some sources enumerate ids page by page and only then fetch one detail
+per id. Page scopes are dropped, so the ids have to be carried out: bind an empty list before the
+`paginate`, `collect` each page's ids into it, and loop over it once pagination has finished:
+
+```json
+{ "type": "set", "id": "allIds", "value": [] },
+{ "type": "paginate", "next": { "jsonpath": "$.responseDetails.next", "as": "cursor" }, "until": "{{ !list.responseDetails.existsMore }}", "steps": [
+  { "type": "request", "id": "list", "url": "{{start.url}}?cursor={{cursor}}", "as": "json" },
+  { "type": "extract", "id": "ids", "from": "list", "selector": "$.items[*].id", "kind": "jsonpath", "take": "json", "many": true },
+  { "type": "collect", "into": "allIds", "value": "{{ids}}" }
+]},
+{ "type": "forEach", "over": "allIds", "as": "id", "emit": true, "steps": [
+  { "type": "request", "id": "detail", "url": "{{start.url}}/{{urlEncode(id)}}", "as": "json" }
+]}
+```
+
+The list is held in memory until the loop ends: fine for thousands of ids. For millions, or when records
+should start flowing before the enumeration ends, **fan out per page** instead: put the `forEach` inside
+the `paginate` body, as in the first shape above, so each page's details are fetched and emitted before the
+next page is read.
 
 ### 3.7 Live elements: driving a configurator
 
@@ -396,6 +455,20 @@ common pattern, both sites in the examples use it:
 | `jsonpath` | JSON data, JSON text, lists of JSON texts | jsonpath-plus syntax: `$.items[*].url`, `$[?(@.actors)]`, `$[?(@['@type']=='Movie')].name`. |
 | `regex` | any document as text: markup, text, JSON re-serialised, a list of texts joined by newlines | A JavaScript regular expression (flags `gs`); group 1 is taken when the pattern has one, else the whole match. For values that live in inline scripts (`"carPath":"([^"]+)"`), attributes, or table prose (`Boot capacity</td>\\s*<td>([^<]+)`). |
 
+**Several keys into one list.** To merge same-shaped arrays kept under different keys
+(`availableExteriors`, `availableInteriors`, `availableWheels`...), name them in an **unquoted** union, or
+match the key names with a filter on `@property`:
+
+```json
+{ "type": "extract", "id": "options", "from": "config", "kind": "jsonpath", "take": "json", "many": true,
+  "selector": "$.model[availableExteriors,availableInteriors,availableWheels,standardEquipments][*]" }
+```
+
+`$.model[?(@property.startsWith('available'))][*]` takes every key that starts with `available`, and
+`$..[?(@property==='availableExteriors' || @property==='availableWheels')][*]` finds them at any depth. The
+quoted union `$.model['availableExteriors','availableInteriors'][*]` matches **nothing** in jsonpath-plus:
+leave the names unquoted.
+
 Every selector is a template: `{{ }}` placeholders render against the scope first, so one step can pick the
 colour set of the current trim (`$[?(@.trimname=='{{trim}}')].colors[*].displayName`) or the row of the
 current item.
@@ -475,6 +548,7 @@ reaches the missing-value policy untouched.
 | `currency` | `locale?`, `currency?` | scalar | `{ amount, currency }`; the code from the arg, else the text's symbol or code |
 | `date` | `format?`, `timezone?` | scalar | a Date; `format` tokens `YYYY MM DD HH mm ss`; `timezone` an IANA zone for text without an offset |
 | `absoluteUrl` | `base?` | scalar | resolve against `base`, else `page.url` |
+| `urlEncode` | – | scalar | percent-encodes one URL component (`encodeURIComponent`): `#` → `%23`, space → `%20`, `&` → `%26`, `+` → `%2B`, `é` → `%C3%A9` |
 | `flatten`, `unique` | – | list | nested lists flattened; duplicates removed |
 | `sum`, `count` | – | list | numbers |
 | `template` | `value` | list | renders a template against the scope, ignoring the input |
@@ -504,7 +578,18 @@ row read:
 ```
 
 `in` is resolved against the scope of the record like a template path, so `colour_data` extracted outside
-the loop is visible. Applied to a list, `lookup` runs per item. `group` goes the other way: one list of
+the loop is visible. Inside an `each` rule's `fields` the same holds: `in` (and a `template` transform's
+paths) look in the current item first, then in the record, so one table extracted once per record can
+annotate every row of a nested list:
+
+```json
+"options": { "each": "option_rows", "fields": {
+  "code":    { "from": "code" },
+  "content": { "from": "code", "transform": [{ "op": "lookup", "in": "componentsInfo", "key": "id", "pick": "text" }] }
+}}
+```
+
+An item key with the same name as a record id wins. `from` inside `fields` stays relative to the item. Applied to a list, `lookup` runs per item. `group` goes the other way: one list of
 rows becomes one item per distinct key, for an output field that is an array of objects (`each` over the
 groups).
 
@@ -524,6 +609,24 @@ const crawler = createCrawler({ hooks: {
 `(input, args, context) => value`, sync or async. From a `hook` **step**, `input` is `undefined` and the
 result is bound under the step's `id`; from a `hook` **transform**, `input` is the value so far. `context`
 gives `recipeId`, the scope snapshot and a `log`. A recipe naming an unregistered hook fails at the call.
+
+**From the cli and the MCP server**, hooks come from a JavaScript module whose default export is the map
+(named function exports work too):
+
+```js
+// hooks.mjs
+export default {
+  positive: (input) => Number(input) > 0,
+}
+```
+
+```sh
+opencraw run recipes/ --hooks hooks.mjs      # or OPENCRAW_HOOKS=hooks.mjs
+```
+
+The MCP server reads `OPENCRAW_HOOKS` from its own environment, never from a tool call: an agent can run
+recipes that call your hooks but cannot make the server load a module of its choosing. The module runs as
+your code, with your privileges, like anything you `import`: load only files you trust.
 
 ---
 
