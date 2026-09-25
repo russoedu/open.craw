@@ -13,12 +13,22 @@ Several input recipes can feed one output; a run processes them one after anothe
 | Package | What it is |
 |---|---|
 | [`@open.craw/core`](./packages/core) | The engine: recipe contracts and validation, the step walk, both runners, mapping, sinks. |
+| [`@open.craw/cli`](./packages/cli) | `open-craw validate` / `run` / `probe` — inspect a site, check a recipe, run a crawl from the terminal. |
 
 ## Quick start
 
 ```sh
 npm install @open.craw/core
 npx playwright install chromium     # only for web recipes and browser bootstraps
+```
+
+Or from the terminal, with [`@open.craw/cli`](./packages/cli):
+
+```sh
+npm install -g @open.craw/cli
+open-craw probe https://example.com/product/1      # find where a site's data lives
+open-craw validate recipes/                        # check a recipe binds before running it
+open-craw run recipes/ --out out/products.jsonl
 ```
 
 ```ts
