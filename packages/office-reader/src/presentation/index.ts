@@ -1,0 +1,5 @@
+export { readPptx } from './read-pptx.use-case'
+export type { ReadPptxOptions } from './read-pptx.use-case'
+export type { Deck, Slide, SlideShape, SlideChart, ChartSeries, SlideFilter } from './deck.model'
+export { OfficeReadError } from '../read-error'
+export type { OfficeReadErrorCode } from '../read-error'

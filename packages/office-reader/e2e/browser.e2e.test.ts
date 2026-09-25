@@ -12,6 +12,7 @@ import { rollup } from 'rollup'
 // page; only the dynamic import that reads a path is allowed.
 const dist = join(__dirname, '..', 'dist')
 const fixture = readFileSync(join(__dirname, '..', 'src', 'spreadsheet', 'fixtures', 'incentivi.xlsx'))
+const deck = readFileSync(join(__dirname, '..', 'src', 'presentation', 'fixtures', 'incentivi.pptx'))
 
 let browser: Browser
 beforeAll(async () => {
@@ -49,6 +50,27 @@ describe('office-reader in a browser', () => {
         ['Fiat', 'Pandina', '15950', '13955.625', '0.125', '2026-06-01', 'true', 'Solo rottamazione'],
         ['', 'Pandina Cross', '17950', '15706.25', '0.125', '2026-06-01T09:30:00', 'false', '#DIV/0!'],
       ])
+    } finally {
+      await page.close()
+    }
+  })
+
+  it('bundles the presentation reader the same way and reads a deck from a Blob', async () => {
+    const code = await bundle('pptx.esm.js')
+    expect(code).not.toMatch(/^import[^;]*from\s*['"]node:/m)
+    const page = await browser.newPage()
+    try {
+      await page.setContent('<!doctype html><title>office-reader</title>')
+      await page.addScriptTag({ type: 'module', content: `${code}\nwindow.officeReader = { readPptx }` })
+      await page.waitForFunction('window.officeReader !== undefined')
+      const slides = await page.evaluate(async (base64) => {
+        const bytes = Uint8Array.from(atob(base64), char => char.codePointAt(0) ?? 0)
+        const reader = (globalThis as unknown as { officeReader: { readPptx: (source: Blob) => Promise<{ slides: { title?: string, charts: unknown[] }[] }> } }).officeReader
+        const read = await reader.readPptx(new Blob([bytes]))
+
+        return read.slides.map(slide => [slide.title, slide.charts.length])
+      }, deck.toString('base64'))
+      expect(slides).toEqual([['Incentivi giugno', 0], ['Griglia prezzi Jeep', 0], ['Vendite', 1], ['Bozza', 0]])
     } finally {
       await page.close()
     }

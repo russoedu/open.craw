@@ -16,12 +16,13 @@ module.exports = withNx(
   },
   {
     // One entry per format, so `@opencraw/office-reader/xlsx` loads the
-    // spreadsheet reader alone. Set here rather than as `additionalEntryPoints`,
+    // spreadsheet reader alone (and `/pptx` the presentation reader). Set here rather than as `additionalEntryPoints`,
     // which names an entry after its file and so collides every slice's
     // index.ts with the main one.
     input: {
       index: `${__dirname}/src/index.ts`,
       xlsx:  `${__dirname}/src/spreadsheet/index.ts`,
+      pptx:  `${__dirname}/src/presentation/index.ts`,
     },
     // Added by MoNecromanCI. rollup hands sourcemapPathTransform an OS-NATIVE
     // path with one parent segment too many, so `sources` resolve to nothing

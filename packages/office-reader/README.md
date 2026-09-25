@@ -1,7 +1,10 @@
 # @opencraw/office-reader
 
-Reads Office files into plain objects. Workbooks (`.xlsx`, `.xlsm`) come back as sheets of cells with their
-merged ranges and hidden rows. Presentations (`.pptx`) are coming next.
+Reads Office files into plain objects:
+
+- **workbooks** (`.xlsx`, `.xlsm`) as sheets of cells, with their merged ranges and hidden rows;
+- **presentations** (`.pptx`, `.pptm`, `.ppsx`) as slides of positioned text boxes, tables, chart data and
+  speaker notes.
 
 - **What the file holds, faithfully.** Formulas give their cached value, and nothing is evaluated. Dates are
   dates, in both the 1900 and 1904 systems. Merged ranges and hidden rows and sheets are reported, not
@@ -110,11 +113,63 @@ says what to do:
 | `legacy-format` | a legacy binary `.xls`, `.ppt` or `.doc`: save it as `.xlsx` / `.pptx`, or export it as PDF |
 | `encrypted` | password-protected |
 | `unsupported-format` | an OpenDocument `.ods` / `.odp` |
-| `not-xlsx` | a zip package that is not a workbook (a `.pptx`, say) |
+| `not-xlsx` / `not-pptx` | a zip package of the other kind (a `.pptx` given to `readXlsx`, say) |
 | `not-zip` | not a zip at all |
 | `too-large` | past the `limits` |
 | `malformed` | damaged: a part does not inflate |
 | `bad-source` | not something to read bytes from (an `http:` URL, a text stream) |
+
+## Read a presentation
+
+```ts
+import { readPptx } from '@opencraw/office-reader/pptx'
+
+const deck = await readPptx('./incentivi.pptx')
+```
+
+```ts
+// { width: 960, height: 540, slides: [
+//   { number: 1, title: 'Incentivi giugno', hidden: false,
+//     shapes: [{ x: 60, y: 30, width: 840, height: 60, text: 'Incentivi giugno', placeholder: 'title' }],
+//     tables: [{ name: 'table 1', hidden: false,
+//                rows: [['Incentivi giugno 2026', '', '', ''], ['Modello', 'Prezzo', '', 'Sconto'], ['', 'Listino', 'Netto', ''], …],
+//                hiddenRows: [], merges: ['A1:D1', 'A2:A3', 'B2:C2', 'D2:D3'] }],
+//     charts: [], notes: 'Prezzi IVA inclusa.\nValidi fino al 30 giugno.' },
+//   { number: 3, title: 'Vendite', …,
+//     charts: [{ type: 'bar', title: 'Immatricolazioni',
+//                series: [{ name: 'Pandina', categories: ['Aprile', 'Maggio', 'Giugno'], values: [1200, 1350.5, 1410] }, …] }] },
+//   …] }
+```
+
+`readPptx(source, options?)` takes the same sources as `readXlsx`. Its options:
+
+| Option | Default | |
+|---|---|---|
+| `slides` | all | Numbers from 1 (`[2, 5]`), a `RegExp` on titles, or `({ number, title, hidden }) => boolean`. |
+| `values` | `'typed'` | Chart values: numbers (`null` where a point is missing), or `'text'`. |
+| `notes`, `charts` | `true` | `false` skips reading them. |
+| `limits` | as above | |
+
+What each slide holds:
+
+- **`shapes`:** its text boxes in reading order (top to bottom, left to right), in points from the top-left
+  corner.
+  - A title or body placeholder with no position of its own takes the one its layout gives it, else the one
+    its master gives it, the way PowerPoint draws it.
+  - Boxes inside a group are placed through the group's scaling.
+  - Slide numbers, dates and footers are left out.
+- **`tables`:** its native tables as sheets, with their merged cells (`gridSpan`, `rowSpan`) as ranges. A
+  cell inside a merge is `''`.
+- **`charts`:** the type, the title and each series' name, categories and values, from the data the chart
+  caches next to its formulas. The embedded workbook is not needed.
+- **`notes`:** the speaker notes.
+- **`hidden`:** hidden in a slideshow.
+
+Slides come in presentation order, which is not always the order of the files inside the zip.
+
+Tested against the 100 presentations of Apache POI's test corpus. It reads 90 of them (562 slides, 41 tables,
+28 charts), and every placeholder gets a position. The other 10 are fuzzer cases and a truncated zip, all
+refused with an `OfficeReadError`.
 
 ## How it compares
 
@@ -127,6 +182,9 @@ says what to do:
 | Browser, workers, edge | yes | yes | Node-first | yes |
 | Writes files | no | yes | yes | no |
 
+For presentations, no JavaScript library we found reads positions, tables and chart data. officeparser
+returns flattened text, and the others are text-only or browser renderers.
+
 SheetJS's npm copy (0.18.5) carries two high-severity advisories (prototype pollution, ReDoS); the fixed
 versions are published on its own CDN only. Choose SheetJS or ExcelJS when you need to **write** workbooks,
 evaluate formulas, or read `.xls` and `.ods`. This package only reads.
@@ -138,5 +196,6 @@ Tested against the 367 workbooks of Apache POI's test corpus, real files and fuz
 
 - **Writing files.**
 - **Evaluating formulas, and applying display formats.** A percentage stays `0.125` and a price stays `15950`.
-- **Legacy `.xls`, `.xlsb` and OpenDocument `.ods`.** These are refused with a code.
-- **Charts, pivot tables, images, comments and data validation.**
+- **Legacy `.xls`, `.ppt`, `.xlsb` and OpenDocument `.ods` / `.odp`.** These are refused with a code.
+- **In workbooks:** charts, pivot tables, images, comments and data validation.
+- **In presentations:** SmartArt text, text inside images (no OCR), animations and themes.

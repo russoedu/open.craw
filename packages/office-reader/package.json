@@ -16,6 +16,11 @@
       "types": "./dist/src/spreadsheet/index.d.ts",
       "import": "./dist/xlsx.esm.js",
       "default": "./dist/xlsx.esm.js"
+    },
+    "./pptx": {
+      "types": "./dist/src/presentation/index.d.ts",
+      "import": "./dist/pptx.esm.js",
+      "default": "./dist/pptx.esm.js"
     }
   },
   "files": [
