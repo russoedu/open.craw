@@ -3,6 +3,7 @@ import type { ExtractionScope } from '../extraction-scope'
 import { HttpError } from '../http-session'
 import type { HttpBody, HttpResponse, HttpSender } from '../http-session'
 import type { InputRecipe, RequestStep } from '../recipe-schema'
+import { deckText } from '../deck-document'
 import { pdfText } from '../pdf-document'
 import { workbookText } from '../workbook-document'
 import { renderDeep, renderText } from '../template'
@@ -55,6 +56,7 @@ function bodyText (body: HttpBody): string {
   if (body.kind === 'json') return JSON.stringify(body.data)
   if (body.kind === 'pdf') return pdfText(body)
   if (body.kind === 'workbook') return workbookText(body)
+  if (body.kind === 'deck') return deckText(body)
 
   return body.kind === 'html' ? body.html : body.text
 }
@@ -79,10 +81,10 @@ function resolveUrl (target: string, base: string | undefined): string {
   }
 }
 
-/** What a step id holds for a document: parsed JSON, the read PDF or workbook, or the markup / text. */
+/** What a step id holds for a document: parsed JSON, the read PDF, workbook or deck, or the markup / text. */
 export function documentValue (body: HttpBody): unknown {
   if (body.kind === 'json') return body.data
-  if (body.kind === 'pdf' || body.kind === 'workbook') return body
+  if (body.kind === 'html') return body.html
 
-  return body.kind === 'html' ? body.html : body.text
+  return body.kind === 'text' ? body.text : body
 }

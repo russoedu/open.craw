@@ -82,6 +82,8 @@ describe('parseInputRecipe', () => {
     expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: 'x', kind: 'table', align: 'middle' }))).toThrow(/align/)
     expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: '^Marke', kind: 'table', sheet: '^FZ', headerRows: 2, fillDown: ['brand'], includeHidden: true }))).not.toThrow()
     expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: 'h1', kind: 'css', headerRows: 2 }))).toThrow(/"headerRows" belongs to kind "table"/)
+    expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: '^Modello', kind: 'table', slide: '^Incentivi', shapes: true }))).not.toThrow()
+    expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: 'x', kind: 'regex', shapes: true }))).toThrow(/"shapes" belongs to kind "table"/)
     expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: 'x', kind: 'table', headerRows: 0 }))).toThrow(/headerRows/)
   })
 

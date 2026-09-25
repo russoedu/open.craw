@@ -59,6 +59,12 @@ beforeAll(async () => {
 
         break
       }
+      case '/deck': {
+        outgoing.setHeader('content-type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation')
+        outgoing.end(readFileSync(join(__dirname, '..', '..', '..', 'office-reader', 'src', 'presentation', 'fixtures', 'incentivi.pptx')))
+
+        break
+      }
       case '/latin': {
         outgoing.setHeader('content-type', 'text/plain; charset=ISO-8859-1')
         outgoing.end(Buffer.from([0x43, 0xE9]))
@@ -164,6 +170,19 @@ describe('HttpClient', () => {
       await writeFile(join(directory, 'old.xls'), new Uint8Array([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]))
       const legacy = pathToFileURL(join(directory, 'old.xls')).href
       await expect(client.send({ url: legacy })).rejects.toThrow(/old\.xls: a legacy binary Office file .* save it as \.xlsx/)
+    } finally {
+      await client.dispose()
+    }
+  })
+
+  it('reads a presentation by content type or extension into a deck', async () => {
+    const client = await HttpClient.open()
+    try {
+      const served = await client.send({ url: `${base}/deck` })
+      expect(served.body).toMatchObject({ kind: 'deck', width: 960, height: 540 })
+      const local = await client.send({ url: pathToFileURL(join(__dirname, '..', '..', '..', 'office-reader', 'src', 'presentation', 'fixtures', 'incentivi.pptx')).href })
+      const titles = local.body.kind === 'deck' ? local.body.slides.map(slide => slide.title) : []
+      expect(titles).toEqual(['Incentivi giugno', 'Griglia prezzi Jeep', 'Vendite', 'Bozza'])
     } finally {
       await client.dispose()
     }

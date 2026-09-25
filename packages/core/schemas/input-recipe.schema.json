@@ -1243,7 +1243,8 @@
                 "text",
                 "pdf",
                 "csv",
-                "xlsx"
+                "xlsx",
+                "pptx"
               ]
             },
             "encoding": {
@@ -1408,6 +1409,13 @@
               }
             },
             "includeHidden": {
+              "type": "boolean"
+            },
+            "slide": {
+              "type": "string",
+              "minLength": 1
+            },
+            "shapes": {
               "type": "boolean"
             }
           },

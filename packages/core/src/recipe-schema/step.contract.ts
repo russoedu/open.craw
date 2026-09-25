@@ -70,8 +70,12 @@ export interface ExtractStep extends StepBaseFields {
   headerRows?:    number
   /** `table` only: output keys whose empty cells take the value of the row above. */
   fillDown?:      string[]
-  /** `table` only: read hidden sheets and rows too (workbook). */
+  /** `table` only: read hidden sheets and rows (workbook) or hidden slides (deck) too. */
   includeHidden?: boolean
+  /** `table` only: a pattern (case-insensitive) for the titles of the slides to read (deck); default every slide. */
+  slide?:         string
+  /** `table` only: read text boxes laid out as a table instead of native tables (deck). */
+  shapes?:        boolean
 }
 export interface SetStep extends StepBaseFields { type: 'set', value: unknown }
 /**
@@ -139,7 +143,7 @@ const requestStep = z.strictObject({
   encoding:  z.string().min(1).optional(),
   delimiter: z.string().length(1).optional(),
 }).refine(step => step.delimiter === undefined || step.as === undefined || step.as === 'csv', { message: '"delimiter" reads CSV only: drop it or set "as": "csv"', path: ['delimiter'] })
-const tableOnly = ['columns', 'until', 'align', 'sheet', 'headerRows', 'fillDown', 'includeHidden'] as const
+const tableOnly = ['columns', 'until', 'align', 'sheet', 'headerRows', 'fillDown', 'includeHidden', 'slide', 'shapes'] as const
 const extractStep = z.strictObject({
   ...base,
   type:          z.literal('extract'),
@@ -155,6 +159,8 @@ const extractStep = z.strictObject({
   headerRows:    z.int().min(1).optional(),
   fillDown:      z.array(z.string().min(1)).min(1).optional(),
   includeHidden: z.boolean().optional(),
+  slide:         z.string().min(1).optional(),
+  shapes:        z.boolean().optional(),
 }).check((context) => {
   if (context.value.kind === 'table') return
   for (const key of tableOnly) {

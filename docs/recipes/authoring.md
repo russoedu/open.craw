@@ -219,7 +219,7 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 
 | Step | Fields | Notes |
 |---|---|---|
-| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `html`, `text`, `pdf`, `csv`, `xlsx`), `encoding?`, `delimiter?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF or workbook, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`). 4xx/5xx fail the step. |
+| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`), `encoding?`, `delimiter?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`). 4xx/5xx fail the step. |
 
 Text bodies are decoded from, in order: a byte-order mark, `encoding` (any WHATWG label: `windows-1252`,
 `iso-8859-15`, `shift_jis`), the charset the server declares, UTF-8, and Windows-1252 for text that is not
@@ -442,6 +442,7 @@ order. Rules:
 | an id holding **data** (an object, a list of objects) | with `jsonpath` | same |
 | an id holding a **read PDF** (a `request` with `as: "pdf"`) | with `table`, `regex` or `jsonpath` (§4.6) | same |
 | an id holding a **read workbook** (a spreadsheet or a CSV) | with `table`, `regex` or `jsonpath` (§4.7) | same |
+| an id holding a **read deck** (a presentation) | with `table`, `regex` or `jsonpath` (§4.8) | same |
 
 JSON-LD wrapped in `/* <![CDATA[ */ ... /* ]]> */` or `<!-- -->` guards is unwrapped before parsing. The
 common pattern, both sites in the examples use it:
@@ -634,6 +635,50 @@ A spreadsheet table under a two-row merged header (the German KBA registration s
 `opencraw probe <url or file>` lists a workbook's sheets, the first rows, and every row that looks like a
 header, with a ready `selector` (and a `headerRows` hint when the header has merged cells). For a CSV it
 also reports the encoding and the delimiter it used.
+
+### 4.8 Presentations
+
+`request` with `as: "pptx"` (or a response served with a presentation content type, or a local
+`file:…pptx`) reads the deck with [`@opencraw/office-reader`](../../packages/office-reader) into slides:
+
+```
+{ kind: "deck", width, height, slides: [{ number, title, hidden,
+    shapes: [{ x, y, width, height, text, placeholder }],   // points from the top-left corner, reading order
+    tables: [{ name, rows, merges }],                        // native tables, as sheets
+    charts: [{ type, title, series: [{ name, categories, values }] }],
+    notes }] }
+```
+
+A title placeholder that PowerPoint places through the slide's layout gets the layout's position, and boxes
+inside a group are placed through its scaling. Slide numbers, dates and footers are left out. A legacy `.ppt`,
+a password-protected file or an `.odp` fails the step, with what to do.
+
+| `kind` | Reads | Use for |
+|---|---|---|
+| `table` | native tables, or with `shapes: true` text boxes laid out as a table | price and incentive tables |
+| `regex` | per visible slide: its text boxes, its tables' rows (cells separated by a tab), then `Notes: …`; slides separated by a blank line | a validity date in the notes: `Notes: .*fino al (\d+ \w+)` |
+| `jsonpath` | the structure above | chart data: `$.slides[?(@.title=='Vendite')].charts[*].series[*]` |
+
+A **native table** reads like a spreadsheet table (§4.7). Merged cells are filled, `headerRows` joins a header
+spread over several rows, and `slide` (a pattern on slide titles) picks the slides:
+
+```json
+{ "type": "extract", "id": "table", "kind": "table", "slide": "^Incentivi", "selector": "^Modello Prezzo", "headerRows": 2,
+  "columns": { "model": "^Modello$", "list": "^Prezzo Listino$", "discount": "^Sconto$" } }
+```
+
+**Text boxes laid out as a table** read with `shapes: true`, through the PDF table reader (§4.6): each box is a
+cell, boxes whose heights overlap form a row, and columns come from where the body's boxes start (`align`
+applies). A very tall box can pull two rows together.
+
+```json
+{ "type": "extract", "id": "table", "kind": "table", "shapes": true, "slide": "^Griglia", "selector": "^Modello Prezzo",
+  "columns": { "model": "^Modello", "price": "^Prezzo" } }
+```
+
+Each table is `{ slide, slideTitle, title, header, rows }`, and hidden slides are skipped unless
+`includeHidden`. `opencraw probe <url or file.pptx>` lists the slides, each native table's header with a ready
+`selector`, the charts' series, and the slides whose short text boxes look like a table.
 
 ## 5. Mapping
 

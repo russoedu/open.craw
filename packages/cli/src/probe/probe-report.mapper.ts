@@ -1,4 +1,5 @@
 import type { ProbeFindings } from './find-data.algorithm'
+import type { DeckFindings } from './deck-findings.mapper'
 import type { PdfFindings } from './pdf-findings.mapper'
 import type { WorkbookFindings } from './workbook-findings.mapper'
 
@@ -58,6 +59,26 @@ export function workbookReport (url: string, workbook: WorkbookFindings): string
     section('Sheets', workbook.sheets.map(sheet => `  ${sheet.name}${sheet.hidden ? ' (hidden)' : ''}: ${sheet.rows} rows × ${sheet.columns} columns`)),
     section('Likely table headers (a "table" extract selector for each)', workbook.headers.map(header => `  ${header.sheet} r${header.row}  ${header.selector}${header.hint === undefined ? '' : `  (${header.hint})`}\n        ${header.text}`)),
     section('First rows (cells separated by " | ")', workbook.rows.map(row => `  ${row.sheet} r${row.row}  ${row.text}`)),
+  ].filter(line => line !== '').join('\n')
+}
+
+/**
+ * Formats what a probe found in a deck (a presentation): its slides, the native
+ * tables' headers with a selector for each, its charts, and the slides whose
+ * text boxes look like a table.
+ *
+ * @param url - The deck's URL.
+ * @param deck - The findings.
+ * @returns The report.
+ */
+export function deckReport (url: string, deck: DeckFindings): string {
+  return [
+    `${url} (presentation, ${deck.slides.length} slide${deck.slides.length === 1 ? '' : 's'}, ${deck.width} × ${deck.height} pt)`,
+    '',
+    section('Slides', deck.slides.map(slide => `  ${slide.number}  ${slide.title === '' ? '(no title)' : slide.title}${slide.hidden ? ' (hidden)' : ''}: ${slide.shapes} text boxes, ${slide.tables} tables, ${slide.charts} charts`)),
+    section('Likely table headers (a "table" extract selector for each)', deck.headers.map(header => `  slide ${header.slide}  ${header.selector}${header.hint === undefined ? '' : `  (${header.hint})`}\n        ${header.text}`)),
+    section('Text boxes laid out as a table (a "table" extract with "shapes": true)', deck.grids.map(grid => `  slide ${grid.slide}  ${grid.title}: ${grid.boxes} short boxes`)),
+    section('Charts (read with jsonpath: $.slides[*].charts[*].series[*])', deck.charts.map(chart => `  slide ${chart.slide}  ${chart.type}${chart.title === undefined ? '' : ` "${chart.title}"`}: ${chart.series.map(series => `${series.name} (${series.points})`).join(', ')}`)),
   ].filter(line => line !== '').join('\n')
 }
 

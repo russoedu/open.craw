@@ -22,7 +22,18 @@ const ROW_OVERLAP = 0.4
  * @returns The rows.
  */
 export function assembleRows (runs: readonly PositionedText[]): PdfRow[] {
-  const cells = joinCells(runs)
+  return rowsOfCells(joinCells(runs))
+}
+
+/**
+ * Groups finished cells into rows, top to bottom: cells whose vertical extents
+ * overlap share a row. For cells that need no joining, such as a slide's text
+ * boxes, each already a cell.
+ *
+ * @param cells - The cells, in any order.
+ * @returns The rows.
+ */
+export function rowsOfCells (cells: readonly PdfCell[]): PdfRow[] {
   const ordered = [...cells].sort((a, b) => middle(b) - middle(a) || a.x - b.x)
   const rows: PdfCell[][] = []
   let top = 0

@@ -1,3 +1,4 @@
+import type { DeckDocument } from '../deck-document'
 import type { PdfDocument } from '../pdf-document'
 import type { WorkbookDocument } from '../workbook-document'
 import type { BodyKind, HttpMethod } from '../recipe-schema'
@@ -20,7 +21,7 @@ export interface HttpRequest {
 
 /** A parsed response body. Structurally the same as a scope document, on purpose. */
 export type HttpBody =
-  PdfDocument | WorkbookDocument | { kind: 'json', data: unknown } | { kind: 'html', html: string } | { kind: 'text', text: string }
+  PdfDocument | WorkbookDocument | DeckDocument | { kind: 'json', data: unknown } | { kind: 'html', html: string } | { kind: 'text', text: string }
 
 export interface HttpResponse {
   status:  number
