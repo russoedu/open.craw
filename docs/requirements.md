@@ -39,7 +39,7 @@ a `hook` step or a `hook` transform. That is the only extension point: recipes s
 | `mode` | `web` (Playwright browser page) or `api` (Playwright request context, no browser). |
 | `start` | One or more `{ url, vars? }`; each start point runs the whole step list. |
 | `vars` | Recipe-level variables, read in templates as `{{vars.name}}`. |
-| `session` | Headers, cookies, user agent, viewport, a saved `storageStatePath`, or a `bootstrap`. |
+| `session` | Headers, cookies, user agent, viewport, a saved `storageStatePath`, a `bootstrap`, and `access` (`{ profile?, country?, sticky? }`, section 2.1). |
 | `limits` | `maxRecords` (exact, whatever is in flight), `delayMs` (minimum interval between request starts across the recipe), `timeoutMs`, `concurrency` (`forEach` iterations in flight, api mode; default `1`). |
 | `onError` | Default step policy: `fail`, `skip`, or `retry { attempts, backoffMs }`. |
 | `steps` | The acquisition recipe (section 2.2). |
@@ -51,6 +51,16 @@ a `hook` step or a `hook` transform. That is the only extension point: recipes s
 (`cookies`, `localStorage`) as a Playwright storage state, optionally saved to `saveTo`. A `web` recipe starts
 its page from that state; an `api` recipe seeds its request context with it. Bootstrap steps are web steps only
 and never emit records.
+
+**Access.** `session.access` says what the site needs (a profile name, a country, stickiness); the runner's
+access config (`CrawlOptions.access`, CLI `--access`, env `OPEN_CRAW_ACCESS`) says how: named profiles of kind
+`direct`, `proxy` (a server and username/password templates, or a provider `preset`), `pool` (a list rotated per
+lease) or `plugin` (a registered `AccessPlugin`). Every profile string is a template over `env.*`, `params.*`,
+`session` (a new random id per sticky lease), `country` and `recipe.id`; an unset `env` variable fails the recipe
+with its name. Each recipe run takes one lease, shared by its bootstrap and its runner and applied to the browser
+context (proxy, extra headers, `ignoreHTTPSErrors`, blocked resource types) and to the HTTP request context. The
+lease is reported as an `access:lease` event without credentials. Authenticated SOCKS proxies are refused at load:
+Chromium does not send SOCKS credentials. See `docs/recipes/access.md`.
 
 ### 2.2 Steps
 
@@ -190,7 +200,7 @@ from them are in `packages/core/schemas/` and are what a recipe's `$schema` shou
 
 ```ts
 const recipes = await loadRecipeSet({ output: 'recipes/product.output.json', inputs: ['recipes/'] })
-const crawler = createCrawler({ hooks, sink: jsonLinesSink('out.jsonl'), onEvent })
+const crawler = createCrawler({ hooks, sink: jsonLinesSink('out.jsonl'), onEvent, access: await loadAccessConfig('access.json') })
 const report = await crawler.run(recipes)
 await crawler.close()
 ```

@@ -143,6 +143,7 @@ steps in its bootstrap** to obtain a session (§2.2).
 | `viewport` | `{ width, height }`, web mode. |
 | `storageStatePath` | A file saved by a previous bootstrap (`saveTo`); the recipe starts from it and skips the bootstrap. |
 | `bootstrap` | `{ steps, keep, saveTo? }`. Runs `steps` in a browser **before** the crawl, then captures what `keep` lists (`cookies`, `localStorage`). A `web` recipe starts its page from that state; an `api` recipe sends those cookies with every request. Bootstrap steps are web steps only and never emit. |
+| `access` | `{ profile?, country?, sticky? }`: what the site needs from the network. `profile` names a profile of the runner's access config (its default when omitted), `country` is a two-letter code for profiles that target by country, `sticky: false` lets the provider change IP per request. Never credentials: those live in the access config. See [access.md](./access.md). |
 
 A login looks like this and works for both modes:
 
@@ -649,11 +650,11 @@ instead of a terminal command.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `no match for <selector>` on the first extract of a page | wrong selector, or the page is a challenge / login wall | print `page:visit` URLs; fetch the page and look; on a bot wall switch to `web` or run from another network |
+| `no match for <selector>` on the first extract of a page | wrong selector, or the page is a challenge / login wall | print `page:visit` URLs; fetch the page and look; on a bot wall switch to `web` or run through a proxy ([access.md](./access.md)) |
 | `none of the N texts bound to "x" is JSON` | the scripts are not JSON-LD, or hold JavaScript | check the block; `evaluate` in web mode is the fallback |
 | a field carries the *next* row's value | the row selector matched a wrapper element first | select the innermost repeating element (§4.5) |
 | `"…" is not a URL and no page is known` | a relative URL before any navigation | make the first step `goto` / `request` with `{{start.url}}` |
 | `mapping.x.from: "y" does not start with a known id` | typo in an id, or the id is bound only in a bootstrap | ids are per recipe; bootstraps produce a session, not ids |
 | `record rejected: title: missing` on every record | the id is bound in a sibling scope, not the emitting one | extract inside the `forEach` body, or before it |
 | the crawl stops after page 1 in web mode | the body navigated away and `next.selector` is not on the page | the engine returns to the listing page; if the listing is itself reached by clicking, use `next.url` |
-| `HTTP 202` with an empty body | AWS WAF challenge | a real browser from a non-flagged IP; nothing in the recipe fixes it |
+| `HTTP 202` with an empty body | AWS WAF challenge | a real browser from a non-flagged IP: a residential proxy profile ([access.md](./access.md)) |
