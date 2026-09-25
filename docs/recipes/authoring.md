@@ -144,6 +144,8 @@ steps in its bootstrap** to obtain a session (§2.2).
 | `storageStatePath` | A file saved by a previous bootstrap (`saveTo`); the recipe starts from it and skips the bootstrap. |
 | `bootstrap` | `{ steps, keep, saveTo? }`. Runs `steps` in a browser **before** the crawl, then captures what `keep` lists (`cookies`, `localStorage`). A `web` recipe starts its page from that state; an `api` recipe sends those cookies with every request. Bootstrap steps are web steps only and never emit. |
 | `access` | `{ profile?, country?, sticky? }`: what the site needs from the network. `profile` names a profile of the runner's access config (its default when omitted), `country` is a two-letter code for profiles that target by country, `sticky: false` lets the provider change IP per request. Never credentials: those live in the access config. See [access.md](./access.md). |
+| `blockedWhen` | `{ status?, header?, text? }`: what counts as the site refusing the crawl, checked on every navigation and request. Default: 403, 429, or an AWS WAF challenge header. A block fails the step with the URL and reason instead of a later selector miss. |
+| `onBlock` | `{ rotate: true, attempts? }`: on a block, take a new access lease (a new IP), reopen the session (re-running the bootstrap) and retry the step, up to `attempts` times per run (default 2). |
 
 A login looks like this and works for both modes:
 
@@ -597,7 +599,8 @@ a resumed run costs the requests but not the duplicates. Any sink can support th
 
 ### 8.1 Events and the trace
 
-Everything the engine does is an event: `recipe:start` / `recipe:finish`, `page:visit`, `step:start` /
+Everything the engine does is an event: `recipe:start` / `recipe:finish`, `page:visit` (with the HTTP status),
+`access:lease` / `access:blocked` / `access:rotate`, `step:start` /
 `step:finish` / `step:retry` / `step:skip` (with the step type, its id and its path such as
 `steps.8.steps.2`), `step:branch`, `record:emit` / `record:reject` / `record:duplicate` / `record:skipped`,
 `warning`, `error`. `traceLine`

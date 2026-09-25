@@ -39,7 +39,7 @@ a `hook` step or a `hook` transform. That is the only extension point: recipes s
 | `mode` | `web` (Playwright browser page) or `api` (Playwright request context, no browser). |
 | `start` | One or more `{ url, vars? }`; each start point runs the whole step list. |
 | `vars` | Recipe-level variables, read in templates as `{{vars.name}}`. |
-| `session` | Headers, cookies, user agent, viewport, a saved `storageStatePath`, a `bootstrap`, and `access` (`{ profile?, country?, sticky? }`, section 2.1). |
+| `session` | Headers, cookies, user agent, viewport, a saved `storageStatePath`, a `bootstrap`, `access` (`{ profile?, country?, sticky? }`), `blockedWhen` and `onBlock` (section 2.1). |
 | `limits` | `maxRecords` (exact, whatever is in flight), `delayMs` (minimum interval between request starts across the recipe), `timeoutMs`, `concurrency` (`forEach` iterations in flight, api mode; default `1`). |
 | `onError` | Default step policy: `fail`, `skip`, or `retry { attempts, backoffMs }`. |
 | `steps` | The acquisition recipe (section 2.2). |
@@ -60,7 +60,15 @@ lease) or `plugin` (a registered `AccessPlugin`). Every profile string is a temp
 with its name. Each recipe run takes one lease, shared by its bootstrap and its runner and applied to the browser
 context (proxy, extra headers, `ignoreHTTPSErrors`, blocked resource types) and to the HTTP request context. The
 lease is reported as an `access:lease` event without credentials. Authenticated SOCKS proxies are refused at load:
-Chromium does not send SOCKS credentials. See `docs/recipes/access.md`.
+Chromium does not send SOCKS credentials.
+
+**Blocks.** Every navigation and request is checked against `session.blockedWhen` (`status`, `header` patterns,
+`text` pattern; default 403, 429 or `x-amzn-waf-action: challenge`). A match raises a `BlockedError` and an
+`access:blocked` event. With `session.onBlock: { rotate: true, attempts? }` the run keeps the old lease until it ends, takes a
+new lease, opens a new runner on it (bootstrap included) and retries the step, without spending the step's retry
+attempts. It rotates at most `attempts` times (default 2), and a block seen by several concurrent iterations of
+one lease rotates once. Otherwise the block fails the step like any error. Replaced runners are disposed when the
+run ends. See `docs/recipes/access.md`.
 
 ### 2.2 Steps
 

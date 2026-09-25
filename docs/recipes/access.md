@@ -7,7 +7,7 @@ through a proxy.
 
 This page explains how open.craw does that: the recipe says what the site needs, a separate access config
 says how to get it, and the engine applies the result to every browser page, bootstrap and HTTP request of
-the run.
+the run. When a response is a block anyway, the run can take a new lease and retry.
 
 ## Two files, two concerns
 
@@ -152,6 +152,55 @@ templates, no code. Any provider can also be written as a raw `proxy` profile wi
 
 - **A recipe that asks for a country with no profile applying** runs direct and gets a `warning` event rather
   than silently ignoring it.
+- **A block** (below) can make the run take a new lease mid-crawl.
+
+## Blocks and rotation
+
+Every navigation (web) and request (api) is checked against the recipe's block rule. A match fails the step
+with a `BlockedError` naming the URL and the reason, and emits `access:blocked`. That replaces the old
+symptom, a selector that finds nothing on a challenge page.
+
+The default rule treats these as a block: status 403 or 429, or an `x-amzn-waf-action: challenge` header
+(AWS WAF answers `202` with it, which is how IMDb refused this project's sandbox). A recipe can replace the
+rule:
+
+```json
+"session": {
+  "blockedWhen": { "status": [403, 503], "header": { "server": "AkamaiGHost" }, "text": "access denied|verify you are human" },
+  "onBlock": { "rotate": true, "attempts": 2 }
+}
+```
+
+`blockedWhen` has three optional conditions, and any one that matches is a block:
+
+- `status`: a list of HTTP statuses.
+- `header`: header names mapped to a pattern the value must match.
+- `text`: a pattern the body must match.
+
+Patterns are case-insensitive regular expressions. A rule you set replaces the default rule completely.
+
+`onBlock.rotate` makes the run take a new lease, which means a new session id and so a new IP on rotating
+providers. It then reopens the browser or HTTP context, runs the bootstrap again (so a login happens on the new
+IP), and retries the blocked step. `attempts` caps the rotations per recipe run and defaults to 2. A rotation
+does not use up the step's own `retry` attempts. Once the rotations are used up, the block fails the step like
+any other error, so `onError: skip` or `retry` still apply.
+
+Under concurrency, several iterations blocked on the same lease trigger one rotation, not one each. The old
+contexts stay open until the run ends, so requests still in flight on them finish.
+
+The trace shows the route:
+
+```text
+  ⇄ access residential (proxy http://brd.superproxy.io:44445, session k3v9x0q2ma)
+  ⇢ page 1  https://www.imdb.com/chart/top/  [403]
+  ⛔ blocked https://www.imdb.com/chart/top/: HTTP 403
+  ↻ new access lease (attempt 2)
+  ⇄ access residential (proxy http://brd.superproxy.io:44445, session 0p2wq7x1ze)
+  ⇢ page 1  https://www.imdb.com/chart/top/
+```
+
+Rotation only helps when the new lease reaches the site from somewhere else: a proxy profile with sticky
+sessions, a pool, or a plugin. On a `direct` profile it reopens the session from the same IP.
 
 ## Plugins
 
@@ -186,7 +235,6 @@ country, stickiness and the attempt number. It returns a lease: `proxy`, `header
 
 Tracked on issue #8:
 
-- **Rotation on a block:** detecting a 403, 429 or AWS WAF challenge and retrying on a new session.
 - **Remote browsers over CDP.**
 - **Per-domain throttling** across recipes.
 - **Persistent browser profiles.**
