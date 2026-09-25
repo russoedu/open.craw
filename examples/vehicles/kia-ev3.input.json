@@ -1,0 +1,45 @@
+{
+  "$schema": "../../packages/core/schemas/input-recipe.schema.json",
+  "kind": "input",
+  "id": "kia-uk",
+  "output": "vehicle-configuration",
+  "mode": "api",
+  "description": "Kia UK publishes three server-rendered pages per model: /pricing/ (one table row per version: quoted trim, battery, power, gearbox, drivetrain, OTR price), /specification/ (motor, boot litres) and the model page, whose colour pickers carry a data-vrdata JSON per trim, joined to each row by a lookup on the trim name. Doors are on none of them, so they stay null.",
+  "vars": { "model": "ev3" },
+  "start": [{ "url": "https://www.kia.com/uk/new-cars/ev3/pricing/" }],
+  "session": {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
+    "headers": { "accept-language": "en-GB,en;q=0.9" }
+  },
+  "limits": { "delayMs": 800, "timeoutMs": 40000 },
+  "steps": [
+    { "type": "set", "id": "make", "value": "Kia" },
+    { "type": "set", "id": "fuel", "value": "Electric" },
+    { "type": "request", "id": "spec_page", "url": "https://www.kia.com/uk/new-cars/{{vars.model}}/specification/", "as": "html" },
+    { "type": "extract", "id": "boot", "selector": "Luggage compartment capacity, seats upright, litres</td>\\s*<td[^>]*>\\s*([0-9,]+)", "kind": "regex", "onError": { "policy": "skip" } },
+    { "type": "extract", "id": "motor", "selector": "Electric Engine\\s*</td>\\s*<td[^>]*>\\s*([^<]+?)\\s*</td>", "kind": "regex", "onError": { "policy": "skip" } },
+    { "type": "request", "id": "model_page", "url": "https://www.kia.com/uk/new-cars/{{vars.model}}/", "as": "html" },
+    { "type": "extract", "id": "model_name", "selector": "\"name\":\"([^\"]+)\",\"position\":3", "kind": "regex" },
+    { "type": "extract", "id": "colour_data", "selector": "[data-vrdata]", "kind": "css", "take": "attr:data-vrdata", "many": true },
+    { "type": "request", "id": "pricing", "url": "{{start.url}}", "as": "html" },
+    { "type": "extract", "id": "rows", "selector": "div.tableWrap table tr:not(:first-child)", "kind": "css", "take": "html", "many": true },
+    { "type": "forEach", "over": "rows", "as": "row", "emit": true, "steps": [
+      { "type": "extract", "id": "label", "from": "row", "selector": "td:first-child", "kind": "css", "take": "text" },
+      { "type": "extract", "id": "trim", "from": "label", "selector": "^'([^']+)'", "kind": "regex", "onError": { "policy": "skip" } },
+      { "type": "extract", "id": "trim_base", "from": "label", "selector": "^'(GT-Line S|GT-Line|Air)", "kind": "regex", "onError": { "policy": "skip" } },
+      { "type": "extract", "id": "drivetrain", "from": "row", "selector": "td:nth-child(2)", "kind": "css", "take": "text" },
+      { "type": "extract", "id": "otr", "from": "row", "selector": "td:nth-child(12)", "kind": "css", "take": "text", "onError": { "policy": "skip" } }
+    ]}
+  ],
+  "mapping": {
+    "make": { "from": "make" },
+    "model": { "from": "model_name", "transform": [{ "op": "replace", "pattern": "^The Kia ", "replacement": "" }, { "op": "trim" }] },
+    "version": { "from": "label", "transform": [{ "op": "replace", "pattern": "^'([^']+)' ", "replacement": "$1 " }] },
+    "trim": { "from": "trim", "onMissing": "skip-record" },
+    "price": { "from": "otr", "transform": [{ "op": "currency", "currency": "GBP" }], "onMissing": "skip-record" },
+    "engine": { "from": ["motor", "label", "drivetrain"], "transform": [{ "op": "template", "value": "{{motor}}, {{label}}" }, { "op": "replace", "pattern": "^undefined, |^, ", "replacement": "" }, { "op": "replace", "pattern": "'[^']+' ", "replacement": "" }] },
+    "fuel": { "from": "fuel" },
+    "bootVolumeLitres": { "from": "boot", "transform": [{ "op": "integer" }] },
+    "colours": { "from": "trim_base", "transform": [{ "op": "lookup", "in": "colour_data", "key": "trimname", "pick": "colors" }, { "op": "jsonpath", "path": "$[*].displayName" }, { "op": "unique" }] }
+  }
+}

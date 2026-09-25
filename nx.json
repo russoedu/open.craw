@@ -103,8 +103,8 @@
     "applyChanges": true
   },
   "mnci": {
-    "workspaceName": "open.craw",
-    "scope": "@open.craw",
+    "workspaceName": "opencraw",
+    "scope": "@opencraw",
     "registry": {
       "kind": "npm"
     },

@@ -1,0 +1,82 @@
+# @opencraw/cli
+
+Command-line tools for [`@opencraw/core`](../core): probe a page for scrapable data, validate recipes,
+and run a crawl from the terminal.
+
+## Install
+
+```sh
+npm install -g @opencraw/cli
+# or, inside this workspace: node packages/cli/bin/opencraw.mjs <command>
+```
+
+## Commands
+
+```
+opencraw validate <recipe files or directories...>
+opencraw run <recipe files or directories...> [options]
+opencraw probe <url> [options]
+```
+
+### `validate`
+
+Loads every recipe file (or every `.json` and `.jsonl` file in a directory; a `.jsonl` file holds one
+recipe per line), parses it against its schema and binds
+the input recipes to the output recipe, printing every problem with its JSON path. Exit code 1 if anything
+fails.
+
+```sh
+opencraw validate recipes/
+```
+
+### `run`
+
+Crawls the recipes at the given paths (files or directories; exactly one output recipe, any number of
+input recipes) and reports what happened.
+
+| Flag | Meaning |
+|---|---|
+| `--out <file>` | Write records to this JSON Lines file. Without it, records print to stdout as JSON Lines. |
+| `--append` | Keep what `--out` holds and add to it; each line carries `_key`. |
+| `--resume` | Skip records `--out` already has (needs `--append`). |
+| `--only <id>` | Run only this input recipe; repeat for more than one. |
+| `--dry-run` | One record per input recipe, printed with the scope it was mapped from — for checking a recipe under construction without a full run. |
+| `--trace` | Print the crawl trace to stderr. |
+| `--headed` | Show the browser instead of running headless. |
+| `--hooks <file>` | A JavaScript module whose default export is `{ name: function }`: the hooks the recipes call (or `OPENCRAW_HOOKS`). It runs as your code; load only files you trust. See [§6 of the authoring guide](../../docs/recipes/authoring.md#6-hooks). |
+
+```sh
+opencraw run recipes/ --out out/products.jsonl --trace
+opencraw run recipes/movie.output.json recipes/tmdb.input.json --dry-run
+```
+
+### `probe`
+
+Fetches a page and reports where its data lives: JSON-LD blocks, inline JSON objects, `.json` URLs
+referenced in the markup, script hosts, and links that look like an API. With `--browser`, it also renders
+the page in a browser and lists the JSON responses it observes while the page settles — useful for
+endpoints only a script fetches after load.
+
+```sh
+opencraw probe https://example.com/product/1
+opencraw probe https://example.com/configurator --browser
+```
+
+Use it before writing an input recipe, to find the shape a site's data actually takes (§9 of
+[the authoring guide](../../docs/recipes/authoring.md)).
+
+### Options common to `run` and `probe`
+
+| Flag | Meaning |
+|---|---|
+| `--browser-path <path>` | A browser binary other than the one Playwright installed (or `OPENCRAW_CHROMIUM`). |
+| `--insecure-tls` | Accept an intercepting proxy's certificate (or `OPENCRAW_INSECURE_TLS=1`). |
+| `--access <file>` | An access config: proxy profiles, with credentials as `{{env.NAME}}` (or `OPENCRAW_ACCESS`). See [access.md](../../docs/recipes/access.md). |
+| `--access-profile <name>` | The profile used by recipes that name none, overriding the config's `default`. `probe` uses it for its fetch. |
+| `--user-agent <ua>` | The user agent to send. |
+
+## Building
+
+Run `nx build @opencraw/cli` to build this project, `nx test @opencraw/cli` for its unit tests, and
+`nx run @opencraw/cli:e2e` for the spawn-driven suite against the fixture shop `@opencraw/core` ships
+(needs a browser: `npm run playwright:install` once, or `OPENCRAW_CHROMIUM=/path/to/chrome`).

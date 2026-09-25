@@ -1,0 +1,300 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "profiles": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[\\w-]+$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "direct"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "headers": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "ignoreHTTPSErrors": {
+                "type": "boolean"
+              },
+              "blockResources": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "media",
+                    "font",
+                    "stylesheet",
+                    "script",
+                    "texttrack",
+                    "xhr",
+                    "fetch",
+                    "eventsource",
+                    "websocket",
+                    "manifest",
+                    "other"
+                  ]
+                }
+              },
+              "kind": {
+                "type": "string",
+                "const": "proxy"
+              },
+              "preset": {
+                "type": "string",
+                "minLength": 1
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "server": {
+                "type": "string",
+                "minLength": 1
+              },
+              "username": {
+                "type": "string"
+              },
+              "password": {
+                "type": "string"
+              },
+              "bypass": {
+                "type": "string"
+              },
+              "session": {
+                "type": "object",
+                "properties": {
+                  "idFormat": {
+                    "type": "string",
+                    "pattern": "^(alnum|digits|hex)([1-9]\\d?)$"
+                  },
+                  "rotate": {
+                    "type": "string",
+                    "enum": [
+                      "per-recipe",
+                      "per-request"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "headers": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "ignoreHTTPSErrors": {
+                "type": "boolean"
+              },
+              "blockResources": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "media",
+                    "font",
+                    "stylesheet",
+                    "script",
+                    "texttrack",
+                    "xhr",
+                    "fetch",
+                    "eventsource",
+                    "websocket",
+                    "manifest",
+                    "other"
+                  ]
+                }
+              },
+              "kind": {
+                "type": "string",
+                "const": "pool"
+              },
+              "proxies": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "server": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "username": {
+                      "type": "string"
+                    },
+                    "password": {
+                      "type": "string"
+                    },
+                    "bypass": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "server"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "rotate": {
+                "type": "string",
+                "enum": [
+                  "round-robin",
+                  "random"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "proxies"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "cdp"
+              },
+              "endpoint": {
+                "type": "string",
+                "minLength": 1
+              },
+              "headers": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "params": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "session": {
+                "type": "object",
+                "properties": {
+                  "idFormat": {
+                    "type": "string",
+                    "pattern": "^(alnum|digits|hex)([1-9]\\d?)$"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "blockResources": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "media",
+                    "font",
+                    "stylesheet",
+                    "script",
+                    "texttrack",
+                    "xhr",
+                    "fetch",
+                    "eventsource",
+                    "websocket",
+                    "manifest",
+                    "other"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "endpoint"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "plugin"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "options": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            "required": [
+              "kind",
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "default": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "profiles"
+  ],
+  "additionalProperties": false,
+  "$id": "https://opencraw/schemas/access-config.schema.json",
+  "title": "OpenCraw access config"
+}

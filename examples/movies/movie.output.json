@@ -1,0 +1,15 @@
+{
+  "$schema": "../../packages/core/schemas/output-recipe.schema.json",
+  "kind": "output",
+  "id": "movie",
+  "version": 1,
+  "description": "A film or series as listed by a streaming or reference site: title, genres and cast.",
+  "fields": {
+    "title": { "type": "string", "required": true, "key": true },
+    "genres": { "type": "array", "items": { "type": "string" }, "required": true },
+    "actors": { "type": "array", "items": { "type": "string" }, "required": true },
+    "source": { "type": "string", "generated": "recipeId", "key": true },
+    "url": { "type": "url", "generated": "sourceUrl" },
+    "scrapedAt": { "type": "datetime", "generated": "now" }
+  }
+}

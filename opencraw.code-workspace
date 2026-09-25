@@ -2,7 +2,7 @@
   "folders": [
     {
       "path": ".",
-      "name": "open.craw"
+      "name": "OpenCraw"
     }
   ],
   "settings": {
@@ -81,6 +81,34 @@
         "script": "core:build",
         "problemMatcher": [],
         "group": "build"
+      },
+      {
+        "label": "cli: qa",
+        "type": "npm",
+        "script": "cli:qa",
+        "problemMatcher": [],
+        "group": "qa"
+      },
+      {
+        "label": "cli: build",
+        "type": "npm",
+        "script": "cli:build",
+        "problemMatcher": [],
+        "group": "build"
+      },
+      {
+        "label": "mcp: qa",
+        "type": "npm",
+        "script": "mcp:qa",
+        "problemMatcher": [],
+        "group": "qa"
+      },
+      {
+        "label": "mcp: build",
+        "type": "npm",
+        "script": "mcp:build",
+        "problemMatcher": [],
+        "group": "build"
       }
     ]
   },
@@ -92,7 +120,7 @@
         "request": "launch",
         "name": "mnci: build",
         "command": "npm run build",
-        "cwd": "${workspaceFolder:open.craw}",
+        "cwd": "${workspaceFolder:OpenCraw}",
         "presentation": {
           "group": "mnci",
           "order": 1
@@ -103,7 +131,7 @@
         "request": "launch",
         "name": "mnci: test",
         "command": "npm run test",
-        "cwd": "${workspaceFolder:open.craw}",
+        "cwd": "${workspaceFolder:OpenCraw}",
         "presentation": {
           "group": "mnci",
           "order": 2
@@ -114,7 +142,7 @@
         "request": "launch",
         "name": "mnci: lint",
         "command": "npm run lint",
-        "cwd": "${workspaceFolder:open.craw}",
+        "cwd": "${workspaceFolder:OpenCraw}",
         "presentation": {
           "group": "mnci",
           "order": 3
@@ -125,7 +153,7 @@
         "request": "launch",
         "name": "mnci: typecheck",
         "command": "npm run typecheck",
-        "cwd": "${workspaceFolder:open.craw}",
+        "cwd": "${workspaceFolder:OpenCraw}",
         "presentation": {
           "group": "mnci",
           "order": 4

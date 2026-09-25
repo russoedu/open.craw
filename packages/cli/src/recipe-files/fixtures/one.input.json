@@ -1,0 +1,1 @@
+{ "kind": "input", "id": "one", "output": "thing", "mode": "api", "start": [{ "url": "http://127.0.0.1:1/x" }], "steps": [{ "type": "set", "id": "n", "value": "x" }, { "type": "emit" }], "mapping": { "name": { "from": "n" } } }

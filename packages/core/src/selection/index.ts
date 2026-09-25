@@ -1,0 +1,7 @@
+export { selectJson } from './json-path.algorithm'
+export { selectRegex } from './regex.algorithm'
+export { selectHtml } from './html-selector.algorithm'
+export type { HtmlMatch } from './html-selector.algorithm'
+export { takeFromHtml, takeFromJson, collapse } from './take-value.mapper'
+export type { Take } from './take-value.mapper'
+export { tryParseJson, parseJsonText, dataItemsOf } from './json-text.algorithm'

@@ -1,23 +1,46 @@
-<!-- nx configuration start-->
-<!-- Leave the start & end comments to automatically receive updates. -->
+# Working in this repository
 
-# General Guidelines for working with Nx
+## What it is
 
-- For navigating/exploring the workspace, invoke the `nx-workspace` skill first - it has patterns for querying projects, targets, and dependencies
-- When running tasks (for example build, lint, test, e2e, etc.), always prefer running the task through `nx` (i.e. `nx run`, `nx run-many`, `nx affected`) instead of using the underlying tooling directly
-- Prefix nx commands with the workspace's package manager (e.g., `pnpm nx build`, `npm exec nx test`) - avoids using globally installed CLI
-- You have access to the Nx MCP server and its tools, use them to help the user
-- For Nx plugin best practices, check `node_modules/@nx/<plugin>/PLUGIN.md`. Not all plugins have this file - proceed without it if unavailable.
-- NEVER guess CLI flags - always check nx_docs or `--help` first when unsure
+OpenCraw is an Nx monorepo (generated and maintained with `@mnci/cli`) holding `@opencraw/core`, a
+recipe-driven crawler engine. Read `README.md`, then `docs/requirements.md` (the specification) and
+`docs/recipes/authoring.md` (the recipe guide) before changing behaviour.
 
-## Scaffolding & Generators
+## Rules that lint enforces
 
-- For scaffolding tasks (creating apps, libs, project structure, setup), ALWAYS invoke the `nx-generate` skill FIRST before exploring or calling MCP tools
+The architecture is vertical feature slices, recorded in `docs/architecture/vertical-feature-slices.md`
+and enforced by `@mnci/eslint-config`'s `verticalSlices` rules:
 
-## When to use nx_docs
+- `packages/*/src/<slice>/` is flat; only `fixtures/` may sit inside a slice, holding data.
+- Every production file is `<kebab>.<role>.ts` with a role from: `handler use-case algorithm policy model
+  contract mapper validator repository client store error config enum`. Tests are `<basename>.test.ts`.
+- A sibling slice is imported only as `'../<slice>'` (its `index.ts`); tests too. No cycles, type imports
+  included: a leaf slice declares its own structural types instead of importing from above.
+- Only `index.ts` lives at the root of `src/`. Non-library code (`e2e/`, `tools/`) sits outside `src/`.
+- Runtime dependencies go in `packages/core/package.json`, never the root (rollup externalises what the
+  package declares; `@nx/dependency-checks` fails either drift).
 
-- USE for: advanced config options, unfamiliar flags, migration guides, plugin configuration, edge cases
-- DON'T USE for: basic generator syntax (`nx g @nx/react:app`), standard commands, things you already know
-- The `nx-generate` skill handles generator discovery internally - don't call nx_docs just to look up generator syntax
+Style is JavaScript Standard as ESLint rules (no semicolons, single quotes, space before function parens,
+aligned object values, blank line before `return`). `npm run format` fixes most of it; there is no Prettier.
 
-<!-- nx configuration end-->
+## Commands
+
+```sh
+npm run format && npm run affected      # what CI runs: lint, typecheck, test, build
+npx nx run core:lint --skip-nx-cache    # dependency-checks needs the Nx graph; bare eslint skips it
+npm run core:e2e                        # browser suite; needs `npm run playwright:install` once
+OPENCRAW_CHROMIUM=/path/to/chrome npm run core:e2e   # ...or a preinstalled browser
+npm run core:schemas                    # regenerate packages/core/schemas after a contract change
+npx --yes @mnci/cli add npm-lib <name>  # a new publishable package; never scaffold by hand
+```
+
+Commit messages are Conventional Commits (husky + commitlint reject others); `nx release` derives
+versions from them.
+
+## Things that bit before
+
+- Jest buffers output: a hanging test prints nothing. Suspect an endless `paginate` first.
+- `create-nx-workspace` writes AI-agent folders whose scripts fail lint; they were deleted on purpose.
+- `unicorn/max-nested-calls` is 3: build zod schemas from named sub-schemas.
+- In-page functions for Playwright must not reference `window`/`document` as variables (lint's
+  isolated-functions rule); pass a string script instead.

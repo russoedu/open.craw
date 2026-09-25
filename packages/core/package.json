@@ -1,5 +1,5 @@
 {
-  "name": "@open.craw/core",
+  "name": "@opencraw/core",
   "version": "0.0.1",
   "type": "module",
   "main": "./dist/index.esm.js",
@@ -20,7 +20,11 @@
     "!**/*.js.map"
   ],
   "dependencies": {
-    "zod": "4.6.5"
+    "cheerio": "^1.2.0",
+    "domhandler": "^6.0.1",
+    "jsonpath-plus": "^10.4.0",
+    "playwright": "^1.63.0",
+    "zod": "^4.6.5"
   },
   "publishConfig": {
     "access": "public"
@@ -52,7 +56,7 @@
           "build"
         ],
         "options": {
-          "command": "jest --config jest.e2e.config.cts",
+          "command": "tsc -p tsconfig.e2e.json && jest --config jest.e2e.config.cts",
           "cwd": "packages/core"
         }
       },

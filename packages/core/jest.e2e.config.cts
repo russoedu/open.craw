@@ -7,12 +7,14 @@ const swcJestConfig = JSON.parse(readFileSync(`${__dirname}/.spec.swcrc`, 'utf-8
 swcJestConfig.swcrc = false
 
 module.exports = {
-  displayName: '@open.craw/core (e2e)',
+  displayName: '@opencraw/core (e2e)',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
   roots: ['<rootDir>/e2e'],
   testMatch: ['**/*.e2e.test.ts'],
   testTimeout: 60000,
+  // The suites share one fixture port and one browser install: run them one after another.
+  maxWorkers:  1,
   transform: { '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig] },
   moduleFileExtensions: ['ts', 'js', 'html'],
 }

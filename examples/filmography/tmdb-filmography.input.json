@@ -1,0 +1,38 @@
+{
+  "$schema": "../../packages/core/schemas/input-recipe.schema.json",
+  "kind": "input",
+  "id": "tmdb",
+  "output": "filmography",
+  "mode": "api",
+  "description": "TMDB: the entry movie's 'Top Billed Cast' scroller links to the lead actor's person page, whose first credits table (Acting) nests one credit_group table per year block; each of their rows is a film: year, title link, character.",
+  "start": [{ "url": "https://www.themoviedb.org/movie/949-heat" }],
+  "session": {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
+    "headers": { "accept-language": "en-US,en;q=0.9" }
+  },
+  "limits": { "maxRecords": 10, "delayMs": 1000, "timeoutMs": 30000 },
+  "steps": [
+    { "type": "request", "id": "entry", "url": "{{start.url}}", "as": "html" },
+    { "type": "extract", "id": "entry_ld", "selector": "script[type=\"application/ld+json\"]", "kind": "css", "take": "text", "many": true },
+    { "type": "extract", "id": "entry_title", "from": "entry_ld", "selector": "$[?(@['@type']=='Movie')].name", "kind": "jsonpath", "take": "json" },
+    { "type": "extract", "id": "actor_name", "selector": "ol.people.scroller li.card p a", "kind": "css", "take": "text" },
+    { "type": "extract", "id": "actor_href", "selector": "ol.people.scroller li.card p a", "kind": "css", "take": "attr:href" },
+    { "type": "request", "id": "actor_page", "url": "{{actor_href}}", "as": "html" },
+    { "type": "extract", "id": "acting_table", "selector": "table.card.credits", "kind": "css", "take": "html" },
+    { "type": "extract", "id": "rows", "from": "acting_table", "selector": "table.credit_group tr", "kind": "css", "take": "html", "many": true },
+    { "type": "forEach", "over": "rows", "as": "row", "emit": true, "steps": [
+      { "type": "extract", "id": "title", "from": "row", "selector": "td.role a bdi", "kind": "css", "take": "text" },
+      { "type": "extract", "id": "film_href", "from": "row", "selector": "td.role a", "kind": "css", "take": "attr:href" },
+      { "type": "extract", "id": "year", "from": "row", "selector": "td.year", "kind": "css", "take": "text", "onError": { "policy": "skip" } },
+      { "type": "extract", "id": "role", "from": "row", "selector": "span.character", "kind": "css", "take": "text", "onError": { "policy": "skip" } }
+    ]}
+  ],
+  "mapping": {
+    "actor": { "from": "actor_name", "transform": [{ "op": "trim" }] },
+    "title": { "from": "title", "transform": [{ "op": "trim" }] },
+    "year": { "from": "year", "transform": [{ "op": "regex", "pattern": "(\\d{4})" }, { "op": "integer" }] },
+    "role": { "from": "role", "transform": [{ "op": "trim" }] },
+    "entryMovie": { "from": "entry_title" },
+    "filmUrl": { "from": "film_href", "transform": [{ "op": "absoluteUrl" }] }
+  }
+}

@@ -8,7 +8,7 @@ const swcJestConfig = JSON.parse(readFileSync(`${__dirname}/.spec.swcrc`, 'utf-8
 swcJestConfig.swcrc = false
 
 module.exports = {
-  displayName: '@open.craw/core',
+  displayName: '@opencraw/core',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
   // Browser-driven tests live in e2e/ and run through `nx run core:e2e`, never inside `test`.

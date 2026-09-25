@@ -1,0 +1,37 @@
+{
+  "kind": "input",
+  "id": "shop-web",
+  "output": "product",
+  "mode": "web",
+  "start": [{ "url": "http://127.0.0.1:4545/catalog?page=1" }],
+  "limits": { "delayMs": 50 },
+  "steps": [
+    { "type": "goto", "url": "{{start.url}}" },
+    { "type": "paginate", "next": { "selector": "a.next" }, "maxPages": 3, "steps": [
+      { "type": "extract", "id": "wall", "selector": "#consent", "kind": "css", "take": "html", "many": true },
+      { "type": "if", "test": "{{wall}}", "steps": [{ "type": "click", "selector": "#accept" }] },
+      { "type": "extract", "id": "links", "selector": "a.product", "kind": "css", "take": "attr:href", "many": true },
+      { "type": "forEach", "over": "links", "as": "link", "emit": true, "steps": [
+        { "type": "goto", "url": "{{link}}" },
+        { "type": "extract", "id": "raw_title", "selector": "h1", "kind": "css", "take": "text" },
+        { "type": "extract", "id": "raw_price", "selector": ".price", "kind": "css", "take": "text" },
+        { "type": "extract", "id": "imgs", "selector": "img.gallery", "kind": "css", "take": "attr:src", "many": true },
+        { "type": "extract", "id": "stock", "selector": ".stock", "kind": "css", "take": "text", "onError": { "policy": "skip" } },
+        { "type": "extract", "id": "variant_rows", "selector": "table.variants tr", "kind": "css", "take": "html", "many": true },
+        { "type": "extract", "id": "seller", "selector": ".seller", "kind": "css", "take": "text" }
+      ]}
+    ]}
+  ],
+  "mapping": {
+    "url": { "from": "page.url" },
+    "title": { "from": "raw_title", "transform": [{ "op": "trim" }] },
+    "price": { "from": "raw_price", "transform": [{ "op": "regex", "pattern": "([\\d.,]+)" }, { "op": "currency", "locale": "de-DE" }] },
+    "inStock": { "from": "stock", "transform": [{ "op": "boolean", "truthy": ["in stock", "available"] }] },
+    "images": { "from": "imgs", "transform": [{ "op": "absoluteUrl" }, { "op": "unique" }] },
+    "variants": { "each": "variant_rows", "fields": {
+      "size": { "from": ".", "transform": [{ "op": "regex", "pattern": "<td class=\"size\">([^<]+)" }] },
+      "price": { "from": ".", "transform": [{ "op": "regex", "pattern": "<td class=\"price\">([^<]+)" }, { "op": "currency", "locale": "de-DE" }] }
+    }},
+    "seller.name": { "from": "seller", "transform": [{ "op": "trim" }] }
+  }
+}

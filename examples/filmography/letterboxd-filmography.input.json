@@ -1,0 +1,36 @@
+{
+  "$schema": "../../packages/core/schemas/input-recipe.schema.json",
+  "kind": "input",
+  "id": "letterboxd",
+  "output": "filmography",
+  "mode": "api",
+  "description": "Letterboxd: the film page's cast list links to /actor/<slug>/, a 'Films starring' poster grid where each item carries the film name, year and role in data attributes and a title attribute.",
+  "start": [{ "url": "https://letterboxd.com/film/heat-1995/" }],
+  "session": {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
+    "headers": { "accept-language": "en-US,en;q=0.9" }
+  },
+  "limits": { "maxRecords": 10, "delayMs": 1000, "timeoutMs": 30000 },
+  "steps": [
+    { "type": "request", "id": "entry", "url": "{{start.url}}", "as": "html" },
+    { "type": "extract", "id": "entry_ld", "selector": "script[type=\"application/ld+json\"]", "kind": "css", "take": "text", "many": true },
+    { "type": "extract", "id": "entry_title", "from": "entry_ld", "selector": "$[?(@['@type']=='Movie')].name", "kind": "jsonpath", "take": "json" },
+    { "type": "extract", "id": "actor_name", "selector": "div.cast-list a.text-slug", "kind": "css", "take": "text" },
+    { "type": "extract", "id": "actor_href", "selector": "div.cast-list a.text-slug", "kind": "css", "take": "attr:href" },
+    { "type": "request", "id": "actor_page", "url": "{{actor_href}}", "as": "html" },
+    { "type": "extract", "id": "items", "selector": "ul.grid li.griditem", "kind": "css", "take": "json", "many": true },
+    { "type": "forEach", "over": "items", "as": "item", "emit": true, "steps": [
+      { "type": "extract", "id": "name", "from": "item", "selector": "div.react-component", "kind": "css", "take": "attr:data-item-name" },
+      { "type": "extract", "id": "link", "from": "item", "selector": "div.react-component", "kind": "css", "take": "attr:data-item-link" },
+      { "type": "extract", "id": "caption", "from": "item", "selector": "li.griditem", "kind": "css", "take": "attr:title" }
+    ]}
+  ],
+  "mapping": {
+    "actor": { "from": "actor_name", "transform": [{ "op": "trim" }] },
+    "title": { "from": "name", "transform": [{ "op": "regex", "pattern": "^(.*?)(?: \\(\\d{4}\\))?$" }, { "op": "trim" }] },
+    "year": { "from": "name", "transform": [{ "op": "regex", "pattern": "\\((\\d{4})\\)$" }, { "op": "integer" }] },
+    "role": { "from": "caption", "transform": [{ "op": "regex", "pattern": " as (.+)$" }] },
+    "entryMovie": { "from": "entry_title" },
+    "filmUrl": { "from": "link", "transform": [{ "op": "absoluteUrl" }] }
+  }
+}

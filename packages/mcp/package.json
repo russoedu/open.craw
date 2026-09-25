@@ -1,0 +1,95 @@
+{
+  "name": "@opencraw/mcp",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/index.esm.js",
+  "module": "./dist/index.esm.js",
+  "types": "./dist/src/index.d.ts",
+  "bin": {
+    "opencraw-mcp": "./bin/opencraw-mcp.mjs"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "default": "./dist/index.esm.js"
+    }
+  },
+  "files": [
+    "dist",
+    "bin",
+    "!**/*.tsbuildinfo",
+    "!**/*.d.ts.map",
+    "!**/*.js.map"
+  ],
+  "dependencies": {
+    "@opencraw/core": "^0.0.1",
+    "@opencraw/cli": "^0.0.1",
+    "@modelcontextprotocol/sdk": "^1.30.1",
+    "playwright": "^1.63.0",
+    "zod": "^4.6.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "An MCP server exposing OpenCraw's crawler as agent tools: probe a page, validate recipes, run a crawl, list recipes.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/russoedu/open.craw.git",
+    "directory": "packages/mcp"
+  },
+  "keywords": [
+    "crawler",
+    "scraper",
+    "mcp",
+    "model-context-protocol",
+    "recipe"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "sideEffects": false,
+  "nx": {
+    "targets": {
+      "typecheck": {
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "lint": {
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "e2e": {
+        "executor": "nx:run-commands",
+        "dependsOn": [
+          "build",
+          {
+            "projects": [
+              "@opencraw/core"
+            ],
+            "target": "e2e"
+          },
+          {
+            "projects": [
+              "@opencraw/cli"
+            ],
+            "target": "e2e"
+          }
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          "{workspaceRoot}/packages/core/e2e/**"
+        ],
+        "options": {
+          "command": "tsc -p tsconfig.e2e.json && jest --config jest.e2e.config.cts",
+          "cwd": "packages/mcp"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "kind": "output",
+  "id": "trim",
+  "version": 1,
+  "fields": {
+    "model": { "type": "string", "required": true, "key": true },
+    "trim": { "type": "string", "required": true },
+    "code": { "type": "string", "required": true, "key": true },
+    "price": { "type": "currency", "currency": "EUR", "required": true }
+  }
+}

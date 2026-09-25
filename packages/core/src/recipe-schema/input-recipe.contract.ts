@@ -1,0 +1,190 @@
+import { z } from 'zod'
+import { CRAWL_MODES, KEEP_KINDS } from './recipe-kind.enum'
+import type { CrawlMode, KeepKind } from './recipe-kind.enum'
+import { errorPolicySchema, stepSchema } from './step.contract'
+import type { ErrorPolicy, Step } from './step.contract'
+import { mappingRuleSchema } from './transform-rule.contract'
+import type { MappingRule } from './transform-rule.contract'
+
+/** A URL the crawl starts from, with variables visible to its templates as `vars.*`. */
+export interface StartPoint {
+  url:   string
+  vars?: Record<string, string | number | boolean>
+}
+
+/** A cookie in Playwright's shape. */
+export interface RecipeCookie {
+  name:      string
+  value:     string
+  domain:    string
+  path?:     string
+  expires?:  number
+  httpOnly?: boolean
+  secure?:   boolean
+  sameSite?: 'Strict' | 'Lax' | 'None'
+}
+
+/** Runs before the crawl, always in a browser, to obtain cookies or storage (a login, a consent wall). */
+export interface SessionBootstrap {
+  steps:   Step[]
+  keep:    KeepKind[]
+  /** Persist the resulting storage state for the next run. */
+  saveTo?: string
+}
+
+/**
+ * What the site needs from the network, never how to get it: the runner's
+ * access config maps a profile name to a provider and credentials.
+ */
+export interface SessionAccess {
+  /** An access profile of the runner's config; its default when omitted. */
+  profile?: string
+  /** ISO 3166 country the traffic should come from, for profiles that target by country. */
+  country?: string
+  /** `false` lets the provider rotate IPs per request; the profile decides when omitted. */
+  sticky?:  boolean
+}
+
+/**
+ * What counts as the site refusing the crawl, checked on every navigation and
+ * request. Any condition that matches is a block. When omitted: status 403 or
+ * 429, or an AWS WAF challenge (`x-amzn-waf-action: challenge`).
+ */
+export interface BlockRule {
+  status?: number[]
+  /** Header name to a regular expression its value must match (case-insensitive). */
+  header?: Record<string, string>
+  /** A regular expression the response body must match (case-insensitive). */
+  text?:   string
+}
+
+/** What to do when blocked: take a new access lease (a new IP), reopen the session, and retry the step. */
+export interface BlockRotation {
+  rotate:    boolean
+  /** How many rotations a recipe run may use. Default 2. */
+  attempts?: number
+}
+
+export interface SessionSpec {
+  headers?:          Record<string, string>
+  cookies?:          RecipeCookie[]
+  userAgent?:        string
+  viewport?:         { width: number, height: number }
+  /** Reuse a storage state saved by a previous bootstrap. */
+  storageStatePath?: string
+  bootstrap?:        SessionBootstrap
+  access?:           SessionAccess
+  blockedWhen?:      BlockRule
+  onBlock?:          BlockRotation
+}
+
+export interface CrawlLimits {
+  maxRecords?:  number
+  /** Minimum interval between two request starts across the recipe, whatever runs in parallel. */
+  delayMs?:     number
+  timeoutMs?:   number
+  /** How many `forEach` iterations may run at once (api mode; a web recipe drives one page). Default 1. */
+  concurrency?: number
+}
+
+/** Where to start, how to navigate, what to extract, and how it maps to one output recipe. */
+export interface InputRecipe {
+  $schema?:     string
+  kind:         'input'
+  id:           string
+  /** The `OutputRecipe.id` this recipe feeds. */
+  output:       string
+  mode:         CrawlMode
+  description?: string
+  start:        StartPoint[]
+  vars?:        Record<string, string | number | boolean>
+  session?:     SessionSpec
+  limits?:      CrawlLimits
+  /** Default policy for every step. */
+  onError?:     ErrorPolicy
+  steps:        Step[]
+  /** Keyed by output field path, dotted for nested fields. */
+  mapping:      Record<string, MappingRule>
+}
+
+const scalar = z.union([z.string(), z.number(), z.boolean()])
+const vars = z.record(z.string().regex(/^[A-Z_]\w*$/i), scalar)
+
+export const startPointSchema: z.ZodType<StartPoint> = z.strictObject({ url: z.string().min(1), vars: vars.optional() })
+
+const cookieSchema: z.ZodType<RecipeCookie> = z.strictObject({
+  name:     z.string().min(1),
+  value:    z.string(),
+  domain:   z.string().min(1),
+  path:     z.string().optional(),
+  expires:  z.number().optional(),
+  httpOnly: z.boolean().optional(),
+  secure:   z.boolean().optional(),
+  sameSite: z.enum(['Strict', 'Lax', 'None']).optional(),
+})
+
+const bootstrapSchema: z.ZodType<SessionBootstrap> = z.strictObject({
+  steps:  z.array(stepSchema).min(1),
+  keep:   z.array(z.enum(KEEP_KINDS)).min(1),
+  saveTo: z.string().optional(),
+})
+
+const sessionAccessSchema: z.ZodType<SessionAccess> = z.strictObject({
+  profile: z.string().regex(/^[\w-]+$/, 'a profile name is letters, digits, hyphens and underscores').optional(),
+  country: z.string().regex(/^[A-Z]{2}$/i, 'a country is a two-letter ISO code').optional(),
+  sticky:  z.boolean().optional(),
+})
+
+const regexSource = z.string().min(1).refine((source) => {
+  try {
+    return new RegExp(source, 'i').source.length > 0
+  } catch {
+    return false
+  }
+}, 'not a valid regular expression')
+
+const blockRuleSchema: z.ZodType<BlockRule> = z.strictObject({
+  status: z.array(z.int().min(100).max(599)).optional(),
+  header: z.record(z.string().min(1), regexSource).optional(),
+  text:   regexSource.optional(),
+})
+
+const blockRotationSchema: z.ZodType<BlockRotation> = z.strictObject({
+  rotate:   z.boolean(),
+  attempts: z.int().min(1).max(10).optional(),
+})
+
+export const sessionSpecSchema: z.ZodType<SessionSpec> = z.strictObject({
+  headers:          z.record(z.string(), z.string()).optional(),
+  cookies:          z.array(cookieSchema).optional(),
+  userAgent:        z.string().optional(),
+  viewport:         z.strictObject({ width: z.int().positive(), height: z.int().positive() }).optional(),
+  storageStatePath: z.string().optional(),
+  bootstrap:        bootstrapSchema.optional(),
+  access:           sessionAccessSchema.optional(),
+  blockedWhen:      blockRuleSchema.optional(),
+  onBlock:          blockRotationSchema.optional(),
+})
+
+const limitsSchema: z.ZodType<CrawlLimits> = z.strictObject({
+  maxRecords:  z.int().positive().optional(),
+  delayMs:     z.int().nonnegative().optional(),
+  timeoutMs:   z.int().positive().optional(),
+  concurrency: z.int().min(1).max(64).optional(),
+})
+
+export const inputRecipeSchema: z.ZodType<InputRecipe> = z.strictObject({
+  $schema:     z.string().optional(),
+  kind:        z.literal('input'),
+  id:          z.string().regex(/^[a-z0-9][a-z0-9-]*$/, 'an id is lowercase letters, digits and hyphens'),
+  output:      z.string().min(1),
+  mode:        z.enum(CRAWL_MODES),
+  description: z.string().optional(),
+  start:       z.array(startPointSchema).min(1),
+  vars:        vars.optional(),
+  session:     sessionSpecSchema.optional(),
+  limits:      limitsSchema.optional(),
+  onError:     errorPolicySchema.optional(),
+  steps:       z.array(stepSchema).min(1),
+  mapping:     z.record(z.string().min(1), mappingRuleSchema),
+})

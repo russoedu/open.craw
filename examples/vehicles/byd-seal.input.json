@@ -1,0 +1,41 @@
+{
+  "$schema": "../../packages/core/schemas/input-recipe.schema.json",
+  "kind": "input",
+  "id": "byd-uk",
+  "output": "vehicle-configuration",
+  "mode": "api",
+  "description": "BYD UK's configurator page embeds a 'carPath' pointing at a static JSON on cms-api.byd.com. That JSON lists every version of the model with its price, its colour/interior/wheel options, and one SKU per priced combination. Motor, boot and doors are not in BYD's data (their fields are empty), so they stay null; the sales bullets give power and drive where BYD states them.",
+  "start": [{ "url": "https://www.byd.com/uk/configurator/seal" }],
+  "session": {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
+    "headers": { "accept-language": "en-GB,en;q=0.9" }
+  },
+  "limits": { "delayMs": 500, "timeoutMs": 40000 },
+  "steps": [
+    { "type": "request", "id": "configurator", "url": "{{start.url}}", "as": "html" },
+    { "type": "extract", "id": "car_path", "selector": "\"carPath\":\"(https://cms-api\\.byd\\.com/[^\"]+\\.json)\"", "kind": "regex" },
+    { "type": "request", "id": "car", "url": "{{car_path}}", "as": "json" },
+    { "type": "set", "id": "make", "value": "BYD" },
+    { "type": "set", "id": "fuel", "value": "Electric" },
+    { "type": "extract", "id": "versions", "from": "car", "selector": "$[*]", "kind": "jsonpath", "take": "json", "many": true },
+    { "type": "forEach", "over": "versions", "as": "version", "steps": [
+      { "type": "extract", "id": "topics", "from": "version", "selector": "$.salesTopic[*]", "kind": "jsonpath", "take": "json", "many": true },
+      { "type": "extract", "id": "power", "from": "topics", "selector": "(\\d+ PS \\(\\d+ kW\\))", "kind": "regex", "onError": { "policy": "skip" } },
+      { "type": "extract", "id": "drive", "from": "topics", "selector": "((?:Rear|Front|All) Wheel Drive)", "kind": "regex", "onError": { "policy": "skip" } },
+      { "type": "extract", "id": "colour_names", "from": "version", "selector": "$.specification.colors.list[*].name", "kind": "jsonpath", "take": "json", "many": true },
+      { "type": "extract", "id": "skus", "from": "version", "selector": "$.skuList.*", "kind": "jsonpath", "take": "json", "many": true },
+      { "type": "forEach", "over": "skus", "as": "sku", "emit": true, "steps": [] }
+    ]}
+  ],
+  "mapping": {
+    "make": { "from": "make" },
+    "model": { "from": "version.seriesNameEn", "transform": [{ "op": "replace", "pattern": "^BYD ", "replacement": "" }] },
+    "version": { "from": "version.modelNameEn" },
+    "trim": { "from": "version.productNameAlias.val" },
+    "configuration": { "from": "sku", "transform": [{ "op": "template", "value": "{{sku.colors.name}} / {{sku.interior.name}} interior / {{sku.wheels.name}} wheels" }] },
+    "price": { "from": "sku.formattedPrice", "transform": [{ "op": "currency", "currency": "GBP" }] },
+    "engine": { "from": ["power", "drive"], "transform": [{ "op": "coalesce" }] },
+    "fuel": { "from": "fuel" },
+    "colours": { "from": "colour_names" }
+  }
+}

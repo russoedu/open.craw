@@ -1,0 +1,15 @@
+{
+  "kind": "output",
+  "id": "product",
+  "version": 1,
+  "fields": {
+    "url": { "type": "url", "required": true, "key": true },
+    "title": { "type": "string", "required": true },
+    "price": { "type": "currency", "currency": "EUR", "required": true },
+    "inStock": { "type": "boolean", "default": false, "onMissing": "default" },
+    "images": { "type": "array", "items": { "type": "url" } },
+    "variants": { "type": "array", "items": { "type": "object", "fields": { "size": { "type": "string" }, "price": { "type": "currency", "currency": "EUR" } } } },
+    "seller": { "type": "object", "fields": { "name": { "type": "string" } } },
+    "scrapedAt": { "type": "datetime", "generated": "now" }
+  }
+}

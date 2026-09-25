@@ -1,0 +1,31 @@
+{
+  "$schema": "../../packages/core/schemas/input-recipe.schema.json",
+  "kind": "input",
+  "id": "netflix",
+  "output": "movie",
+  "mode": "api",
+  "description": "Netflix's public 'Movies' genre page lists titles in a JSON-LD ItemList; every title page carries a JSON-LD block with name, genre and actors. No browser and no login needed.",
+  "start": [{ "url": "https://www.netflix.com/browse/genre/34399" }],
+  "session": {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
+    "headers": { "accept-language": "en-US,en;q=0.9" }
+  },
+  "limits": { "maxRecords": 5, "delayMs": 1000, "timeoutMs": 30000 },
+  "steps": [
+    { "type": "request", "id": "listing", "url": "{{start.url}}", "as": "html" },
+    { "type": "extract", "id": "listing_ld", "selector": "script[type=\"application/ld+json\"]", "kind": "css", "take": "text", "many": true },
+    { "type": "extract", "id": "items", "from": "listing_ld", "selector": "$[*].itemListElement[*].item", "kind": "jsonpath", "take": "json", "many": true },
+    { "type": "forEach", "over": "items", "as": "item", "emit": true, "steps": [
+      { "type": "request", "id": "detail", "url": "{{item.url}}", "as": "html" },
+      { "type": "extract", "id": "detail_ld", "selector": "script[type=\"application/ld+json\"]", "kind": "css", "take": "text", "many": true },
+      { "type": "extract", "id": "name", "from": "detail_ld", "selector": "$[*].name", "kind": "jsonpath", "take": "json" },
+      { "type": "extract", "id": "genre", "from": "detail_ld", "selector": "$[*].genre", "kind": "jsonpath", "take": "json", "onError": { "policy": "skip" } },
+      { "type": "extract", "id": "actors", "from": "detail_ld", "selector": "$[*].actors[*].name", "kind": "jsonpath", "take": "json", "many": true }
+    ]}
+  ],
+  "mapping": {
+    "title": { "from": "name", "transform": [{ "op": "trim" }] },
+    "genres": { "from": "genre" },
+    "actors": { "from": "actors" }
+  }
+}
