@@ -7,6 +7,7 @@ import { readPptxDeck } from '../deck-document'
 import { readPdf } from '../pdf-document'
 import type { BodyKind } from '../recipe-schema'
 import { csvWorkbook, readXlsxWorkbook, sheetNameOf } from '../workbook-document'
+import { parseJsonLike, parseJsonLines } from '../selection'
 import { readYaml } from '../yaml-document'
 import { HttpError } from './http-response.contract'
 import type { HttpBody, HttpRequest, HttpResponse, HttpSender } from './http-response.contract'
@@ -63,8 +64,8 @@ export class HttpClient implements HttpSender {
       data:    httpRequest.body as string | Record<string, unknown> | undefined,
       timeout: httpRequest.timeoutMs ?? this.timeoutMs,
     })
-    const { body, warnings } = await readBody(response, httpRequest)
-    const result: HttpResponse = { status: response.status(), url: response.url(), headers: response.headers(), body, ...(warnings.length > 0 && { warnings }) }
+    const { body, warnings, format } = await readBody(response, httpRequest)
+    const result: HttpResponse = { status: response.status(), url: response.url(), headers: response.headers(), body, format, ...(warnings.length > 0 && { warnings }) }
     if (response.status() >= 400) throw new HttpError(response.status(), response.url(), body, response.headers())
 
     return result
@@ -84,6 +85,7 @@ export class HttpClient implements HttpSender {
 interface ReadBody {
   body:     HttpBody
   warnings: string[]
+  format:   BodyKind
 }
 
 async function readBody (response: APIResponse, httpRequest: HttpRequest): Promise<ReadBody> {
@@ -101,9 +103,9 @@ async function readBody (response: APIResponse, httpRequest: HttpRequest): Promi
 async function readLocalFile (httpRequest: HttpRequest): Promise<HttpResponse> {
   const path = fileURLToPath(httpRequest.url)
   const bytes = await readFile(path)
-  const { body, warnings } = await parseBody(httpRequest.as ?? formatFromExtension(extname(path)), bytes, httpRequest.url, httpRequest)
+  const { body, warnings, format } = await parseBody(httpRequest.as ?? formatFromExtension(extname(path)), bytes, httpRequest.url, httpRequest)
 
-  return { status: 200, url: httpRequest.url, headers: {}, body, ...(warnings.length > 0 && { warnings }) }
+  return { status: 200, url: httpRequest.url, headers: {}, body, format, ...(warnings.length > 0 && { warnings }) }
 }
 
 async function parseBody (format: BodyKind, bytes: Uint8Array, url: string, reading: { encoding?: string, delimiter?: string, scalars?: 'typed' | 'text', charset?: string }): Promise<ReadBody> {
@@ -111,10 +113,10 @@ async function parseBody (format: BodyKind, bytes: Uint8Array, url: string, read
     const { text } = decodeText(bytes, reading)
     const { data, warnings } = await readYaml(text, url, reading.scalars)
 
-    return { body: { kind: 'json', data }, warnings }
+    return { body: { kind: 'json', data }, warnings, format }
   }
 
-  return { body: await parseFormat(format, bytes, url, reading), warnings: [] }
+  return { body: await parseFormat(format, bytes, url, reading), warnings: [], format }
 }
 
 async function parseFormat (format: BodyKind, bytes: Uint8Array, url: string, reading: { encoding?: string, delimiter?: string, charset?: string }): Promise<HttpBody> {
@@ -123,20 +125,30 @@ async function parseFormat (format: BodyKind, bytes: Uint8Array, url: string, re
   if (format === 'pptx') return readPptxDeck(bytes, url)
   const { text, encoding } = decodeText(bytes, reading)
   if (format === 'csv') return csvWorkbook(text, { name: sheetNameOf(url), encoding, delimiter: reading.delimiter })
+  if (format === 'jsonl') return { kind: 'json', data: parseJsonLines(text, url) }
   if (format === 'json') {
-    try {
-      return { kind: 'json', data: JSON.parse(text) as unknown }
-    } catch (error) {
-      throw new Error(`${url}: body is not JSON (${(error as Error).message})`, { cause: error })
-    }
+    const parsed = parseJsonLike(text)
+    if ('error' in parsed) throw new Error(`${url}: body is not JSON (${parsed.error.message})${looksLikeJsonLines(text) ? '; it looks like JSON Lines: read it with "as": "jsonl"' : ''}`, { cause: parsed.error })
+
+    return { kind: 'json', data: parsed.value }
   }
 
   return format === 'html' ? { kind: 'html', html: text } : { kind: 'text', text }
 }
 
+/** Several lines, the first of them JSON on its own. */
+function looksLikeJsonLines (text: string): boolean {
+  const lines = text.split(/\r?\n/).filter(line => line.trim() !== '')
+  if (lines.length < 2) return false
+  const first = parseJsonLike(lines[0])
+
+  return 'value' in first
+}
+
 function formatFromContentType (contentType: string): BodyKind {
   const type = contentType.toLowerCase().split(';', 1)[0].trim()
   if (CSV_TYPES.has(type)) return 'csv'
+  if (JSON_LINES_TYPES.has(type)) return 'jsonl'
   // A legacy .xls or .ppt goes to the Office reader too, which says what to do with it.
   if (type.includes('spreadsheetml') || type.startsWith('application/vnd.ms-excel')) return 'xlsx'
   if (type.includes('presentationml') || type.startsWith('application/vnd.ms-powerpoint')) return 'pptx'
@@ -148,11 +160,12 @@ function formatFromContentType (contentType: string): BodyKind {
   return 'text'
 }
 
+const JSON_LINES_TYPES = new Set(['application/x-ndjson', 'application/ndjson', 'application/jsonl', 'application/x-jsonlines', 'application/jsonlines'])
 const YAML_TYPES = new Set(['application/yaml', 'application/x-yaml', 'text/yaml', 'text/x-yaml'])
 const CSV_TYPES = new Set(['text/csv', 'application/csv', 'text/x-csv', 'application/x-csv', 'text/comma-separated-values', 'text/tab-separated-values'])
 
 function formatFromExtension (extension: string): BodyKind {
-  const formats: Record<string, BodyKind> = { '.json': 'json', '.pdf': 'pdf', '.csv': 'csv', '.tsv': 'csv', '.xlsx': 'xlsx', '.xlsm': 'xlsx', '.xls': 'xlsx', '.pptx': 'pptx', '.pptm': 'pptx', '.ppsx': 'pptx', '.ppt': 'pptx', '.yaml': 'yaml', '.yml': 'yaml', '.html': 'html', '.htm': 'html', '.xml': 'html' }
+  const formats: Record<string, BodyKind> = { '.json': 'json', '.jsonl': 'jsonl', '.ndjson': 'jsonl', '.pdf': 'pdf', '.csv': 'csv', '.tsv': 'csv', '.xlsx': 'xlsx', '.xlsm': 'xlsx', '.xls': 'xlsx', '.pptx': 'pptx', '.pptm': 'pptx', '.ppsx': 'pptx', '.ppt': 'pptx', '.yaml': 'yaml', '.yml': 'yaml', '.html': 'html', '.htm': 'html', '.xml': 'html' }
 
   return formats[extension.toLowerCase()] ?? 'text'
 }

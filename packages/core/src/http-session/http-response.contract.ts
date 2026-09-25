@@ -33,6 +33,8 @@ export interface HttpResponse {
   body:      HttpBody
   /** What reading the body noticed but read anyway (an unknown YAML tag…). */
   warnings?: string[]
+  /** The format the body was read as (`yaml` and `jsonl` both give JSON data). */
+  format?:   BodyKind
 }
 
 /** The part of the client the api runner needs; tests fake it. */

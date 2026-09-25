@@ -219,7 +219,7 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 
 | Step | Fields | Notes |
 |---|---|---|
-| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`, `yaml`), `encoding?`, `delimiter?`, `scalars?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck, `application/yaml` YAML). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`, `.yaml`, `.yml`). 4xx/5xx fail the step. |
+| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `jsonl`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`, `yaml`), `encoding?`, `delimiter?`, `scalars?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck, `application/yaml` YAML, `application/x-ndjson` JSON Lines). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`, `.yaml`, `.yml`, `.jsonl`, `.ndjson`). 4xx/5xx fail the step. |
 
 Text bodies are decoded from, in order: a byte-order mark, `encoding` (any WHATWG label: `windows-1252`,
 `iso-8859-15`, `shift_jis`), the charset the server declares, UTF-8, and Windows-1252 for text that is not
@@ -444,8 +444,21 @@ order. Rules:
 | an id holding a **read workbook** (a spreadsheet or a CSV) | with `table`, `regex` or `jsonpath` (§4.7) | same |
 | an id holding a **read deck** (a presentation) | with `table`, `regex` or `jsonpath` (§4.8) | same |
 
-JSON-LD wrapped in `/* <![CDATA[ */ ... /* ]]> */` or `<!-- -->` guards is unwrapped before parsing. The
-common pattern, both sites in the examples use it:
+**JSON Lines** (NDJSON: one JSON value per line, as bulk exports and Shopify bulk operations give) read with
+`as: "jsonl"`, or by the `application/x-ndjson` / `application/jsonl` content types or the `.jsonl` / `.ndjson`
+extensions, into an **array** of the lines' values: `$[*]` walks them. A line that does not parse fails the step
+with its number. JSON Lines served as `application/json` fail with a hint to use `as: "jsonl"`.
+
+**Wrapped JSON** is unwrapped, both in a response read as JSON and in text a `jsonpath` extract parses (`from`):
+
+- comment guards around JSON-LD: `/* <![CDATA[ */ … /* ]]> */`, `<!-- … -->`;
+- anti-hijacking prefixes: `)]}'` (with or without a comma), `while(1);`, `for(;;);`;
+- JSONP: `callback({…});`, so an endpoint served as `text/javascript` reads with `as: "json"`;
+- an assignment in an inline script: `window.__INITIAL_STATE__ = {…};` (with `var`, `let` or `const`, too).
+
+Valid JSON is always read as it is: a wrapper is only removed when the text does not parse, and what is inside
+must be strict JSON. Nothing is evaluated, so a JavaScript literal (`{ a: undefined }`, unquoted keys) still
+fails: read it with `regex`, or a hook. The common JSON-LD pattern, both sites in the examples use it:
 
 ```json
 { "type": "extract", "id": "ld", "selector": "script[type=\"application/ld+json\"]", "kind": "css", "take": "text", "many": true },

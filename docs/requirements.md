@@ -90,7 +90,7 @@ optional `when` template that must render truthy for the step to run.
 | `wait` | web | – | one of `selector`, `ms`, `state: 'networkidle'` |
 | `evaluate` | web | value | `script`, JavaScript run in the page. Trusted recipes only. |
 | `screenshot` | web | – | `path` |
-| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'html' \| 'text' \| 'pdf' \| 'csv' \| 'xlsx' \| 'pptx' \| 'yaml'`, `encoding?`, `delimiter?` (CSV), `scalars?` (YAML) |
+| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'jsonl' \| 'html' \| 'text' \| 'pdf' \| 'csv' \| 'xlsx' \| 'pptx' \| 'yaml'`, `encoding?`, `delimiter?` (CSV), `scalars?` (YAML) |
 | `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex' \| 'table'`, `take`, `many?`, `from?`; `table` also `columns?`, `until?`, `align?` (PDF), `fillDown?`, `sheet?`, `headerRows?`, `includeHidden?` (workbook), `slide?`, `shapes?` (deck) |
 | `set` | both | value | `value` (template or literal) |
 | `collect` | both | – | `into` (a list id bound in an enclosing scope), `value` (template or literal); appends, so values outlive the `forEach` iteration or `paginate` page that found them |
@@ -132,6 +132,13 @@ YAML (`as: 'yaml'`, `application/yaml` and kin, `.yaml`/`.yml`) is parsed with t
 (several documents: an array): version pinned to 1.2 core whatever the document declares, merge keys applied,
 duplicate keys an error, aliases capped at 100, custom tags read as plain values with a `warning` event;
 `scalars: 'text'` (failsafe schema) keeps every scalar as written.
+
+JSON Lines (`as: 'jsonl'`, `application/x-ndjson` and kin, `.jsonl`/`.ndjson`) read into an array of the lines'
+values; a line that does not parse fails with its number. JSON — a response read as JSON or text a `jsonpath`
+extract parses — is read as it is, and only when that fails, unwrapped from comment guards, an anti-hijacking
+prefix (`)]}'`, `while(1);`, `for(;;);`), a JSONP call or a script assignment; the rest must be strict JSON.
+`probe` on JSON, JSON Lines or YAML shows the structure (four levels, a sample per leaf) and every array of
+objects with its path and shared keys.
 
 `take` is `text` (default), `html`, `value`, `json` or `attr:<name>`. `xpath` works on live pages only; on
 fetched HTML use `css`; on JSON use `jsonpath`. A `jsonpath` extract whose `from` is text parses it as JSON; a list of

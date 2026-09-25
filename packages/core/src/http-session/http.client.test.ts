@@ -71,6 +71,24 @@ beforeAll(async () => {
 
         break
       }
+      case '/export': {
+        outgoing.setHeader('content-type', 'application/x-ndjson')
+        outgoing.end('{"id":1}\n{"id":2}\n')
+
+        break
+      }
+      case '/mislabelled': {
+        outgoing.setHeader('content-type', 'application/json')
+        outgoing.end('{"id":1}\n{"id":2}\n')
+
+        break
+      }
+      case '/jsonp': {
+        outgoing.setHeader('content-type', 'application/javascript')
+        outgoing.end('cb({"id":1});')
+
+        break
+      }
       case '/latin': {
         outgoing.setHeader('content-type', 'text/plain; charset=ISO-8859-1')
         outgoing.end(Buffer.from([0x43, 0xE9]))
@@ -207,6 +225,23 @@ describe('HttpClient', () => {
       expect(typed.body).toEqual({ kind: 'json', data: { zip: 123 } })
       const verbatim = await client.send({ url, scalars: 'text' })
       expect(verbatim.body).toEqual({ kind: 'json', data: { zip: '0123' } })
+    } finally {
+      await client.dispose()
+    }
+  })
+
+  it('reads JSON Lines into an array, unwraps JSONP read as JSON, and names the format it read', async () => {
+    const client = await HttpClient.open()
+    try {
+      const lines = await client.send({ url: `${base}/export` })
+      expect([lines.format, lines.body]).toEqual(['jsonl', { kind: 'json', data: [{ id: 1 }, { id: 2 }] }])
+      await expect(client.send({ url: `${base}/mislabelled` })).rejects.toThrow(/looks like JSON Lines: read it with "as": "jsonl"/)
+      const jsonp = await client.send({ url: `${base}/jsonp`, as: 'json' })
+      expect(jsonp.body).toEqual({ kind: 'json', data: { id: 1 } })
+      const directory = await mkdtemp(join(tmpdir(), 'http-client-'))
+      await writeFile(join(directory, 'rows.ndjson'), '[1]\n[2]\n')
+      const local = await client.send({ url: pathToFileURL(join(directory, 'rows.ndjson')).href })
+      expect(local.body).toEqual({ kind: 'json', data: [[1], [2]] })
     } finally {
       await client.dispose()
     }

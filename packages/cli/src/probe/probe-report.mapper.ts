@@ -1,5 +1,6 @@
 import type { ProbeFindings } from './find-data.algorithm'
 import type { DeckFindings } from './deck-findings.mapper'
+import type { JsonFindings } from './json-findings.mapper'
 import type { PdfFindings } from './pdf-findings.mapper'
 import type { WorkbookFindings } from './workbook-findings.mapper'
 
@@ -79,6 +80,25 @@ export function deckReport (url: string, deck: DeckFindings): string {
     section('Likely table headers (a "table" extract selector for each)', deck.headers.map(header => `  slide ${header.slide}  ${header.selector}${header.hint === undefined ? '' : `  (${header.hint})`}\n        ${header.text}`)),
     section('Text boxes laid out as a table (a "table" extract with "shapes": true)', deck.grids.map(grid => `  slide ${grid.slide}  ${grid.title}: ${grid.boxes} short boxes`)),
     section('Charts (read with jsonpath: $.slides[*].charts[*].series[*])', deck.charts.map(chart => `  slide ${chart.slide}  ${chart.type}${chart.title === undefined ? '' : ` "${chart.title}"`}: ${chart.series.map(series => `${series.name} (${series.points})`).join(', ')}`)),
+  ].filter(line => line !== '').join('\n')
+}
+
+/**
+ * Formats what a probe found in JSON data: its record lists with the path a
+ * `jsonpath` extract needs, then its structure.
+ *
+ * @param url - The document's URL.
+ * @param json - The findings.
+ * @returns The report.
+ */
+export function jsonReport (url: string, json: JsonFindings): string {
+  const read = { json: 'JSON', jsonl: 'JSON Lines', yaml: 'YAML' }[json.format] ?? json.format
+
+  return [
+    `${url} (${read}: ${json.type})`,
+    '',
+    section('Record lists (a "jsonpath" selector for each, largest first)', json.lists.map(list => `  ${list.path}  ${list.length} entries\n        keys: ${list.keys.join(', ')}`)),
+    section('Structure', json.tree.map(line => `  ${line}`)),
   ].filter(line => line !== '').join('\n')
 }
 

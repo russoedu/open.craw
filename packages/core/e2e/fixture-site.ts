@@ -172,6 +172,20 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
 
     return
   }
+  if (url.pathname === '/products.jsonl') {
+    // A bulk export: one product per line, as NDJSON.
+    outgoing.writeHead(200, { 'content-type': 'application/x-ndjson' })
+    outgoing.end('{"sku":"P-1","name":"Pandina","price":15950}\n{"sku":"P-2","name":"600e","price":36950}\n')
+
+    return
+  }
+  if (url.pathname === '/legacy.js') {
+    // An old endpoint that still answers JSONP.
+    outgoing.writeHead(200, { 'content-type': 'text/javascript' })
+    outgoing.end('jQuery3510_1712({"items":[{"sku":"J-1","name":"Avenger","price":24950}]});')
+
+    return
+  }
   if (url.pathname === '/discounts.pdf') {
     outgoing.writeHead(200, { 'content-type': 'application/pdf' })
     outgoing.end(readFileSync(join(__dirname, '..', 'src', 'pdf-document', 'fixtures', 'discounts.pdf')))

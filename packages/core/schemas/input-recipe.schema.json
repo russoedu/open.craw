@@ -1239,6 +1239,7 @@
               "type": "string",
               "enum": [
                 "json",
+                "jsonl",
                 "html",
                 "text",
                 "pdf",

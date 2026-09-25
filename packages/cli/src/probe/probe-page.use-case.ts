@@ -8,9 +8,11 @@ import type { Terminal } from '../terminal'
 import { findData } from './find-data.algorithm'
 import { describeDeck } from './deck-findings.mapper'
 import type { DeckFindings } from './deck-findings.mapper'
+import { describeJson } from './json-findings.mapper'
+import type { JsonFindings } from './json-findings.mapper'
 import { describePdf } from './pdf-findings.mapper'
 import type { PdfFindings } from './pdf-findings.mapper'
-import { deckReport, pdfReport, probeReport, workbookReport } from './probe-report.mapper'
+import { deckReport, jsonReport, pdfReport, probeReport, workbookReport } from './probe-report.mapper'
 import { describeWorkbook } from './workbook-findings.mapper'
 import type { WorkbookFindings } from './workbook-findings.mapper'
 
@@ -30,6 +32,8 @@ export interface ProbeResult {
   workbook?: WorkbookFindings
   /** Present when the URL is a presentation: its slides, table headers, charts and text-box grids. */
   deck?:     DeckFindings
+  /** Present when the URL is JSON, JSON Lines or YAML: its structure and record lists. */
+  json?:     JsonFindings
 }
 
 /**
@@ -64,7 +68,8 @@ export async function probeUrl (url: string, options: { browser: boolean } & Com
     if (body.kind === 'pdf') return { url: response.url, status: response.status, findings: findData(''), observed: [], pdf: describePdf(body) }
     if (body.kind === 'workbook') return { url: response.url, status: response.status, findings: findData(''), observed: [], workbook: describeWorkbook(body) }
     if (body.kind === 'deck') return { url: response.url, status: response.status, findings: findData(''), observed: [], deck: describeDeck(body) }
-    const text = body.kind === 'html' ? body.html : (body.kind === 'text' ? body.text : JSON.stringify(body.data))
+    if (body.kind === 'json') return { url: response.url, status: response.status, findings: findData(''), observed: [], json: describeJson(body.data, response.format ?? 'json') }
+    const text = body.kind === 'html' ? body.html : body.text
     const observed = options.browser && !target.startsWith('file:') ? await observeBrowserJson(url, options, lease) : []
 
     return { url: response.url, status: response.status, findings: findData(text), observed }
@@ -120,6 +125,7 @@ function reportOf (result: ProbeResult): string {
   if (result.pdf !== undefined) return pdfReport(result.url, result.pdf)
   if (result.workbook !== undefined) return workbookReport(result.url, result.workbook)
   if (result.deck !== undefined) return deckReport(result.url, result.deck)
+  if (result.json !== undefined) return jsonReport(result.url, result.json)
 
   return probeReport(result.url, result.status, result.findings, result.observed)
 }
