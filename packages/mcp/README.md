@@ -1,11 +1,11 @@
-# @open.craw/mcp
+# @opencraw/mcp
 
-An MCP (Model Context Protocol) server exposing [`@open.craw/core`](../core) as tools an agent can call
+An MCP (Model Context Protocol) server exposing [`@opencraw/core`](../core) as tools an agent can call
 directly: probe a page, validate recipes, run a crawl, list what's already authored. Local transport only
-(stdio) — the host launches it as a subprocess, the same shape as the [`open-craw` cli](../cli).
+(stdio) — the host launches it as a subprocess, the same shape as the [`opencraw` cli](../cli).
 
 This does **not** auto-author recipes from a sentence. The four tools are the same primitives the
-`open-craw` cli gives a terminal; the calling agent still writes the JSON recipes, using `probe` and
+`opencraw` cli gives a terminal; the calling agent still writes the JSON recipes, using `probe` and
 `validate` to iterate, the same way this project's own example recipes were built by hand. An agent that
 can write files passes their `paths`; one that can't (a chat-only host) passes the `recipes` inline.
 
@@ -14,20 +14,20 @@ can write files passes their `paths`; one that can't (a chat-only host) passes t
 ```json
 {
   "mcpServers": {
-    "open-craw": {
+    "opencraw": {
       "command": "node",
-      "args": ["/absolute/path/to/open.craw/packages/mcp/bin/open-craw-mcp.mjs"],
-      "env": { "OPEN_CRAW_CHROMIUM": "/path/to/chrome" }
+      "args": ["/absolute/path/to/opencraw/packages/mcp/bin/opencraw-mcp.mjs"],
+      "env": { "OPENCRAW_CHROMIUM": "/path/to/chrome" }
     }
   }
 }
 ```
 
-`OPEN_CRAW_CHROMIUM` and `OPEN_CRAW_INSECURE_TLS=1` in the server's environment are the defaults for every
+`OPENCRAW_CHROMIUM` and `OPENCRAW_INSECURE_TLS=1` in the server's environment are the defaults for every
 `probe`/`run` call's `browserPath`/`insecureTls`, so a sandbox without Playwright's own bundled browser
 does not need every tool call to repeat them.
 
-`OPEN_CRAW_ACCESS` points at an access config ([access.md](../../docs/recipes/access.md)): proxy profiles, with
+`OPENCRAW_ACCESS` points at an access config ([access.md](../../docs/recipes/access.md)): proxy profiles, with
 credentials as `{{env.NAME}}` read from the server's environment. The `probe` and `run` tools then take an
 `access` argument naming a profile. The file and the credentials never pass through a tool call.
 
@@ -45,7 +45,7 @@ endpoints only a script fetches after load.
 | `url` | The page to fetch. |
 | `browser?` | Also render it in a browser (slower, a few seconds). |
 | `browserPath?`, `insecureTls?`, `userAgent?` | As in the cli. |
-| `access?` | An access profile from the server's `OPEN_CRAW_ACCESS` config. |
+| `access?` | An access profile from the server's `OPENCRAW_ACCESS` config. |
 
 Returns `{ url, status, findings: { jsonLd, inlineJson, jsonUrls, scriptHosts, apiLinks }, observed }`.
 
@@ -75,7 +75,7 @@ Crawls the recipes at the given paths, or passed inline.
 | `only?` | Run only these input recipe ids. |
 | `dryRun?` | One record per input recipe instead of a full crawl — for checking a recipe under construction. |
 | `headed?`, `browserPath?`, `insecureTls?`, `userAgent?` | As in the cli. |
-| `access?` | The access profile for recipes that name none, from the server's `OPEN_CRAW_ACCESS` config. |
+| `access?` | The access profile for recipes that name none, from the server's `OPENCRAW_ACCESS` config. |
 
 Returns `{ report: CrawlReport, records?, truncated? }`. `records`/`truncated` are present only when `out`
 was not given, and `records` is capped at 50 even then.
@@ -93,7 +93,7 @@ Returns `{ outputs: [{ path, id }], inputs: [{ path, id, output, mode }], others
 
 ## Building
 
-`nx build @open.craw/mcp`, `nx test @open.craw/mcp` (unit tests per tool), `nx run @open.craw/mcp:e2e`
+`nx build @opencraw/mcp`, `nx test @opencraw/mcp` (unit tests per tool), `nx run @opencraw/mcp:e2e`
 (spawns the built server and drives it with the MCP SDK's own `Client`/`StdioClientTransport`, against the
-fixture shop `@open.craw/core` ships; needs a browser — `npm run playwright:install` once, or
-`OPEN_CRAW_CHROMIUM=/path/to/chrome`).
+fixture shop `@opencraw/core` ships; needs a browser — `npm run playwright:install` once, or
+`OPENCRAW_CHROMIUM=/path/to/chrome`).

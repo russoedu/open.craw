@@ -14,7 +14,7 @@ const recipes = join(__dirname, 'recipes')
 let site: Server
 let proxy: ForwardProxy
 beforeAll(async () => {
-  process.env.OPEN_CRAW_E2E_PROXY_PASSWORD = PASSWORD
+  process.env.OPENCRAW_E2E_PROXY_PASSWORD = PASSWORD
   site = await startFixtureSite()
   proxy = await startForwardProxy(PASSWORD)
 })
@@ -27,7 +27,7 @@ beforeEach(() => { proxy.hits.length = 0 })
 function access (extra: Record<string, unknown> = {}): AccessConfig {
   return {
     profiles: {
-      local: { kind: 'proxy', server: `http://127.0.0.1:${PROXY_PORT}`, username: 'tester-{{session}}', password: '{{env.OPEN_CRAW_E2E_PROXY_PASSWORD}}', session: { idFormat: 'alnum8' }, ...extra },
+      local: { kind: 'proxy', server: `http://127.0.0.1:${PROXY_PORT}`, username: 'tester-{{session}}', password: '{{env.OPENCRAW_E2E_PROXY_PASSWORD}}', session: { idFormat: 'alnum8' }, ...extra },
     },
     default: 'local',
   }
@@ -79,10 +79,10 @@ describe('access profiles (real chromium, local forward proxy)', () => {
 
   it('fails the recipe, naming the variable, when a credential is not in the environment', async () => {
     const set = await loadRecipeSet({ output: join(recipes, 'product.output.json'), inputs: [join(recipes, 'shop-web.input.json')] })
-    const crawler = createCrawler({ browser: browserConfig(), access: access({ password: '{{env.OPEN_CRAW_E2E_UNSET}}' }) })
+    const crawler = createCrawler({ browser: browserConfig(), access: access({ password: '{{env.OPENCRAW_E2E_UNSET}}' }) })
     try {
       const report = await crawler.run(set)
-      expect(report.recipes[0].error).toContain('needs the environment variable OPEN_CRAW_E2E_UNSET')
+      expect(report.recipes[0].error).toContain('needs the environment variable OPENCRAW_E2E_UNSET')
       expect(proxy.hits).toHaveLength(0)
     } finally {
       await crawler.close()

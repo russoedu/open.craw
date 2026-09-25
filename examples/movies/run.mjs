@@ -5,11 +5,11 @@
 //   node examples/movies/run.mjs --only netflix  # or --only imdb
 //
 // IMDb needs a browser: `npm run playwright:install` once. Environment:
-//   OPEN_CRAW_CHROMIUM=/path/to/chrome   use a browser other than the one Playwright installed
-//   OPEN_CRAW_INSECURE_TLS=1             accept an intercepting proxy's certificate (sandboxes only)
+//   OPENCRAW_CHROMIUM=/path/to/chrome   use a browser other than the one Playwright installed
+//   OPENCRAW_INSECURE_TLS=1             accept an intercepting proxy's certificate (sandboxes only)
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createCrawler, jsonLinesSink, loadRecipeSet, traceLine } from '@open.craw/core'
+import { createCrawler, jsonLinesSink, loadRecipeSet, traceLine } from '@opencraw/core'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : undefined
@@ -22,8 +22,8 @@ const recipes = await loadRecipeSet({ output: join(here, 'movie.output.json'), i
 const crawler = createCrawler({
   sink:    jsonLinesSink(join(here, 'out', 'movies.jsonl')),
   browser: {
-    executablePath:    process.env.OPEN_CRAW_CHROMIUM,
-    ignoreHTTPSErrors: process.env.OPEN_CRAW_INSECURE_TLS === '1',
+    executablePath:    process.env.OPENCRAW_CHROMIUM,
+    ignoreHTTPSErrors: process.env.OPENCRAW_INSECURE_TLS === '1',
   },
   onEvent: (event) => {
     const line = trace ? traceLine(event) : undefined

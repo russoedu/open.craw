@@ -1,7 +1,7 @@
 // Runs the example recipes against the e2e fixture shop. From the repo root:
 //   npm run core:build && node examples/run.mjs
 // The web recipe needs a browser: `npm run playwright:install` once.
-import { createCrawler, jsonLinesSink, loadRecipeSet } from '@open.craw/core'
+import { createCrawler, jsonLinesSink, loadRecipeSet } from '@opencraw/core'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 

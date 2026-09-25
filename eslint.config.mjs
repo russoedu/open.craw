@@ -10,7 +10,7 @@ import mnci from '@mnci/eslint-config'
 //                     markup and JSON linters do not apply to it.
 //   dependency-checks `npm run format` is `eslint --fix`, and this rule's fixer REWRITES
 //                     package.json to match the Nx project graph. With a stale graph it
-//                     deleted playwright, cheerio and jsonpath-plus from @open.craw/core and
+//                     deleted playwright, cheerio and jsonpath-plus from @opencraw/core and
 //                     pinned zod. Missing-dependency detection stays on (its fix only adds);
 //                     the two fixes that remove or re-pin declared dependencies are off.
 export default [

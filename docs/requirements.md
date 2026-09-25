@@ -1,6 +1,6 @@
 # Recipe-based, data-driven crawler engine: requirements
 
-This is the specification `@open.craw/core` is built and checked against. The user guide is
+This is the specification `@opencraw/core` is built and checked against. The user guide is
 [recipes.md](./recipes/authoring.md); the code layout is in [architecture/vertical-feature-slices.md](./architecture/vertical-feature-slices.md).
 
 ## 1. Architecture and philosophy
@@ -53,7 +53,7 @@ its page from that state; an `api` recipe seeds its request context with it. Boo
 and never emit records.
 
 **Access.** `session.access` says what the site needs (a profile name, a country, stickiness); the runner's
-access config (`CrawlOptions.access`, CLI `--access`, env `OPEN_CRAW_ACCESS`) says how: named profiles of kind
+access config (`CrawlOptions.access`, CLI `--access`, env `OPENCRAW_ACCESS`) says how: named profiles of kind
 `direct`, `proxy` (a server and username/password templates, or a provider `preset`), `pool` (a list rotated per
 lease), `cdp` (a remote browser: `chromium.connectOverCDP` on a templated endpoint; web recipes only, the bootstrap
 runs in the same remote session, the provider's context is reused) or `plugin` (a registered `AccessPlugin`, which

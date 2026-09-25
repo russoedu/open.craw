@@ -1,6 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
-import { RecipeBindingError, RecipeValidationError, bindRecipeSet, parseInputRecipe, parseOutputRecipe } from '@open.craw/core'
-import { readRecipeFiles } from '@open.craw/cli'
+import { RecipeBindingError, RecipeValidationError, bindRecipeSet, parseInputRecipe, parseOutputRecipe } from '@opencraw/core'
+import { readRecipeFiles } from '@opencraw/cli'
 import { recipeSourceOf, recipeSourceShape } from '../recipe-source'
 import type { RecipeSourceArgs } from '../recipe-source'
 

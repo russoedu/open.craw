@@ -561,7 +561,7 @@ drops just that record. Use it on the price of a table whose header row you cann
 ## 8. Loading, binding and running
 
 ```ts
-import { createCrawler, jsonLinesSink, loadRecipeSet, traceLine } from '@open.craw/core'
+import { createCrawler, jsonLinesSink, loadRecipeSet, traceLine } from '@opencraw/core'
 
 const recipes = await loadRecipeSet({ output: 'recipes/movie.output.json', inputs: ['recipes/'] })
 const crawler = createCrawler({
@@ -633,10 +633,10 @@ The example runners print it with `--trace`.
 
 ## 9. Method: how to write a recipe for a new site
 
-A quick way to see where a site's data lives before writing selectors by hand: `@open.craw/cli`'s
-`open-craw probe <url>` (add `--browser` to also watch the JSON a script fetches after load) lists JSON-LD
+A quick way to see where a site's data lives before writing selectors by hand: `@opencraw/cli`'s
+`opencraw probe <url>` (add `--browser` to also watch the JSON a script fetches after load) lists JSON-LD
 blocks, inline JSON objects, `.json` URLs, script hosts and API-looking links found in the page.
-`@open.craw/mcp` gives an agent the same `probe`, plus `validate`, `run` and `list_recipes`, as MCP tools
+`@opencraw/mcp` gives an agent the same `probe`, plus `validate`, `run` and `list_recipes`, as MCP tools
 instead of a terminal command.
 
 1. **Find the data before the markup.** Fetch the page with a browser user agent and look for

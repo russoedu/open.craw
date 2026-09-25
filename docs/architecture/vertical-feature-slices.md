@@ -2,14 +2,14 @@
 
 - **Status:** Accepted
 - **Date:** 2026-09-24
-- **Scope:** every hand-authored TypeScript package under `packages/` (today: `@open.craw/core`)
+- **Scope:** every hand-authored TypeScript package under `packages/` (today: `@opencraw/core`)
 - **Enforced by:** `@mnci/eslint-config`'s `verticalSlices` rules, switched on in the root `eslint.config.mjs`
 
 ## Decision
 
 Each package is organised as **capability -> cohesive subfeature -> flat, role-suffixed files**.
 
-- The **package is the capability** (`@open.craw/core` = "run a recipe-driven crawl").
+- The **package is the capability** (`@opencraw/core` = "run a recipe-driven crawl").
 - Every folder directly under `src/` is a **subfeature** ("slice"): one outcome, one `index.ts` that is its
   whole public API.
 - A slice is **flat**. The only folder allowed inside one is `fixtures/`, which holds test data (HTML, JSON),

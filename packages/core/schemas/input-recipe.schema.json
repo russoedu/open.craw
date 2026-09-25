@@ -2523,6 +2523,6 @@
       ]
     }
   },
-  "$id": "https://open.craw/schemas/input-recipe.schema.json",
-  "title": "open.craw input recipe"
+  "$id": "https://opencraw/schemas/input-recipe.schema.json",
+  "title": "OpenCraw input recipe"
 }

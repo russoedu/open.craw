@@ -1,5 +1,5 @@
-import { AccessBroker, BrowserClient, HttpClient } from '@open.craw/core'
-import type { AccessLease } from '@open.craw/core'
+import { AccessBroker, BrowserClient, HttpClient } from '@opencraw/core'
+import type { AccessLease } from '@opencraw/core'
 import { resolveAccess } from '../access'
 import type { CommonOptions } from '../arguments'
 import type { Terminal } from '../terminal'
@@ -23,7 +23,7 @@ export interface ProbeResult {
  * options name (direct without one). With `browser: true` it also
  * renders the page and lists the JSON responses seen while it settles, which
  * finds endpoints a plain fetch of the initial HTML cannot. No `Terminal`
- * involved: the cli's `probePage` and `@open.craw/mcp`'s probe tool both
+ * involved: the cli's `probePage` and `@opencraw/mcp`'s probe tool both
  * build on this, one printing the result, the other returning it as data.
  *
  * @param url - The page to probe.

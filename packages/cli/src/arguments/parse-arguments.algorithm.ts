@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util'
 import type { Command, CommonOptions } from './command.contract'
 
-export const USAGE = `open-craw <command> [options]
+export const USAGE = `opencraw <command> [options]
 
 Commands
   validate <recipe files or directories...>   Parse and bind the recipes; list every problem with its path.
@@ -21,10 +21,10 @@ Options for probe
   --browser           Also render the page in a browser and list the JSON it fetches.
 
 Options for both
-  --browser-path <p>  A browser binary other than the one Playwright installed (or OPEN_CRAW_CHROMIUM).
-  --insecure-tls      Accept an intercepting proxy's certificate (or OPEN_CRAW_INSECURE_TLS=1).
+  --browser-path <p>  A browser binary other than the one Playwright installed (or OPENCRAW_CHROMIUM).
+  --insecure-tls      Accept an intercepting proxy's certificate (or OPENCRAW_INSECURE_TLS=1).
   --user-agent <ua>   The user agent to send.
-  --access <file>     An access config: proxy profiles, credentials as {{env.NAME}} (or OPEN_CRAW_ACCESS).
+  --access <file>     An access config: proxy profiles, credentials as {{env.NAME}} (or OPENCRAW_ACCESS).
   --access-profile <name>
                       The access profile to use when a recipe names none.
   --help, --version`
@@ -61,10 +61,10 @@ export function parseArguments (argv: readonly string[], env: Record<string, str
   if (values.version === true) return { name: 'version' }
   const [name, ...rest] = positionals
   const options: CommonOptions = {
-    browserPath:   values['browser-path'] ?? env.OPEN_CRAW_CHROMIUM,
-    insecureTls:   values['insecure-tls'] === true || env.OPEN_CRAW_INSECURE_TLS === '1',
+    browserPath:   values['browser-path'] ?? env.OPENCRAW_CHROMIUM,
+    insecureTls:   values['insecure-tls'] === true || env.OPENCRAW_INSECURE_TLS === '1',
     userAgent:     values['user-agent'],
-    access:        values.access ?? (env.OPEN_CRAW_ACCESS === '' ? undefined : env.OPEN_CRAW_ACCESS),
+    access:        values.access ?? (env.OPENCRAW_ACCESS === '' ? undefined : env.OPENCRAW_ACCESS),
     accessProfile: values['access-profile'],
   }
   switch (name) {

@@ -1,4 +1,4 @@
-# Browser end-to-end tests for @open.craw/core. Kept out of ci.yml on purpose:
+# Browser end-to-end tests for @opencraw/core. Kept out of ci.yml on purpose:
 # that file is owned and rewritten by `mnci upgrade`, this one is ours.
 name: e2e
 

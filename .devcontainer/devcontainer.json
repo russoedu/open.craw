@@ -1,5 +1,5 @@
 {
-  "name": "open.craw",
+  "name": "OpenCraw",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:24-bookworm",
   "features": {
     "ghcr.io/devcontainers/features/python:1": {

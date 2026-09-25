@@ -1,5 +1,5 @@
-import { readRecipeSource } from '@open.craw/core'
-import type { RecipeSource } from '@open.craw/core'
+import { readRecipeSource } from '@opencraw/core'
+import type { RecipeSource } from '@opencraw/core'
 
 /** Decoded recipes, split by their `kind`. */
 export interface RecipeFiles {

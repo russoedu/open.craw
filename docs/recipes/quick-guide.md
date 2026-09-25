@@ -131,7 +131,7 @@ by `saveTo` on a later run. `headers`, `cookies`, `userAgent` and `viewport` app
 ## 5. Running
 
 ```ts
-import { createCrawler, jsonLinesSink, loadRecipeSet } from '@open.craw/core'
+import { createCrawler, jsonLinesSink, loadRecipeSet } from '@opencraw/core'
 
 const recipes = await loadRecipeSet({ output: 'recipes/product.output.json', inputs: ['recipes/'] })
 const crawler = createCrawler({

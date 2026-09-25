@@ -1,11 +1,11 @@
-# @open.craw/core
+# @opencraw/core
 
 The recipe-driven crawler engine. See the [repository README](../../README.md) for the concept, the
 [recipe guide](../../docs/recipes/authoring.md) for authoring recipes and [`docs/requirements.md`](../../docs/requirements.md)
 for the specification.
 
 ```sh
-npm install @open.craw/core
+npm install @opencraw/core
 npx playwright install chromium   # web recipes and browser bootstraps only
 ```
 
@@ -20,7 +20,7 @@ npx playwright install chromium   # web recipes and browser bootstraps only
 | `loadAccessConfig(path)`, `AccessBroker`, `ACCESS_PRESETS` | Access configs: load and validate one, lease a profile outside a crawl (the cli's `probe` does), list the provider presets. |
 | `crawler.run(set)` | Runs every input recipe in sequence; returns a `CrawlReport`. |
 | `crawler.close()` | Closes the browser, if one was launched. |
-| `HttpClient`, `BrowserClient` | The same clients the engine's runners use, for tooling built on top of `@open.craw/core` (`@open.craw/cli`'s `probe` command uses both). |
+| `HttpClient`, `BrowserClient` | The same clients the engine's runners use, for tooling built on top of `@opencraw/core` (`@opencraw/cli`'s `probe` command uses both). |
 | `parseInputRecipe`, `parseOutputRecipe`, `inputRecipeJsonSchema`, `outputRecipeJsonSchema`, `accessConfigJsonSchema` | The contracts, for tooling. |
 
 A recipe source is any of:
@@ -63,5 +63,5 @@ access            proxy profiles, presets, leases, plugins
 ```
 
 `e2e/` holds the fixture shop and the browser suite (`nx run core:e2e`); `tools/` emits `schemas/`.
-Set `OPEN_CRAW_CHROMIUM=/path/to/chrome` to run the e2e suite with a browser other than the one
+Set `OPENCRAW_CHROMIUM=/path/to/chrome` to run the e2e suite with a browser other than the one
 `playwright install` fetched.

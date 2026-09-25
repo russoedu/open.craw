@@ -10,7 +10,7 @@ import type { Duplex } from 'node:stream'
  * that browser pages, bootstraps and HTTP requests all go through the proxy an
  * access profile names, with the session the lease rendered.
  */
-export const PROXY_PORT = Number(process.env.OPEN_CRAW_PROXY_PORT ?? '4645')
+export const PROXY_PORT = Number(process.env.OPENCRAW_PROXY_PORT ?? '4645')
 
 export interface ProxyHit {
   username: string
@@ -25,7 +25,7 @@ export interface ForwardProxy {
   blockNextUser: () => void
 }
 
-const CHALLENGE = 'Basic realm="open.craw e2e"'
+const CHALLENGE = 'Basic realm="OpenCraw e2e"'
 
 function credentialsOf (incoming: IncomingMessage): { username: string, password: string } | undefined {
   const header = incoming.headers['proxy-authorization']

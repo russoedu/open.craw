@@ -61,13 +61,13 @@ afterAll(async () => {
 
 describe('HttpClient', () => {
   it('keeps cookies across requests and parses JSON by content type', async () => {
-    const client = await HttpClient.open({ headers: { 'x-extra': '1' }, userAgent: 'open.craw-test' })
+    const client = await HttpClient.open({ headers: { 'x-extra': '1' }, userAgent: 'opencraw-test' })
     try {
       await expect(client.send({ url: `${base}/api` })).rejects.toThrow(HttpError)
       await client.send({ url: `${base}/login` })
       const response = await client.send({ url: `${base}/api`, query: { page: '2' } })
       expect(response.status).toBe(200)
-      expect(response.body).toEqual({ kind: 'json', data: { page: '2', method: 'GET', agent: 'open.craw-test', extra: '1' } })
+      expect(response.body).toEqual({ kind: 'json', data: { page: '2', method: 'GET', agent: 'opencraw-test', extra: '1' } })
       const state = await client.storageState()
       expect(state.cookies.map(cookie => cookie.name)).toEqual(['session'])
     } finally {

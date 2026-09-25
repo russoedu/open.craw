@@ -1,15 +1,15 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
-import { probeUrl } from '@open.craw/cli'
+import { probeUrl } from '@opencraw/cli'
 import { z } from 'zod'
 
 /** Input schema for the `probe` tool: a raw zod shape, as `McpServer.registerTool` expects. */
 export const probeInputShape = {
   url:         z.string().describe('The page to fetch and inspect.'),
   browser:     z.boolean().optional().describe('Also render the page in a browser and list the JSON responses it fetches while settling. Slower (a few seconds); finds endpoints a plain fetch of the initial HTML cannot.'),
-  browserPath: z.string().optional().describe('A browser binary other than the one Playwright installed. Defaults to OPEN_CRAW_CHROMIUM in the server\'s environment.'),
-  insecureTls: z.boolean().optional().describe("Accept an intercepting proxy's certificate. Defaults to OPEN_CRAW_INSECURE_TLS=1 in the server's environment."),
+  browserPath: z.string().optional().describe('A browser binary other than the one Playwright installed. Defaults to OPENCRAW_CHROMIUM in the server\'s environment.'),
+  insecureTls: z.boolean().optional().describe("Accept an intercepting proxy's certificate. Defaults to OPENCRAW_INSECURE_TLS=1 in the server's environment."),
   userAgent:   z.string().optional().describe('The user agent to send.'),
-  access:      z.string().optional().describe('An access profile (a proxy) from the server\'s access config file, OPEN_CRAW_ACCESS.'),
+  access:      z.string().optional().describe('An access profile (a proxy) from the server\'s access config file, OPENCRAW_ACCESS.'),
 }
 
 /**
@@ -23,10 +23,10 @@ export async function probeTool (args: { url: string, browser?: boolean, browser
   try {
     const result = await probeUrl(args.url, {
       browser:       args.browser ?? false,
-      browserPath:   args.browserPath ?? process.env.OPEN_CRAW_CHROMIUM,
-      insecureTls:   args.insecureTls === true || process.env.OPEN_CRAW_INSECURE_TLS === '1',
+      browserPath:   args.browserPath ?? process.env.OPENCRAW_CHROMIUM,
+      insecureTls:   args.insecureTls === true || process.env.OPENCRAW_INSECURE_TLS === '1',
       userAgent:     args.userAgent,
-      access:        process.env.OPEN_CRAW_ACCESS === '' ? undefined : process.env.OPEN_CRAW_ACCESS,
+      access:        process.env.OPENCRAW_ACCESS === '' ? undefined : process.env.OPENCRAW_ACCESS,
       accessProfile: args.access,
     })
 

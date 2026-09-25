@@ -17,14 +17,14 @@ describe('runTool', () => {
 
   it('refuses an access profile when the server has no access config', async () => {
     const fixtures = join(__dirname, '..', 'validate-tool', 'fixtures')
-    const saved = process.env.OPEN_CRAW_ACCESS
-    delete process.env.OPEN_CRAW_ACCESS
+    const saved = process.env.OPENCRAW_ACCESS
+    delete process.env.OPENCRAW_ACCESS
     try {
       const result = await runTool({ paths: [join(fixtures, 'thing.output.json'), join(fixtures, 'one.input.json')], access: 'uk' })
       expect(result.isError).toBe(true)
       expect((result.content[0] as { text: string }).text).toContain('--access-profile needs an access config')
     } finally {
-      if (saved !== undefined) process.env.OPEN_CRAW_ACCESS = saved
+      if (saved !== undefined) process.env.OPENCRAW_ACCESS = saved
     }
   })
 })

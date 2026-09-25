@@ -3,7 +3,7 @@ import { createServer } from './server'
 
 /**
  * Runs the server over stdio until the transport closes. This is what
- * `bin/open-craw-mcp.mjs` calls; an MCP host launches it as a subprocess and
+ * `bin/opencraw-mcp.mjs` calls; an MCP host launches it as a subprocess and
  * talks JSON-RPC over stdin/stdout, so there is no argv to parse.
  */
 export async function main (): Promise<void> {

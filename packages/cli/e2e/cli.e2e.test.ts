@@ -7,18 +7,18 @@ import { promisify } from 'node:util'
 import { startFixtureSite, stopFixtureSite } from '../../core/e2e/fixture-site'
 
 const run = promisify(execFile)
-const BIN = join(__dirname, '..', 'bin', 'open-craw.mjs')
+const BIN = join(__dirname, '..', 'bin', 'opencraw.mjs')
 const FIXTURE_PORT = '4546'
 const recipesDir = join(__dirname, '..', '..', 'core', 'e2e', 'recipes')
 
 let site: Server
 beforeAll(async () => {
-  process.env.OPEN_CRAW_FIXTURE_PORT = FIXTURE_PORT
+  process.env.OPENCRAW_FIXTURE_PORT = FIXTURE_PORT
   site = await startFixtureSite()
 })
 afterAll(async () => { await stopFixtureSite(site) })
 
-describe('open-craw cli', () => {
+describe('opencraw cli', () => {
   it('validate: accepts the reference recipes and reports the binding', async () => {
     const { stdout } = await run('node', [BIN, 'validate', recipesDir])
     expect(stdout).toContain('ok: product <- shop-api, shop-web')

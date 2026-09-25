@@ -6,7 +6,7 @@ export interface CommonOptions {
   insecureTls:    boolean
   /** A user agent for requests and the browser. */
   userAgent?:     string
-  /** An access config file (proxy profiles); `OPEN_CRAW_ACCESS` when not given. */
+  /** An access config file (proxy profiles); `OPENCRAW_ACCESS` when not given. */
   access?:        string
   /** The access profile to use by default, overriding the config's `default`. */
   accessProfile?: string

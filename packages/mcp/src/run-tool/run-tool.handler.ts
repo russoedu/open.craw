@@ -1,7 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
-import { RecipeBindingError, RecipeSet, RecipeValidationError, createCrawler, jsonLinesSink, memorySink } from '@open.craw/core'
-import type { CrawlReport } from '@open.craw/core'
-import { loadForRun, resolveAccess } from '@open.craw/cli'
+import { RecipeBindingError, RecipeSet, RecipeValidationError, createCrawler, jsonLinesSink, memorySink } from '@opencraw/core'
+import type { CrawlReport } from '@opencraw/core'
+import { loadForRun, resolveAccess } from '@opencraw/cli'
 import { z } from 'zod'
 import { recipeSourceOf, recipeSourceShape } from '../recipe-source'
 import type { RecipeSourceArgs } from '../recipe-source'
@@ -17,10 +17,10 @@ export const runInputShape = {
   only:        z.array(z.string()).optional().describe('Run only these input recipe ids.'),
   dryRun:      z.boolean().optional().describe('One record per input recipe, with the scope it was mapped from, instead of a full crawl. For checking a recipe under construction.'),
   headed:      z.boolean().optional().describe('Show the browser instead of running headless.'),
-  browserPath: z.string().optional().describe('A browser binary other than the one Playwright installed. Defaults to OPEN_CRAW_CHROMIUM in the server\'s environment.'),
-  insecureTls: z.boolean().optional().describe("Accept an intercepting proxy's certificate. Defaults to OPEN_CRAW_INSECURE_TLS=1 in the server's environment."),
+  browserPath: z.string().optional().describe('A browser binary other than the one Playwright installed. Defaults to OPENCRAW_CHROMIUM in the server\'s environment.'),
+  insecureTls: z.boolean().optional().describe("Accept an intercepting proxy's certificate. Defaults to OPENCRAW_INSECURE_TLS=1 in the server's environment."),
   userAgent:   z.string().optional().describe('The user agent to send.'),
-  access:      z.string().optional().describe('An access profile (a proxy) from the server\'s access config file, OPEN_CRAW_ACCESS, used by every recipe that names none. The error for an unknown name lists the profiles.'),
+  access:      z.string().optional().describe('An access profile (a proxy) from the server\'s access config file, OPENCRAW_ACCESS, used by every recipe that names none. The error for an unknown name lists the profiles.'),
 }
 
 interface RunArgs extends RecipeSourceArgs {
@@ -72,8 +72,8 @@ export async function runTool (args: RunArgs): Promise<CallToolResult> {
       resume:  args.resume,
       browser: {
         headless:          args.headed !== true,
-        executablePath:    args.browserPath ?? process.env.OPEN_CRAW_CHROMIUM,
-        ignoreHTTPSErrors: args.insecureTls === true || process.env.OPEN_CRAW_INSECURE_TLS === '1',
+        executablePath:    args.browserPath ?? process.env.OPENCRAW_CHROMIUM,
+        ignoreHTTPSErrors: args.insecureTls === true || process.env.OPENCRAW_INSECURE_TLS === '1',
       },
     })
   } catch (error) {
@@ -97,7 +97,7 @@ export async function runTool (args: RunArgs): Promise<CallToolResult> {
 
 /** The access config file the server was started with; the tool picks a profile from it, never a file. */
 function serverAccessFile (): string | undefined {
-  const file = process.env.OPEN_CRAW_ACCESS
+  const file = process.env.OPENCRAW_ACCESS
 
   return file === undefined || file === '' ? undefined : file
 }

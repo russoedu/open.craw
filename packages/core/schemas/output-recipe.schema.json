@@ -151,6 +151,6 @@
       "additionalProperties": false
     }
   },
-  "$id": "https://open.craw/schemas/output-recipe.schema.json",
-  "title": "open.craw output recipe"
+  "$id": "https://opencraw/schemas/output-recipe.schema.json",
+  "title": "OpenCraw output recipe"
 }

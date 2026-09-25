@@ -1,12 +1,12 @@
 {
-  "name": "@open.craw/mcp",
+  "name": "@opencraw/mcp",
   "version": "0.0.1",
   "type": "module",
   "main": "./dist/index.esm.js",
   "module": "./dist/index.esm.js",
   "types": "./dist/src/index.d.ts",
   "bin": {
-    "open-craw-mcp": "./bin/open-craw-mcp.mjs"
+    "opencraw-mcp": "./bin/opencraw-mcp.mjs"
   },
   "exports": {
     "./package.json": "./package.json",
@@ -24,8 +24,8 @@
     "!**/*.js.map"
   ],
   "dependencies": {
-    "@open.craw/core": "^0.0.1",
-    "@open.craw/cli": "^0.0.1",
+    "@opencraw/core": "^0.0.1",
+    "@opencraw/cli": "^0.0.1",
     "@modelcontextprotocol/sdk": "^1.30.1",
     "playwright": "^1.63.0",
     "zod": "^4.6.5"
@@ -33,7 +33,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "description": "An MCP server exposing open.craw's crawler as agent tools: probe a page, validate recipes, run a crawl, list recipes.",
+  "description": "An MCP server exposing OpenCraw's crawler as agent tools: probe a page, validate recipes, run a crawl, list recipes.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -69,13 +69,13 @@
           "build",
           {
             "projects": [
-              "@open.craw/core"
+              "@opencraw/core"
             ],
             "target": "e2e"
           },
           {
             "projects": [
-              "@open.craw/cli"
+              "@opencraw/cli"
             ],
             "target": "e2e"
           }

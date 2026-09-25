@@ -5,7 +5,7 @@ project's sandbox with an AWS WAF challenge, and Peugeot UK's Akamai edge answer
 browser included. No selector fixes an IP-level block. The fix is to send the traffic from somewhere else,
 through a proxy.
 
-This page explains how open.craw does that: the recipe says what the site needs, a separate access config
+This page explains how OpenCraw does that: the recipe says what the site needs, a separate access config
 says how to get it, and the engine applies the result to every browser page, bootstrap and HTTP request of
 the run. When a response is a block anyway, the run can take a new lease and retry. A profile can also point at
 a remote browser service instead of a proxy.
@@ -43,13 +43,13 @@ recipes go direct.
 Run it:
 
 ```sh
-BRD_CUSTOMER=hl_123 BRD_PASSWORD=... open-craw run recipes/ --access access.json
-open-craw run recipes/ --access access.json --access-profile residential   # override the default
-OPEN_CRAW_ACCESS=access.json open-craw probe https://example.com           # the env var works too
+BRD_CUSTOMER=hl_123 BRD_PASSWORD=... opencraw run recipes/ --access access.json
+opencraw run recipes/ --access access.json --access-profile residential   # override the default
+OPENCRAW_ACCESS=access.json opencraw probe https://example.com           # the env var works too
 ```
 
 From code: `createCrawler({ access: await loadAccessConfig('access.json') })`. From the MCP server: start it
-with `OPEN_CRAW_ACCESS=/path/to/access.json` in its environment. The `run` and `probe` tools then take an
+with `OPENCRAW_ACCESS=/path/to/access.json` in its environment. The `run` and `probe` tools then take an
 `access` argument naming a profile; the file never passes through the tool call.
 
 ## Why a config and not a plugin per provider
@@ -57,7 +57,7 @@ with `OPEN_CRAW_ACCESS=/path/to/access.json` in its environment. The `run` and `
 Before designing this, we surveyed 10 proxy networks, 8 "unblocker" products, 6 scraping APIs and 9
 remote-browser services. Each one connects in one of three ways:
 
-| Shape | Who | How open.craw handles it |
+| Shape | Who | How OpenCraw handles it |
 |---|---|---|
 | HTTP proxy, `{ server, username, password }` | All 10 proxy networks (Bright Data, Oxylabs, Decodo, IPRoyal, Webshare, SOAX, NetNut, Rayobyte, Evomi, Massive) and every unblocker's proxy mode (Bright Data Web Unlocker, Oxylabs Web Unblocker, Zyte, ScraperAPI, ScrapingBee, Scrapfly, Decodo, ZenRows) | `proxy` profiles, with presets |
 | Remote browser over CDP | Bright Data Browser API, Browserless, Browserbase, Zyte, Oxylabs, Steel, Hyperbrowser | `cdp` profiles; a plugin when the URL comes from an API call |
@@ -252,8 +252,8 @@ A plugin is for access that config cannot express: a remote browser whose URL co
 one function:
 
 ```ts
-import { createCrawler } from '@open.craw/core'
-import type { AccessPlugin } from '@open.craw/core'
+import { createCrawler } from '@opencraw/core'
+import type { AccessPlugin } from '@opencraw/core'
 
 const rotatingList: AccessPlugin = {
   name: 'my-list',

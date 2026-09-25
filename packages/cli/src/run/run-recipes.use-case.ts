@@ -1,5 +1,5 @@
-import { RecipeBindingError, RecipeSet, RecipeValidationError, createCrawler, jsonLinesSink, memorySink, traceLine } from '@open.craw/core'
-import type { CrawlEvent } from '@open.craw/core'
+import { RecipeBindingError, RecipeSet, RecipeValidationError, createCrawler, jsonLinesSink, memorySink, traceLine } from '@opencraw/core'
+import type { CrawlEvent } from '@opencraw/core'
 import { resolveAccess } from '../access'
 import type { Command } from '../arguments'
 import type { Terminal } from '../terminal'

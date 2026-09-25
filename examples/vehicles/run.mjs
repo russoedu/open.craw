@@ -6,11 +6,11 @@
 //   node examples/vehicles/run.mjs --only byd-uk   # or --only kia-uk
 //   node examples/vehicles/run.mjs --trace         # print the route: pages, steps, records
 //
-// Neither source needs a browser. OPEN_CRAW_INSECURE_TLS=1 accepts an intercepting
+// Neither source needs a browser. OPENCRAW_INSECURE_TLS=1 accepts an intercepting
 // proxy's certificate (sandboxes only).
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createCrawler, jsonLinesSink, loadRecipeSet, traceLine } from '@open.craw/core'
+import { createCrawler, jsonLinesSink, loadRecipeSet, traceLine } from '@opencraw/core'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : undefined
@@ -22,7 +22,7 @@ const inputs = [['byd-uk', 'byd-seal.input.json'], ['kia-uk', 'kia-ev3.input.jso
 const recipes = await loadRecipeSet({ output: join(here, 'vehicle-configuration.output.json'), inputs })
 const crawler = createCrawler({
   sink:    jsonLinesSink(join(here, 'out', 'vehicles.jsonl')),
-  browser: { ignoreHTTPSErrors: process.env.OPEN_CRAW_INSECURE_TLS === '1' },
+  browser: { ignoreHTTPSErrors: process.env.OPENCRAW_INSECURE_TLS === '1' },
   onEvent: (event) => {
     const line = trace ? traceLine(event) : undefined
     if (line !== undefined) console.log(line)

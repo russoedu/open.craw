@@ -10,7 +10,7 @@ const swcJestConfig = JSON.parse(
 swcJestConfig.swcrc = false;
 
 module.exports = {
-  displayName: '@open.craw/cli',
+  displayName: '@opencraw/cli',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
   // Spawn-driven tests live in e2e/ and run through `nx run cli:e2e`, never inside `test`.

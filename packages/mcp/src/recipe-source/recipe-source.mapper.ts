@@ -1,4 +1,4 @@
-import type { RecipeSource } from '@open.craw/core'
+import type { RecipeSource } from '@opencraw/core'
 import { z } from 'zod'
 
 const recipeObject = z.record(z.string(), z.unknown())

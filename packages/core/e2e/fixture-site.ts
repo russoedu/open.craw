@@ -8,7 +8,7 @@ import type { BrowserSessionConfig } from '../src/index'
  * JSON API behind that cookie which paginates with `nextPage`. Web mode and api
  * mode must produce the same records from it.
  */
-export const FIXTURE_PORT = Number(process.env.OPEN_CRAW_FIXTURE_PORT ?? '4545')
+export const FIXTURE_PORT = Number(process.env.OPENCRAW_FIXTURE_PORT ?? '4545')
 export const FIXTURE_BASE = `http://127.0.0.1:${FIXTURE_PORT}`
 
 const PAGES = 3
@@ -148,12 +148,12 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
 }
 
 /**
- * Browser settings for the e2e runs. `OPEN_CRAW_CHROMIUM` points at a chromium
+ * Browser settings for the e2e runs. `OPENCRAW_CHROMIUM` points at a chromium
  * binary when the one `playwright install` would fetch is not available (a
  * sandbox with a preinstalled browser); unset, Playwright's own browser is used.
  */
 export function browserConfig (): BrowserSessionConfig {
-  const executablePath = process.env.OPEN_CRAW_CHROMIUM
+  const executablePath = process.env.OPENCRAW_CHROMIUM
 
   return executablePath === undefined || executablePath === '' ? {} : { executablePath }
 }

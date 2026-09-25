@@ -1,5 +1,5 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
-import { readRecipeFiles } from '@open.craw/cli'
+import { readRecipeFiles } from '@opencraw/cli'
 import { z } from 'zod'
 
 /** Input schema for the `list_recipes` tool. */

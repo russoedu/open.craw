@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { startFixtureSite, stopFixtureSite } from '../../core/e2e/fixture-site'
 
-const BIN = join(__dirname, '..', 'bin', 'open-craw-mcp.mjs')
+const BIN = join(__dirname, '..', 'bin', 'opencraw-mcp.mjs')
 const FIXTURE_PORT = '4547'
 const recipesDir = join(__dirname, '..', '..', 'core', 'e2e', 'recipes')
 
@@ -13,7 +13,7 @@ let site: Server
 let client: Client
 
 beforeAll(async () => {
-  process.env.OPEN_CRAW_FIXTURE_PORT = FIXTURE_PORT
+  process.env.OPENCRAW_FIXTURE_PORT = FIXTURE_PORT
   site = await startFixtureSite()
   const env: Record<string, string> = {}
   for (const [key, value] of Object.entries(process.env)) if (value !== undefined) env[key] = value
@@ -38,7 +38,7 @@ function oneLine (path: string): string {
   return JSON.stringify(JSON.parse(readFileSync(path, 'utf8')))
 }
 
-describe('open-craw mcp server', () => {
+describe('opencraw mcp server', () => {
   it('lists the four crawl-primitive tools', async () => {
     const { tools } = await client.listTools()
     expect(tools.map(tool => tool.name).sort((a, b) => a.localeCompare(b))).toEqual(['list_recipes', 'probe', 'run', 'validate'])

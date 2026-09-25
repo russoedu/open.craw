@@ -8,5 +8,5 @@ import { accessConfigSchema } from './access-profile.contract'
  * @returns A draft 2020-12 document.
  */
 export function accessConfigJsonSchema (): Record<string, unknown> {
-  return { ...z.toJSONSchema(accessConfigSchema, { target: 'draft-2020-12', io: 'input', unrepresentable: 'any' }), $id: 'https://open.craw/schemas/access-config.schema.json', title: 'open.craw access config' }
+  return { ...z.toJSONSchema(accessConfigSchema, { target: 'draft-2020-12', io: 'input', unrepresentable: 'any' }), $id: 'https://opencraw/schemas/access-config.schema.json', title: 'OpenCraw access config' }
 }

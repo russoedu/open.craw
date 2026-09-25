@@ -4,12 +4,12 @@ import { probeInputShape, probeTool } from '../probe-tool'
 import { runInputShape, runTool } from '../run-tool'
 import { validateInputShape, validateTool } from '../validate-tool'
 
-const SERVER_INFO = { name: 'open-craw', version: '0.0.1' }
+const SERVER_INFO = { name: 'opencraw', version: '0.0.1' }
 
 /**
  * Builds the MCP server: one tool per crawl primitive (`probe`, `validate`,
- * `run`, `list_recipes`), each a thin wrapper over `@open.craw/core` and
- * `@open.craw/cli`'s structured helpers. No transport is attached; `main`
+ * `run`, `list_recipes`), each a thin wrapper over `@opencraw/core` and
+ * `@opencraw/cli`'s structured helpers. No transport is attached; `main`
  * connects it over stdio.
  *
  * @returns The server, ready to `connect`.

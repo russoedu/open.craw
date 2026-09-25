@@ -1,4 +1,4 @@
-# open.craw
+# OpenCraw
 
 A recipe-driven crawler for Node.js. The engine is generic; everything site-specific is JSON:
 
@@ -12,28 +12,28 @@ Several input recipes can feed one output; a run processes them one after anothe
 
 | Package | What it is |
 |---|---|
-| [`@open.craw/core`](./packages/core) | The engine: recipe contracts and validation, the step walk, both runners, mapping, sinks. |
-| [`@open.craw/cli`](./packages/cli) | `open-craw validate` / `run` / `probe` — inspect a site, check a recipe, run a crawl from the terminal. |
-| [`@open.craw/mcp`](./packages/mcp) | The same probe/validate/run/list primitives as an MCP server, for an agent instead of a terminal. |
+| [`@opencraw/core`](./packages/core) | The engine: recipe contracts and validation, the step walk, both runners, mapping, sinks. |
+| [`@opencraw/cli`](./packages/cli) | `opencraw validate` / `run` / `probe` — inspect a site, check a recipe, run a crawl from the terminal. |
+| [`@opencraw/mcp`](./packages/mcp) | The same probe/validate/run/list primitives as an MCP server, for an agent instead of a terminal. |
 
 ## Quick start
 
 ```sh
-npm install @open.craw/core
+npm install @opencraw/core
 npx playwright install chromium     # only for web recipes and browser bootstraps
 ```
 
-Or from the terminal, with [`@open.craw/cli`](./packages/cli):
+Or from the terminal, with [`@opencraw/cli`](./packages/cli):
 
 ```sh
-npm install -g @open.craw/cli
-open-craw probe https://example.com/product/1      # find where a site's data lives
-open-craw validate recipes/                        # check a recipe binds before running it
-open-craw run recipes/ --out out/products.jsonl
+npm install -g @opencraw/cli
+opencraw probe https://example.com/product/1      # find where a site's data lives
+opencraw validate recipes/                        # check a recipe binds before running it
+opencraw run recipes/ --out out/products.jsonl
 ```
 
 ```ts
-import { createCrawler, jsonLinesSink, loadRecipeSet } from '@open.craw/core'
+import { createCrawler, jsonLinesSink, loadRecipeSet } from '@opencraw/core'
 
 const recipes = await loadRecipeSet({ output: 'recipes/product.output.json', inputs: ['recipes/'] })
 const crawler = createCrawler({ sink: jsonLinesSink('out/products.jsonl') })
@@ -53,7 +53,7 @@ with `mnci add`. Code is organised in vertical feature slices, enforced by lint:
 ```sh
 npm install
 npm run affected            # lint, typecheck, test, build for what changed (what CI runs)
-npm run core:qa             # lint + unit tests of @open.craw/core
+npm run core:qa             # lint + unit tests of @opencraw/core
 npm run playwright:install  # once, for the browser tests
 npm run core:e2e            # browser + HTTP end-to-end suite against a local fixture shop
 npm run core:schemas        # regenerate packages/core/schemas from the zod contracts

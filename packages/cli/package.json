@@ -1,12 +1,12 @@
 {
-  "name": "@open.craw/cli",
+  "name": "@opencraw/cli",
   "version": "0.0.1",
   "type": "module",
   "main": "./dist/index.esm.js",
   "module": "./dist/index.esm.js",
   "types": "./dist/src/index.d.ts",
   "bin": {
-    "open-craw": "./bin/open-craw.mjs"
+    "opencraw": "./bin/opencraw.mjs"
   },
   "exports": {
     "./package.json": "./package.json",
@@ -24,13 +24,13 @@
     "!**/*.js.map"
   ],
   "dependencies": {
-    "@open.craw/core": "^0.0.1",
+    "@opencraw/core": "^0.0.1",
     "playwright": "^1.63.0"
   },
   "publishConfig": {
     "access": "public"
   },
-  "description": "Command-line tools for open.craw: probe a page for scrapable data, validate recipes, run a crawl.",
+  "description": "Command-line tools for OpenCraw: probe a page for scrapable data, validate recipes, run a crawl.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -65,7 +65,7 @@
           "build",
           {
             "projects": [
-              "@open.craw/core"
+              "@opencraw/core"
             ],
             "target": "e2e"
           }

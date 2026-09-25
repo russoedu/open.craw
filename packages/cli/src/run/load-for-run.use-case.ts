@@ -1,5 +1,5 @@
-import { bindRecipeSet, parseInputRecipe, parseOutputRecipe } from '@open.craw/core'
-import type { RecipeSet, RecipeSource } from '@open.craw/core'
+import { bindRecipeSet, parseInputRecipe, parseOutputRecipe } from '@opencraw/core'
+import type { RecipeSet, RecipeSource } from '@opencraw/core'
 import { readRecipeFiles } from '../recipe-files'
 
 /**

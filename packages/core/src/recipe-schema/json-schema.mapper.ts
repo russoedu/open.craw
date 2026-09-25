@@ -13,7 +13,7 @@ const OPTIONS = { target: 'draft-2020-12', io: 'input', unrepresentable: 'any' }
  * @returns A draft 2020-12 document.
  */
 export function outputRecipeJsonSchema (): JsonSchemaDocument {
-  return { ...z.toJSONSchema(outputRecipeSchema, OPTIONS), $id: 'https://open.craw/schemas/output-recipe.schema.json', title: 'open.craw output recipe' }
+  return { ...z.toJSONSchema(outputRecipeSchema, OPTIONS), $id: 'https://opencraw/schemas/output-recipe.schema.json', title: 'OpenCraw output recipe' }
 }
 
 /**
@@ -22,5 +22,5 @@ export function outputRecipeJsonSchema (): JsonSchemaDocument {
  * @returns A draft 2020-12 document.
  */
 export function inputRecipeJsonSchema (): JsonSchemaDocument {
-  return { ...z.toJSONSchema(inputRecipeSchema, OPTIONS), $id: 'https://open.craw/schemas/input-recipe.schema.json', title: 'open.craw input recipe' }
+  return { ...z.toJSONSchema(inputRecipeSchema, OPTIONS), $id: 'https://opencraw/schemas/input-recipe.schema.json', title: 'OpenCraw input recipe' }
 }

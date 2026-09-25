@@ -2,7 +2,7 @@
 
 ## What it is
 
-`open.craw` is an Nx monorepo (generated and maintained with `@mnci/cli`) holding `@open.craw/core`, a
+OpenCraw is an Nx monorepo (generated and maintained with `@mnci/cli`) holding `@opencraw/core`, a
 recipe-driven crawler engine. Read `README.md`, then `docs/requirements.md` (the specification) and
 `docs/recipes/authoring.md` (the recipe guide) before changing behaviour.
 
@@ -29,7 +29,7 @@ aligned object values, blank line before `return`). `npm run format` fixes most 
 npm run format && npm run affected      # what CI runs: lint, typecheck, test, build
 npx nx run core:lint --skip-nx-cache    # dependency-checks needs the Nx graph; bare eslint skips it
 npm run core:e2e                        # browser suite; needs `npm run playwright:install` once
-OPEN_CRAW_CHROMIUM=/path/to/chrome npm run core:e2e   # ...or a preinstalled browser
+OPENCRAW_CHROMIUM=/path/to/chrome npm run core:e2e   # ...or a preinstalled browser
 npm run core:schemas                    # regenerate packages/core/schemas after a contract change
 npx --yes @mnci/cli add npm-lib <name>  # a new publishable package; never scaffold by hand
 ```

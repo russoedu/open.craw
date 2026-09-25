@@ -1,4 +1,4 @@
-import { RecipeBindingError, RecipeValidationError, bindRecipeSet, parseInputRecipe, parseOutputRecipe } from '@open.craw/core'
+import { RecipeBindingError, RecipeValidationError, bindRecipeSet, parseInputRecipe, parseOutputRecipe } from '@opencraw/core'
 import { readRecipeFiles } from '../recipe-files'
 import type { Terminal } from '../terminal'
 
