@@ -90,7 +90,7 @@ optional `when` template that must render truthy for the step to run.
 | `wait` | web | – | one of `selector`, `ms`, `state: 'networkidle'` |
 | `evaluate` | web | value | `script`, JavaScript run in the page. Trusted recipes only. |
 | `screenshot` | web | – | `path` |
-| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'html' \| 'text' \| 'pdf' \| 'csv' \| 'xlsx' \| 'pptx'`, `encoding?`, `delimiter?` (CSV) |
+| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'html' \| 'text' \| 'pdf' \| 'csv' \| 'xlsx' \| 'pptx' \| 'yaml'`, `encoding?`, `delimiter?` (CSV), `scalars?` (YAML) |
 | `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex' \| 'table'`, `take`, `many?`, `from?`; `table` also `columns?`, `until?`, `align?` (PDF), `fillDown?`, `sheet?`, `headerRows?`, `includeHidden?` (workbook), `slide?`, `shapes?` (deck) |
 | `set` | both | value | `value` (template or literal) |
 | `collect` | both | – | `into` (a list id bound in an enclosing scope), `value` (template or literal); appends, so values outlive the `forEach` iteration or `paginate` page that found them |
@@ -127,6 +127,11 @@ left out), native tables as sheets with merges, charts from their caches, notes,
 native tables through the workbook algorithm, or text boxes (`shapes: true`) through the PDF algorithm, one
 box per cell; `slide` picks slides by title, and returns `{ slide, slideTitle, title, header, rows }`. `regex`
 reads the slides' text, `jsonpath` the deck. `.ppt`, encrypted files and `.odp` fail with what to do.
+
+YAML (`as: 'yaml'`, `application/yaml` and kin, `.yaml`/`.yml`) is parsed with the `yaml` package into JSON data
+(several documents: an array): version pinned to 1.2 core whatever the document declares, merge keys applied,
+duplicate keys an error, aliases capped at 100, custom tags read as plain values with a `warning` event;
+`scalars: 'text'` (failsafe schema) keeps every scalar as written.
 
 `take` is `text` (default), `html`, `value`, `json` or `attr:<name>`. `xpath` works on live pages only; on
 fetched HTML use `css`; on JSON use `jsonpath`. A `jsonpath` extract whose `from` is text parses it as JSON; a list of

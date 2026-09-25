@@ -219,7 +219,7 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 
 | Step | Fields | Notes |
 |---|---|---|
-| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`), `encoding?`, `delimiter?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`). 4xx/5xx fail the step. |
+| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`, `yaml`), `encoding?`, `delimiter?`, `scalars?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck, `application/yaml` YAML). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`, `.yaml`, `.yml`). 4xx/5xx fail the step. |
 
 Text bodies are decoded from, in order: a byte-order mark, `encoding` (any WHATWG label: `windows-1252`,
 `iso-8859-15`, `shift_jis`), the charset the server declares, UTF-8, and Windows-1252 for text that is not
@@ -679,6 +679,22 @@ applies). A very tall box can pull two rows together.
 Each table is `{ slide, slideTitle, title, header, rows }`, and hidden slides are skipped unless
 `includeHidden`. `opencraw probe <url or file.pptx>` lists the slides, each native table's header with a ready
 `selector`, the charts' series, and the slides whose short text boxes look like a table.
+
+### 4.9 YAML
+
+`request` with `as: "yaml"` (or a response served as `application/yaml`, `text/yaml` or their `x-` forms, or a
+local `file:…yaml` / `…yml`) parses the YAML into **JSON data**: `jsonpath`, `forEach` and `json` fields work
+exactly as on a JSON response. Several documents (`---`) become an array of them.
+
+- **YAML 1.2, always.** Under YAML 1.1, `country: NO` is `false`, `y` is `true` and `0123` is octal `83`. The
+  parser is pinned to 1.2 even when the file declares `%YAML 1.1`, so `NO` stays `"NO"`.
+- **`scalars: "text"`** on the `request` keeps every scalar as written. Even 1.2 reads `zip: 0123` as `123` and
+  `version: 1.10` as `1.1`; with `"text"`, they stay `"0123"` and `"1.10"`, and transforms convert what needs
+  converting.
+- **Merge keys** (`<<: *defaults`) are applied, **anchors** expand with a cap (a "billion laughs" file fails),
+  and **duplicate keys** fail the step with their line.
+- **Custom tags** (`!!js/function`, `!custom`) never build values: the tagged value is read as a plain one, and
+  the trace shows a warning.
 
 ## 5. Mapping
 

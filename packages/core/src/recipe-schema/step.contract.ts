@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { BODY_KINDS, ERROR_POLICIES, HTTP_METHODS, SELECTOR_KINDS, TABLE_ALIGNS, TAKE_KINDS, WAIT_UNTIL } from './recipe-kind.enum'
+import { BODY_KINDS, YAML_SCALARS, ERROR_POLICIES, HTTP_METHODS, SELECTOR_KINDS, TABLE_ALIGNS, TAKE_KINDS, WAIT_UNTIL } from './recipe-kind.enum'
 import type { BodyKind, HttpMethod, SelectorKind, TableAlign, WaitUntil } from './recipe-kind.enum'
 
 /** What to do when a step fails. Resolved step -> recipe -> `fail`. */
@@ -49,6 +49,8 @@ export interface RequestStep extends StepBaseFields {
   encoding?:  string
   /** A CSV body's delimiter (one character); default: detected among `,` `;` tab `|`. */
   delimiter?: string
+  /** A YAML body's scalars: `typed` (default, YAML 1.2) or `text`, every scalar as written (`0123` stays `"0123"`). */
+  scalars?:   'typed' | 'text'
 }
 export interface ExtractStep extends StepBaseFields {
   type:           'extract'
@@ -142,7 +144,10 @@ const requestStep = z.strictObject({
   as:        z.enum(BODY_KINDS).optional(),
   encoding:  z.string().min(1).optional(),
   delimiter: z.string().length(1).optional(),
-}).refine(step => step.delimiter === undefined || step.as === undefined || step.as === 'csv', { message: '"delimiter" reads CSV only: drop it or set "as": "csv"', path: ['delimiter'] })
+  scalars:   z.enum(YAML_SCALARS).optional(),
+})
+  .refine(step => step.delimiter === undefined || step.as === undefined || step.as === 'csv', { message: '"delimiter" reads CSV only: drop it or set "as": "csv"', path: ['delimiter'] })
+  .refine(step => step.scalars === undefined || step.as === undefined || step.as === 'yaml', { message: '"scalars" reads YAML only: drop it or set "as": "yaml"', path: ['scalars'] })
 const tableOnly = ['columns', 'until', 'align', 'sheet', 'headerRows', 'fillDown', 'includeHidden', 'slide', 'shapes'] as const
 const extractStep = z.strictObject({
   ...base,

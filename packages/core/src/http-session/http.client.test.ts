@@ -65,6 +65,12 @@ beforeAll(async () => {
 
         break
       }
+      case '/catalogue': {
+        outgoing.setHeader('content-type', 'application/yaml')
+        outgoing.end('models:\n  - name: Pandina\n    tag: !custom x\n')
+
+        break
+      }
       case '/latin': {
         outgoing.setHeader('content-type', 'text/plain; charset=ISO-8859-1')
         outgoing.end(Buffer.from([0x43, 0xE9]))
@@ -183,6 +189,24 @@ describe('HttpClient', () => {
       const local = await client.send({ url: pathToFileURL(join(__dirname, '..', '..', '..', 'office-reader', 'src', 'presentation', 'fixtures', 'incentivi.pptx')).href })
       const titles = local.body.kind === 'deck' ? local.body.slides.map(slide => slide.title) : []
       expect(titles).toEqual(['Incentivi giugno', 'Griglia prezzi Jeep', 'Vendite', 'Bozza'])
+    } finally {
+      await client.dispose()
+    }
+  })
+
+  it('reads YAML by content type or extension into JSON data, and reports what the parser noticed', async () => {
+    const client = await HttpClient.open()
+    try {
+      const served = await client.send({ url: `${base}/catalogue` })
+      expect(served.body).toEqual({ kind: 'json', data: { models: [{ name: 'Pandina', tag: 'x' }] } })
+      expect(served.warnings).toEqual([expect.stringMatching(/Unresolved tag/)])
+      const directory = await mkdtemp(join(tmpdir(), 'http-client-'))
+      await writeFile(join(directory, 'list.yml'), 'zip: 0123\n')
+      const url = pathToFileURL(join(directory, 'list.yml')).href
+      const typed = await client.send({ url })
+      expect(typed.body).toEqual({ kind: 'json', data: { zip: 123 } })
+      const verbatim = await client.send({ url, scalars: 'text' })
+      expect(verbatim.body).toEqual({ kind: 'json', data: { zip: '0123' } })
     } finally {
       await client.dispose()
     }

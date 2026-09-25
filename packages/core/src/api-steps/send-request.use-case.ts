@@ -38,6 +38,7 @@ export async function sendRequest (step: RequestStep, scope: ExtractionScope, cl
       as:        step.as,
       encoding:  step.encoding,
       delimiter: step.delimiter,
+      scalars:   step.scalars,
       timeoutMs: recipe.limits?.timeoutMs,
     })
   } catch (error) {
@@ -46,6 +47,8 @@ export async function sendRequest (step: RequestStep, scope: ExtractionScope, cl
     throw await detectBlock({ url: error.url, status: error.status, headers: error.headers, text: async () => bodyText(error.body) }, recipe.session?.blockedWhen) ?? error
   }
   events.emit({ type: 'page:visit', recipeId: recipe.id, url: response.url, number: scope.pageState?.number ?? 1, status: response.status })
+  const warnings = response.warnings ?? []
+  for (const warning of warnings) events.emit({ type: 'warning', recipeId: recipe.id, message: `${response.url}: ${warning}`, meta: { url: response.url } })
   const blocked = await detectBlock({ url: response.url, status: response.status, headers: response.headers, text: async () => bodyText(response.body) }, recipe.session?.blockedWhen)
   if (blocked !== undefined) throw blocked
   scope.setPage({ url: response.url, document: response.body })

@@ -7,6 +7,7 @@ import { readPptxDeck } from '../deck-document'
 import { readPdf } from '../pdf-document'
 import type { BodyKind } from '../recipe-schema'
 import { csvWorkbook, readXlsxWorkbook, sheetNameOf } from '../workbook-document'
+import { readYaml } from '../yaml-document'
 import { HttpError } from './http-response.contract'
 import type { HttpBody, HttpRequest, HttpResponse, HttpSender } from './http-response.contract'
 import { charsetOf, decodeText } from './text-decoding.algorithm'
@@ -62,8 +63,8 @@ export class HttpClient implements HttpSender {
       data:    httpRequest.body as string | Record<string, unknown> | undefined,
       timeout: httpRequest.timeoutMs ?? this.timeoutMs,
     })
-    const body = await readBody(response, httpRequest)
-    const result: HttpResponse = { status: response.status(), url: response.url(), headers: response.headers(), body }
+    const { body, warnings } = await readBody(response, httpRequest)
+    const result: HttpResponse = { status: response.status(), url: response.url(), headers: response.headers(), body, ...(warnings.length > 0 && { warnings }) }
     if (response.status() >= 400) throw new HttpError(response.status(), response.url(), body, response.headers())
 
     return result
@@ -79,7 +80,13 @@ export class HttpClient implements HttpSender {
   }
 }
 
-async function readBody (response: APIResponse, httpRequest: HttpRequest): Promise<HttpBody> {
+/** A body as read, with what reading it noticed. */
+interface ReadBody {
+  body:     HttpBody
+  warnings: string[]
+}
+
+async function readBody (response: APIResponse, httpRequest: HttpRequest): Promise<ReadBody> {
   const contentType = response.headers()['content-type'] ?? ''
   const format = httpRequest.as ?? formatFromContentType(contentType)
 
@@ -87,17 +94,30 @@ async function readBody (response: APIResponse, httpRequest: HttpRequest): Promi
 }
 
 /**
- * A `file:` URL, read from disk: a PDF, spreadsheet, presentation, CSV or
- * JSON a recipe gets from a folder instead of a server. The format is `as`, else the file extension.
+ * A `file:` URL, read from disk: a PDF, spreadsheet, presentation, CSV, YAML
+ * or JSON a recipe gets from a folder instead of a server. The format is `as`,
+ * else the file extension.
  */
 async function readLocalFile (httpRequest: HttpRequest): Promise<HttpResponse> {
   const path = fileURLToPath(httpRequest.url)
   const bytes = await readFile(path)
+  const { body, warnings } = await parseBody(httpRequest.as ?? formatFromExtension(extname(path)), bytes, httpRequest.url, httpRequest)
 
-  return { status: 200, url: httpRequest.url, headers: {}, body: await parseBody(httpRequest.as ?? formatFromExtension(extname(path)), bytes, httpRequest.url, httpRequest) }
+  return { status: 200, url: httpRequest.url, headers: {}, body, ...(warnings.length > 0 && { warnings }) }
 }
 
-async function parseBody (format: BodyKind, bytes: Uint8Array, url: string, reading: { encoding?: string, delimiter?: string, charset?: string }): Promise<HttpBody> {
+async function parseBody (format: BodyKind, bytes: Uint8Array, url: string, reading: { encoding?: string, delimiter?: string, scalars?: 'typed' | 'text', charset?: string }): Promise<ReadBody> {
+  if (format === 'yaml') {
+    const { text } = decodeText(bytes, reading)
+    const { data, warnings } = await readYaml(text, url, reading.scalars)
+
+    return { body: { kind: 'json', data }, warnings }
+  }
+
+  return { body: await parseFormat(format, bytes, url, reading), warnings: [] }
+}
+
+async function parseFormat (format: BodyKind, bytes: Uint8Array, url: string, reading: { encoding?: string, delimiter?: string, charset?: string }): Promise<HttpBody> {
   if (format === 'pdf') return readPdf(bytes, url)
   if (format === 'xlsx') return readXlsxWorkbook(bytes, url)
   if (format === 'pptx') return readPptxDeck(bytes, url)
@@ -120,6 +140,7 @@ function formatFromContentType (contentType: string): BodyKind {
   // A legacy .xls or .ppt goes to the Office reader too, which says what to do with it.
   if (type.includes('spreadsheetml') || type.startsWith('application/vnd.ms-excel')) return 'xlsx'
   if (type.includes('presentationml') || type.startsWith('application/vnd.ms-powerpoint')) return 'pptx'
+  if (YAML_TYPES.has(type)) return 'yaml'
   if (type.includes('json')) return 'json'
   if (type.includes('pdf')) return 'pdf'
   if (type.includes('html') || type.includes('xml')) return 'html'
@@ -127,10 +148,11 @@ function formatFromContentType (contentType: string): BodyKind {
   return 'text'
 }
 
+const YAML_TYPES = new Set(['application/yaml', 'application/x-yaml', 'text/yaml', 'text/x-yaml'])
 const CSV_TYPES = new Set(['text/csv', 'application/csv', 'text/x-csv', 'application/x-csv', 'text/comma-separated-values', 'text/tab-separated-values'])
 
 function formatFromExtension (extension: string): BodyKind {
-  const formats: Record<string, BodyKind> = { '.json': 'json', '.pdf': 'pdf', '.csv': 'csv', '.tsv': 'csv', '.xlsx': 'xlsx', '.xlsm': 'xlsx', '.xls': 'xlsx', '.pptx': 'pptx', '.pptm': 'pptx', '.ppsx': 'pptx', '.ppt': 'pptx', '.html': 'html', '.htm': 'html', '.xml': 'html' }
+  const formats: Record<string, BodyKind> = { '.json': 'json', '.pdf': 'pdf', '.csv': 'csv', '.tsv': 'csv', '.xlsx': 'xlsx', '.xlsm': 'xlsx', '.xls': 'xlsx', '.pptx': 'pptx', '.pptm': 'pptx', '.ppsx': 'pptx', '.ppt': 'pptx', '.yaml': 'yaml', '.yml': 'yaml', '.html': 'html', '.htm': 'html', '.xml': 'html' }
 
   return formats[extension.toLowerCase()] ?? 'text'
 }

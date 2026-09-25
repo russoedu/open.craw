@@ -16,6 +16,8 @@ export interface HttpRequest {
   encoding?:  string
   /** A CSV body's delimiter (one character); default: detected. */
   delimiter?: string
+  /** A YAML body's scalars: `typed` (default) or `text`. */
+  scalars?:   'typed' | 'text'
   timeoutMs?: number
 }
 
@@ -24,11 +26,13 @@ export type HttpBody =
   PdfDocument | WorkbookDocument | DeckDocument | { kind: 'json', data: unknown } | { kind: 'html', html: string } | { kind: 'text', text: string }
 
 export interface HttpResponse {
-  status:  number
+  status:    number
   /** The final URL after redirects. */
-  url:     string
-  headers: Record<string, string>
-  body:    HttpBody
+  url:       string
+  headers:   Record<string, string>
+  body:      HttpBody
+  /** What reading the body noticed but read anyway (an unknown YAML tag…). */
+  warnings?: string[]
 }
 
 /** The part of the client the api runner needs; tests fake it. */

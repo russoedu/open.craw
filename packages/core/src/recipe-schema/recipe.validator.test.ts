@@ -93,6 +93,8 @@ describe('parseInputRecipe', () => {
     expect(() => parseInputRecipe(request({ as: 'json', encoding: 'utf8' }))).not.toThrow()
     expect(() => parseInputRecipe(request({ as: 'json', delimiter: ';' }))).toThrow(/"delimiter" reads CSV only/)
     expect(() => parseInputRecipe(request({ as: 'csv', delimiter: ';;' }))).toThrow(/delimiter/)
+    expect(() => parseInputRecipe(request({ as: 'yaml', scalars: 'text' }))).not.toThrow()
+    expect(() => parseInputRecipe(request({ as: 'json', scalars: 'text' }))).toThrow(/"scalars" reads YAML only/)
   })
 
   it('rejects unknown keys (typos) anywhere', () => {

@@ -1244,7 +1244,8 @@
                 "pdf",
                 "csv",
                 "xlsx",
-                "pptx"
+                "pptx",
+                "yaml"
               ]
             },
             "encoding": {
@@ -1255,6 +1256,13 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 1
+            },
+            "scalars": {
+              "type": "string",
+              "enum": [
+                "typed",
+                "text"
+              ]
             }
           },
           "required": [

@@ -13,6 +13,24 @@ import type { BrowserSessionConfig } from '../src/index'
 export const FIXTURE_PORT = Number(process.env.OPENCRAW_FIXTURE_PORT ?? '4545')
 export const FIXTURE_BASE = `http://127.0.0.1:${FIXTURE_PORT}`
 
+/** A CMS export in YAML: anchors, merge keys, a 1.1-style `NO` that 1.2 keeps as text. */
+const CATALOGUE_YAML = `defaults: &defaults
+  brand: Fiat
+  currency: EUR
+  market: NO
+models:
+  - <<: *defaults
+    name: Pandina
+    price: 15950
+  - <<: *defaults
+    name: 600e
+    price: 36950
+  - <<: *defaults
+    brand: Jeep
+    name: Avenger
+    price: 24950
+`
+
 const PAGES = 3
 const PER_PAGE = 2
 
@@ -145,6 +163,12 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
   if (url.pathname === '/incentivi.pptx') {
     outgoing.writeHead(200, { 'content-type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation' })
     outgoing.end(readFileSync(join(__dirname, '..', '..', 'office-reader', 'src', 'presentation', 'fixtures', 'incentivi.pptx')))
+
+    return
+  }
+  if (url.pathname === '/catalogue.yaml') {
+    outgoing.writeHead(200, { 'content-type': 'application/yaml' })
+    outgoing.end(CATALOGUE_YAML)
 
     return
   }
