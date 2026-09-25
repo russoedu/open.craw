@@ -219,7 +219,7 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 
 | Step | Fields | Notes |
 |---|---|---|
-| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `html`, `text`) | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides. 4xx/5xx fail the step. |
+| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `html`, `text`, `pdf`) | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF). A `file:` URL reads a local file, its kind from `as` or the extension. 4xx/5xx fail the step. |
 
 `body` is templated **all the way down**: a string body is one template, and in an object or list body
 every string inside it is one, at any depth. A string that is exactly one placeholder keeps the value's type
@@ -436,6 +436,7 @@ order. Rules:
 | an id holding **text** | with `css`: the text as HTML (a fragment such as a `<tr>` is parsed as a fragment, so cells survive); with `jsonpath`: the text parsed as JSON | same |
 | an id holding a **list of texts** | with `jsonpath`: every entry that parses as JSON becomes one element of an array and the path runs over the array | same |
 | an id holding **data** (an object, a list of objects) | with `jsonpath` | same |
+| an id holding a **read PDF** (a `request` with `as: "pdf"`) | with `table`, `regex` or `jsonpath` (§4.6) | same |
 
 JSON-LD wrapped in `/* <![CDATA[ */ ... /* ]]> */` or `<!-- -->` guards is unwrapped before parsing. The
 common pattern, both sites in the examples use it:
@@ -500,6 +501,59 @@ the *next* row's role: a shifted field, no error. When a site nests tables or li
 repeating element (`table.credit_group tr`, not `tr`) and check the first record by hand.
 
 ---
+
+### 4.6 PDFs
+
+`request` with `as: "pdf"` (or a response served as `application/pdf`, or a local `file:…pdf`) reads the
+PDF's text layer with pdf.js into pages of **rows**: text that sits side by side becomes a cell, cells whose
+vertical extents overlap become a row. A scan has no text layer and fails the step (no OCR). Three extract
+kinds read it:
+
+| `kind` | Reads | Use for |
+|---|---|---|
+| `table` | tables, found by their header row | price lists, discount sheets, spec tables |
+| `regex` | the text: one line per row, cells separated by a tab, pages by a blank line | a value next to a label: `Valid until\t(\S+)` |
+| `jsonpath` | the structure: `{ kind: "pdf", pages: [{ number, width, height, rows: [{ text, top, bottom, cells: [{ x, y, width, height, text }] }] }] }` | positions, a given page |
+
+A **table** extract takes the header row's pattern as its `selector`, and returns one table per match, `many`
+for all of them:
+
+```json
+{ "type": "request", "id": "sheet", "url": "{{start.url}}", "as": "pdf" },
+{ "type": "extract", "id": "tables", "selector": "^MODELLI", "kind": "table", "many": true,
+  "until": "^(NOTA BENE|N\\.B\\.)",
+  "columns": { "model": "^MODELLI", "discount": "^Sconto", "excluded": "^Versioni", "extra": "^Azion" } },
+{ "type": "forEach", "over": "tables", "as": "table", "steps": [
+  { "type": "set", "id": "rows", "value": "{{table.rows}}" },
+  { "type": "forEach", "over": "rows", "as": "row", "emit": true, "steps": [] }
+]}
+```
+
+Each table is `{ page, title, header, rows }`: `title` is the first header cell (`MODELLI FIAT`, a brand), and
+each row an object keyed by `columns` (output key → a pattern for that column's header cell), or by the header
+texts without `columns`. A cell's lines are joined by spaces. All patterns are case-insensitive.
+
+| Field | Meaning |
+|---|---|
+| `selector` | Matches a table's header row, its cells joined by spaces. |
+| `until` | Matches the row that ends a table: a footnote, a "Note:" line. A table also ends at the next row the `selector` matches, and at the page's end. With a narrow `selector` (one table among several), set `until` to the start of the next one. |
+| `columns` | Output key → header pattern. Unmatched columns are dropped. |
+| `align` | How a row's values sit against a cell wrapped over several lines: `top`, `center`, `bottom`, or `auto` (default). |
+
+How it reads a table, which is what makes real-world sheets work:
+
+- **Columns come from the body.** A header is often centred over a column whose cells are left-aligned, so the
+  left edges of the body's cells cluster into bands, and bands map to header cells left to right. A header
+  spanning two columns reads both.
+- **Rows are regrouped.** A long name wraps over several lines, a note runs onto a second line, a list of
+  versions sits above and below its row. A line with a name and a value, or with a value in the first value
+  column, anchors a row; the other lines join it. With `auto`, a table that centres values beside wrapped
+  names shares the wrapped lines evenly around each anchor; otherwise a line joins the nearest anchor, and a
+  line halfway between two joins the one below.
+
+Find the selectors with `opencraw probe <url or file.pdf>`: for a PDF it lists the rows and every row that
+looks like a table header, with a ready `selector`. The Stellantis example
+(`examples/stellantis-it-discounts/`) reads eight monthly discount sheets this way.
 
 ## 5. Mapping
 
@@ -691,8 +745,9 @@ JSON path) and then **binds** the inputs to the output (`RecipeBindingError`): e
 output field, every `from` starts with a known id, required fields are covered, web steps stay in web
 recipes, `next.selector` only in web mode, one emitting construct per path.
 
-The report gives, per recipe: `emitted`, `rejected`, `duplicates`, `skipped`, `pages`, `durationMs`, and
-`error` when the recipe stopped. The sink summary says how many records were written and where.
+The report gives, per recipe: `emitted`, `rejected`, `duplicates`, `skipped` (records a resumed run already
+had), `stepsSkipped` (steps whose `onError: skip` swallowed a failure: a check that found nothing), `pages`,
+`durationMs`, and `error` when the recipe stopped. The sink summary says how many records were written and where.
 
 **Resuming.** A long crawl that dies halfway does not have to start over. Open the sink in append mode and
 ask the crawler to resume:

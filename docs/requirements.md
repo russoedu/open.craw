@@ -90,8 +90,8 @@ optional `when` template that must render truthy for the step to run.
 | `wait` | web | – | one of `selector`, `ms`, `state: 'networkidle'` |
 | `evaluate` | web | value | `script`, JavaScript run in the page. Trusted recipes only. |
 | `screenshot` | web | – | `path` |
-| `request` | api | document | `method?`, `url`, `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'html' \| 'text'` |
-| `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex'`, `take`, `many?`, `from?` |
+| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'html' \| 'text' \| 'pdf'` |
+| `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex' \| 'table'`, `take`, `many?`, `from?`; `table` also `columns?`, `until?`, `align?` |
 | `set` | both | value | `value` (template or literal) |
 | `collect` | both | – | `into` (a list id bound in an enclosing scope), `value` (template or literal); appends, so values outlive the `forEach` iteration or `paginate` page that found them |
 | `forEach` | both | – | `over` (a list id) or `selector` (web: live elements), `as` (variable), `steps`, `emit?: true \| { output }` |
@@ -99,6 +99,11 @@ optional `when` template that must render truthy for the step to run.
 | `paginate` | both | – | `next`, `until?` (template), `maxPages?`, `steps` |
 | `emit` | both | record | `output?` |
 | `hook` | both | value | `name`, `args?` |
+
+A PDF (`as: 'pdf'`) is read into pages of rows of positioned cells (pdf.js, text layer only; a scan fails).
+`table` finds tables by their header row and returns `{ page, title, header, rows }`, rows keyed by column:
+columns come from where the body's cells start, and lines of a wrapped cell are regrouped into their row.
+`regex` reads a PDF as text (one line per row, cells tab-separated), `jsonpath` reads its structure.
 
 `take` is `text` (default), `html`, `value`, `json` or `attr:<name>`. `xpath` works on live pages only; on
 fetched HTML use `css`; on JSON use `jsonpath`. A `jsonpath` extract whose `from` is text parses it as JSON; a list of

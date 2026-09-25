@@ -62,6 +62,14 @@ opencraw probe https://example.com/product/1
 opencraw probe https://example.com/configurator --browser
 ```
 
+A PDF (a URL served as `application/pdf`, or a local `.pdf` path) is read instead: `probe` lists its first
+rows and every row that looks like a table header, with the `selector` a `table` extract needs.
+
+```sh
+opencraw probe https://example.com/price-list.pdf
+opencraw probe ./sheets/september.pdf
+```
+
 Use it before writing an input recipe, to find the shape a site's data actually takes (§9 of
 [the authoring guide](../../docs/recipes/authoring.md)).
 
