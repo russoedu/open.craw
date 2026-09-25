@@ -55,7 +55,9 @@ and never emit records.
 **Access.** `session.access` says what the site needs (a profile name, a country, stickiness); the runner's
 access config (`CrawlOptions.access`, CLI `--access`, env `OPEN_CRAW_ACCESS`) says how: named profiles of kind
 `direct`, `proxy` (a server and username/password templates, or a provider `preset`), `pool` (a list rotated per
-lease) or `plugin` (a registered `AccessPlugin`). Every profile string is a template over `env.*`, `params.*`,
+lease), `cdp` (a remote browser: `chromium.connectOverCDP` on a templated endpoint; web recipes only, the bootstrap
+runs in the same remote session, the provider's context is reused) or `plugin` (a registered `AccessPlugin`, which
+may return a proxy or a CDP endpoint). Every profile string is a template over `env.*`, `params.*`,
 `session` (a new random id per sticky lease), `country` and `recipe.id`; an unset `env` variable fails the recipe
 with its name. Each recipe run takes one lease, shared by its bootstrap and its runner and applied to the browser
 context (proxy, extra headers, `ignoreHTTPSErrors`, blocked resource types) and to the HTTP request context. The

@@ -7,7 +7,8 @@ through a proxy.
 
 This page explains how open.craw does that: the recipe says what the site needs, a separate access config
 says how to get it, and the engine applies the result to every browser page, bootstrap and HTTP request of
-the run. When a response is a block anyway, the run can take a new lease and retry.
+the run. When a response is a block anyway, the run can take a new lease and retry. A profile can also point at
+a remote browser service instead of a proxy.
 
 ## Two files, two concerns
 
@@ -59,7 +60,7 @@ remote-browser services. Each one connects in one of three ways:
 | Shape | Who | How open.craw handles it |
 |---|---|---|
 | HTTP proxy, `{ server, username, password }` | All 10 proxy networks (Bright Data, Oxylabs, Decodo, IPRoyal, Webshare, SOAX, NetNut, Rayobyte, Evomi, Massive) and every unblocker's proxy mode (Bright Data Web Unlocker, Oxylabs Web Unblocker, Zyte, ScraperAPI, ScrapingBee, Scrapfly, Decodo, ZenRows) | `proxy` profiles, with presets |
-| Remote browser over CDP | Bright Data Browser API, Browserless, Browserbase, Zyte, Oxylabs, Steel, Hyperbrowser | Planned (issue #8, phase C) |
+| Remote browser over CDP | Bright Data Browser API, Browserless, Browserbase, Zyte, Oxylabs, Steel, Hyperbrowser | `cdp` profiles; a plugin when the URL comes from an API call |
 | URL-rewriting API (`GET api.x.com?url=`) | ScraperAPI, ScrapingBee, Zyte, Scrapfly, ZenRows | Not supported: no live page, a different request and response shape per vendor, and every one of these vendors also sells the proxy shape |
 
 The proxy shape covers almost everyone. The providers differ only in where they want options written:
@@ -114,6 +115,48 @@ A list of proxies, for providers that sell IP lists (Webshare direct, dedicated 
 
 Each lease takes the next entry, or a random one with `"rotate": "random"`. `headers`, `ignoreHTTPSErrors`
 and `blockResources` apply to every entry.
+
+### `cdp`: a remote browser
+
+Remote-browser services run the browser for you and deal with IPs, fingerprints and challenges. A web recipe
+connects to one over the Chrome DevTools Protocol instead of launching Chromium:
+
+```json
+"cloud": { "kind": "cdp",
+  "endpoint": "wss://brd-customer-{{env.BRD_CUSTOMER}}-zone-{{env.BRD_ZONE}}{{country ? '-country-' + lower(country) : ''}}:{{env.BRD_PASSWORD}}@brd.superproxy.io:9222" }
+```
+
+| Field | Meaning |
+|---|---|
+| `endpoint` | `wss://…` or `http://host:port`. A template: tokens and credentials usually live in it. |
+| `headers` | Sent with the connection, for providers that authenticate with a header. Templates. |
+| `params` | Read as `params.*`, as in `proxy` profiles. |
+| `session.idFormat` | The format of `{{session}}`, for providers that name sessions in the URL. |
+| `blockResources` | As in `proxy` profiles. |
+
+Endpoints of common services, to adapt from the provider's current docs:
+
+| Service | `endpoint` |
+|---|---|
+| Bright Data Browser API | `wss://brd-customer-…-zone-…[-country-xx]:PASSWORD@brd.superproxy.io:9222` |
+| Browserless | `wss://production-sfo.browserless.io?token=…[&proxy=residential&proxyCountry=xx]` |
+| Oxylabs Headless Browser | `wss://USER:PASS@hb.oxylabs.io?p_cc=XX` |
+| Zyte | `https://browser.zyte.com/?ttl=600[&proxy_region=XX]`, with `headers: { "Authorization": "Basic {{env.ZYTE_BASIC}}" }` (the key followed by `:`, base64-encoded) |
+
+How a remote session is used:
+
+- **Web recipes only.** An api recipe on a `cdp` profile fails at the start of its run, before any request,
+  with a message saying it needs a proxy profile. `probe` refuses one too.
+- **The bootstrap runs in the same remote session as the crawl.** Providers tie the IP and fingerprint to the
+  connection, so a login in one connection would not carry over to another.
+- **The provider's own context is reused** when it offers one, because some providers pin the proxy and
+  fingerprint to it. Cookies (from `session.cookies` or a saved `storageStatePath`), headers, blocked resources
+  and the viewport are applied to it. `session.userAgent` cannot change on an existing context and is ignored.
+  From a saved state only cookies apply, not localStorage.
+- **Closing disconnects**, which ends the session on the provider's side (and its billing).
+- **Rotation reconnects.** With `onBlock.rotate`, a block opens a new connection, and so a new remote session.
+  Some providers allow one domain per session and short idle timeouts, so rotation is the normal way to get a
+  fresh one.
 
 ### `direct` and `plugin`
 
@@ -204,8 +247,9 @@ sessions, a pool, or a plugin. On a `direct` profile it reopens the session from
 
 ## Plugins
 
-A plugin is for access that config cannot express: a remote browser whose URL comes from a REST call, a proxy
-list fetched from an API, a credential that expires. It is a name and one function:
+A plugin is for access that config cannot express: a remote browser whose URL comes from a REST call
+(Browserbase, Steel, Hyperbrowser), a proxy list fetched from an API, a credential that expires. It is a name and
+one function:
 
 ```ts
 import { createCrawler } from '@open.craw/core'
@@ -228,14 +272,38 @@ const crawler = createCrawler({ accessPlugins: [rotatingList], access: {
 ```
 
 The plugin receives its profile's `options` with every string rendered, plus the recipe id, the requested
-country, stickiness and the attempt number. It returns a lease: `proxy`, `headers`, `ignoreHTTPSErrors`,
-`blockResources`, and an optional `release()` called when the run ends.
+country, stickiness and the attempt number. It returns a lease: `proxy` or `cdp`, `headers`,
+`ignoreHTTPSErrors`, `blockResources`, `session`, and an optional `release()` called when the run ends.
+
+A remote browser created through an API is the same shape, returning `cdp`. This sketch follows Browserbase's
+REST API; check the provider's current docs for the exact endpoints and fields:
+
+```ts
+const browserbase: AccessPlugin = {
+  name: 'browserbase',
+  async lease ({ options }) {
+    const headers = { 'X-BB-API-Key': String(options.apiKey), 'Content-Type': 'application/json' }
+    const created = await fetch('https://api.browserbase.com/v1/sessions', { method: 'POST', headers, body: JSON.stringify({ projectId: options.projectId, proxies: true }) })
+    const session = (await created.json()) as { id: string, connectUrl: string }
+
+    return {
+      cdp:     { endpoint: session.connectUrl },
+      session: session.id,
+      release: async () => {
+        await fetch(`https://api.browserbase.com/v1/sessions/${session.id}`, { method: 'POST', headers, body: JSON.stringify({ projectId: options.projectId, status: 'REQUEST_RELEASE' }) })
+      },
+    }
+  },
+}
+```
+
+`release()` runs when the recipe run ends, including after a rotation, so a remote session is never left
+running.
 
 ## Not covered yet
 
 Tracked on issue #8:
 
-- **Remote browsers over CDP.**
 - **Per-domain throttling** across recipes.
 - **Persistent browser profiles.**
 
