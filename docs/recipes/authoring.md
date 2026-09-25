@@ -219,7 +219,7 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 
 | Step | Fields | Notes |
 |---|---|---|
-| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `jsonl`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`, `yaml`), `encoding?`, `delimiter?`, `scalars?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck, `application/yaml` YAML, `application/x-ndjson` JSON Lines). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`, `.yaml`, `.yml`, `.jsonl`, `.ndjson`). 4xx/5xx fail the step. |
+| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `jsonl`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`, `yaml`, `markdown`), `encoding?`, `delimiter?`, `scalars?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck, `application/yaml` YAML, `application/x-ndjson` JSON Lines, `text/markdown` Markdown). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`, `.yaml`, `.yml`, `.jsonl`, `.ndjson`, `.md`). 4xx/5xx fail the step. |
 
 Text bodies are decoded from, in order: a byte-order mark, `encoding` (any WHATWG label: `windows-1252`,
 `iso-8859-15`, `shift_jis`), the charset the server declares, UTF-8, and Windows-1252 for text that is not
@@ -708,6 +708,47 @@ exactly as on a JSON response. Several documents (`---`) become an array of them
   and **duplicate keys** fail the step with their line.
 - **Custom tags** (`!!js/function`, `!custom`) never build values: the tagged value is read as a plain one, and
   the trace shows a warning.
+
+### 4.10 Markdown
+
+`request` with `as: "markdown"` (or a response served as `text/markdown`, or a local `file:…md`) renders
+GitHub-flavoured Markdown (tables, task lists, strikethrough, autolinks) to an **HTML document**, so every
+`css` selector works on it. GitHub raw and most CDNs serve Markdown as `text/plain`: set `as`. Two additions
+make it easier to aim at:
+
+- **Sections.** Each heading and everything up to the next heading of the same or a higher level is wrapped
+  in `<section data-heading="…" data-level="…">`, sections nesting: the table under *Prezzi* is
+  `section[data-heading='Prezzi' i] table`. Headings get GitHub's slug ids (`<h2 id="prezzi">`).
+- **Front matter.** A leading `---` YAML block is parsed (YAML 1.2, as §4.9) and put in the head as
+  `<script type="application/json" data-front-matter>`: read it the way JSON-LD is read.
+
+```json
+{ "type": "request", "url": "{{start.url}}", "as": "markdown" },
+{ "type": "extract", "id": "front", "selector": "script[data-front-matter]", "kind": "css", "take": "text" },
+{ "type": "extract", "id": "updated", "from": "front", "selector": "$.updated", "kind": "jsonpath" },
+{ "type": "extract", "id": "table", "selector": "^Modello Versione", "kind": "table", "columns": { "model": "^Modello$", "price": "^Prezzo$" } }
+```
+
+In a GFM table a `|` inside a code span still splits the cell: the Markdown must write it `\|`. Raw HTML in the
+Markdown is kept and selectable, and never runs (it is parsed, not loaded in a browser). To run a `regex` over
+the Markdown source instead, request it with `as: "text"`.
+
+### 4.11 HTML tables
+
+`table` also reads an HTML document's `<table>`s: a fetched page, rendered Markdown, or, in web mode, the live
+page. Every table becomes a grid: `thead`, `tbody` and `tfoot` rows in order, `th` and `td` alike, cell text
+with whitespace collapsed, and `colspan` / `rowspan` as merged ranges. From there it is the grid table of §4.7:
+the `selector` matches the header row, merged cells are filled, `headerRows` joins a header over two rows,
+`fillDown` and `columns` work the same. A table inside a table is read on its own.
+
+```json
+{ "type": "extract", "id": "table", "kind": "table", "selector": "^Model Version", "headerRows": 2,
+  "columns": { "model": "^Model$", "version": "^Version$", "urban": "^Consumption Urban$" } }
+```
+
+A model merged down its versions (`rowspan`) reads on every row, and *Consumption* over *Urban · Mixed*
+(`colspan`) names both columns. It replaces a `css` extract per `tr` and a `take` per `td`. `probe` lists
+every table's header row with a ready `selector`.
 
 ## 5. Mapping
 

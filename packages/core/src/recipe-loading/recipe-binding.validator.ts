@@ -80,7 +80,10 @@ function walkStep (step: Step, at: string, mode: 'web' | 'api', known: Set<strin
     known.add(step.id)
   }
   if (step.type === 'extract' && step.from !== undefined && !known.has(step.from)) report(`${at}.from`, `"${step.from}" is not a known id`)
-  if (mode === 'web' && state.bootstrap !== true && step.type === 'extract' && step.kind === 'table' && step.from === undefined) report(at, 'a "table" extract reads a PDF, which a web page is not: fetch the PDF with a request step in an api recipe, or extract "from" a PDF bound earlier')
+  if (mode === 'web' && state.bootstrap !== true && step.type === 'extract' && step.kind === 'table' && step.from === undefined) {
+    const foreign = (['sheet', 'slide', 'shapes', 'align', 'includeHidden'] as const).filter(option => step[option] !== undefined)
+    if (foreign.length > 0) report(at, `a "table" extract on a web page reads its HTML tables; ${foreign.map(option => `"${option}"`).join(', ')} belong to PDFs, workbooks or decks (fetch one with a request step in an api recipe)`)
+  }
   if (step.type === 'collect' && !known.has(step.into)) report(`${at}.into`, `"${step.into}" is not a known id: set it to [] before the loop that collects into it`)
   const nested = (): WalkState => ({ ...state, ids: new Set(state.ids) })
   switch (step.type) {

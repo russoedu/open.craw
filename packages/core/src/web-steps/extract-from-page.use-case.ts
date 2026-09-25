@@ -1,5 +1,5 @@
 import type { Page } from 'playwright'
-import { extractFromDocument, renderSelector } from '../api-steps'
+import { extractFromDocument, renderSelector, tablesIn } from '../api-steps'
 import type { ExtractionScope } from '../extraction-scope'
 import type { ExtractStep } from '../recipe-schema'
 import { collapse, selectRegex } from '../selection'
@@ -16,13 +16,7 @@ export async function extractFromPage (step: ExtractStep, page: Page, scope: Ext
 
     return
   }
-  if (step.kind === 'table') throw new Error('table reads a PDF, a workbook or a deck: fetch it with a request step in api mode, or extract "from" one bound earlier')
-  const rendered = renderSelector(step.selector, scope)
-  const take = step.take ?? 'text'
-  const raw = step.kind === 'regex'
-    ? selectRegex(await page.content(), rendered)
-    : await page.locator(step.kind === 'xpath' ? `xpath=${rendered}` : rendered).evaluateAll(readAll, take)
-  const values = take === 'text' ? raw.map(value => (typeof value === 'string' ? collapse(value) : value)) : raw
+  const values = step.kind === 'table' ? tablesIn({ kind: 'html', html: await page.content() }, step, scope) : await readPage(step, page, scope)
   if (step.many === true) {
     if (step.id !== undefined) scope.set(step.id, values)
 
@@ -30,6 +24,17 @@ export async function extractFromPage (step: ExtractStep, page: Page, scope: Ext
   }
   if (values.length === 0) throw new NoMatchError(step.selector)
   if (step.id !== undefined) scope.set(step.id, values[0])
+}
+
+/** A css, xpath or regex extract on the live page. */
+async function readPage (step: ExtractStep, page: Page, scope: ExtractionScope): Promise<unknown[]> {
+  const rendered = renderSelector(step.selector, scope)
+  const take = step.take ?? 'text'
+  const raw = step.kind === 'regex'
+    ? selectRegex(await page.content(), rendered)
+    : await page.locator(step.kind === 'xpath' ? `xpath=${rendered}` : rendered).evaluateAll(readAll, take)
+
+  return take === 'text' ? raw.map(value => (typeof value === 'string' ? collapse(value) : value)) : raw
 }
 
 /** Runs inside the page: one value per matched element. Keep it self-contained; it is serialised. */

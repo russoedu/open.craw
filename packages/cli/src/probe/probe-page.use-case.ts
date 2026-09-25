@@ -8,6 +8,8 @@ import type { Terminal } from '../terminal'
 import { findData } from './find-data.algorithm'
 import { describeDeck } from './deck-findings.mapper'
 import type { DeckFindings } from './deck-findings.mapper'
+import { describeHtml } from './html-findings.mapper'
+import type { HtmlFindings } from './html-findings.mapper'
 import { describeJson } from './json-findings.mapper'
 import type { JsonFindings } from './json-findings.mapper'
 import { describePdf } from './pdf-findings.mapper'
@@ -34,6 +36,8 @@ export interface ProbeResult {
   deck?:     DeckFindings
   /** Present when the URL is JSON, JSON Lines or YAML: its structure and record lists. */
   json?:     JsonFindings
+  /** Present for HTML: its tables' headers; for rendered Markdown also its outline and front matter. */
+  html?:     HtmlFindings
 }
 
 /**
@@ -63,7 +67,9 @@ export async function probeUrl (url: string, options: { browser: boolean } & Com
   })
   try {
     const target = /^[a-z][\w+.-]+:/i.test(url) ? url : pathToFileURL(resolve(url)).href
-    const response = await client.send({ url: target })
+    // GitHub raw and CDNs serve Markdown as text/plain: a .md URL is read as Markdown.
+    const markdown = /\.(?:md|markdown)$/i.test(new URL(target).pathname)
+    const response = await client.send({ url: target, ...(markdown && { as: 'markdown' as const }) })
     const { body } = response
     if (body.kind === 'pdf') return { url: response.url, status: response.status, findings: findData(''), observed: [], pdf: describePdf(body) }
     if (body.kind === 'workbook') return { url: response.url, status: response.status, findings: findData(''), observed: [], workbook: describeWorkbook(body) }
@@ -72,7 +78,9 @@ export async function probeUrl (url: string, options: { browser: boolean } & Com
     const text = body.kind === 'html' ? body.html : body.text
     const observed = options.browser && !target.startsWith('file:') ? await observeBrowserJson(url, options, lease) : []
 
-    return { url: response.url, status: response.status, findings: findData(text), observed }
+    const html = body.kind === 'html' ? { html: describeHtml(body.html, response.format === 'markdown') } : {}
+
+    return { url: response.url, status: response.status, findings: findData(text), observed, ...html }
   } finally {
     await client.dispose()
   }
@@ -127,5 +135,5 @@ function reportOf (result: ProbeResult): string {
   if (result.deck !== undefined) return deckReport(result.url, result.deck)
   if (result.json !== undefined) return jsonReport(result.url, result.json)
 
-  return probeReport(result.url, result.status, result.findings, result.observed)
+  return probeReport(result.url, result.status, result.findings, result.observed, result.html)
 }

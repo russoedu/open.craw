@@ -57,7 +57,9 @@ every likely table header with the `selector` a `table` extract needs. For a spr
 spreadsheet type or `text/csv`, or a local `.xlsx`, `.csv` or `.tsv` path) it adds
 `workbook: { csv?: { encoding, delimiter }, sheets, rows, headers }`. For a presentation it adds
 `deck: { width, height, slides, headers, charts, grids }`, and for JSON, JSON Lines or YAML
-`json: { format, type, tree, lists }`: the structure, and every list of records with its path.
+`json: { format, type, tree, lists }`: the structure, and every list of records with its path. An HTML page
+adds `html: { tables, outline?, frontMatter? }`: its tables' header rows, and for Markdown its sections and
+front matter keys.
 
 ### `validate`
 

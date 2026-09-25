@@ -67,7 +67,8 @@ A PDF, a spreadsheet, a CSV or a presentation (a URL served with its content typ
 rows, and every row that looks like a table header, with the `selector` a `table` extract needs. For a CSV it
 also names the encoding and the delimiter it detected; for a presentation, its charts and the slides whose
 text boxes look like a table. JSON, JSON Lines and YAML show their structure instead, and every list of
-records with the `jsonpath` that walks it.
+records with the `jsonpath` that walks it. An HTML page also lists its tables' header rows, and Markdown
+(a `.md` URL is read as Markdown even when served as `text/plain`) its sections and front matter keys.
 
 ```sh
 opencraw probe https://example.com/price-list.pdf

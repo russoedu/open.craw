@@ -15,6 +15,8 @@ module.exports = {
   testEnvironment: 'node',
   // pdf.js is an ES module Jest cannot load itself: see jest-pdfjs.cjs.
   moduleNameMapper: { '^pdfjs-dist/legacy/build/pdf\\.mjs$': '<rootDir>/jest-pdfjs.cjs' },
+  // marked ships as an ES module only: transform it like the sources.
+  transformIgnorePatterns: ['/node_modules/(?!marked/)'],
   // Spawn-driven tests live in e2e/ and run through `nx run cli:e2e`, never inside `test`.
   testPathIgnorePatterns: ['/node_modules/', '<rootDir>/e2e/', '\\.e2e\\.test\\.ts$'],
   transform: {

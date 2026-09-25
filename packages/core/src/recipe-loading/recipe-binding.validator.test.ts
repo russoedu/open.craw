@@ -95,9 +95,11 @@ describe('validateBinding', () => {
     expect(messages(declared)).toEqual([])
   })
 
-  it('refuses a table extract on a web page, but not from a PDF bound earlier', () => {
-    const onPage: InputRecipe = { ...web, steps: [{ type: 'extract', id: 't', selector: '^MODELS', kind: 'table' }, ...web.steps] }
-    expect(messages(onPage)[0]).toMatch(/steps\.0: a "table" extract reads a PDF/)
+  it('takes a table extract on a web page (its HTML tables), but not the options of PDFs, workbooks or decks', () => {
+    const onPage: InputRecipe = { ...web, steps: [{ type: 'extract', id: 't', selector: '^Model', kind: 'table', headerRows: 2 }, ...web.steps] }
+    expect(messages(onPage)).toEqual([])
+    const withShapes: InputRecipe = { ...web, steps: [{ type: 'extract', id: 't', selector: '^MODELS', kind: 'table', shapes: true, align: 'top' }, ...web.steps] }
+    expect(messages(withShapes)[0]).toMatch(/steps\.0: a "table" extract on a web page reads its HTML tables; "shapes", "align" belong to/)
     const fromBound: InputRecipe = { ...web, steps: [{ type: 'set', id: 'doc', value: '' }, { type: 'extract', id: 't', selector: '^MODELS', kind: 'table', from: 'doc' }, ...web.steps] }
     expect(messages(fromBound)).toEqual([])
   })

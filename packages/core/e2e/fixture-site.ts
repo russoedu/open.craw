@@ -14,6 +14,12 @@ export const FIXTURE_PORT = Number(process.env.OPENCRAW_FIXTURE_PORT ?? '4545')
 export const FIXTURE_BASE = `http://127.0.0.1:${FIXTURE_PORT}`
 
 /** A CMS export in YAML: anchors, merge keys, a 1.1-style `NO` that 1.2 keeps as text. */
+/** A spec page whose table merges a model's cells down its versions and a group header across its columns. */
+const SPECS_PAGE = `<!doctype html><html lang="en"><head><title>Specs</title></head><body><h1>Specs</h1>
+<table class="specs"><thead><tr><th rowspan="2">Model</th><th rowspan="2">Version</th><th colspan="2">Consumption</th></tr><tr><th>Urban</th><th>Mixed</th></tr></thead>
+<tbody><tr><td rowspan="2">Pandina</td><td>1.0 Hybrid</td><td>5,2</td><td>4,9</td></tr><tr><td>1.0 Hybrid Cross</td><td>5,4</td><td>5,1</td></tr>
+<tr><td>600e</td><td>La Prima</td><td>0</td><td>0</td></tr></tbody></table></body></html>`
+
 const CATALOGUE_YAML = `defaults: &defaults
   brand: Fiat
   currency: EUR
@@ -186,6 +192,14 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
 
     return
   }
+  if (url.pathname === '/listino.md') {
+    // Served as GitHub raw serves it: text/plain.
+    outgoing.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' })
+    outgoing.end(readFileSync(join(__dirname, '..', 'src', 'markdown-document', 'fixtures', 'listino.md')))
+
+    return
+  }
+  if (url.pathname === '/specs') return html(SPECS_PAGE)
   if (url.pathname === '/discounts.pdf') {
     outgoing.writeHead(200, { 'content-type': 'application/pdf' })
     outgoing.end(readFileSync(join(__dirname, '..', 'src', 'pdf-document', 'fixtures', 'discounts.pdf')))

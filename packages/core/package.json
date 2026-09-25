@@ -24,6 +24,7 @@
     "cheerio": "^1.2.0",
     "domhandler": "^6.0.1",
     "jsonpath-plus": "^10.4.0",
+    "marked": "^18.0.14",
     "pdfjs-dist": "^6.3.289",
     "playwright": "^1.63.0",
     "yaml": "^2.9.1",

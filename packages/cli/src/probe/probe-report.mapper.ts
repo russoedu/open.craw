@@ -1,5 +1,6 @@
 import type { ProbeFindings } from './find-data.algorithm'
 import type { DeckFindings } from './deck-findings.mapper'
+import type { HtmlFindings } from './html-findings.mapper'
 import type { JsonFindings } from './json-findings.mapper'
 import type { PdfFindings } from './pdf-findings.mapper'
 import type { WorkbookFindings } from './workbook-findings.mapper'
@@ -11,10 +12,14 @@ import type { WorkbookFindings } from './workbook-findings.mapper'
  * @param status - The HTTP status.
  * @param findings - What `findData` found.
  * @param observed - JSON responses a browser saw, when `--browser` was used.
+ * @param html - The tables (and, for Markdown, the outline and front matter) found.
  * @returns The report.
  */
-export function probeReport (url: string, status: number, findings: ProbeFindings, observed: string[] = []): string {
+export function probeReport (url: string, status: number, findings: ProbeFindings, observed: string[] = [], html?: HtmlFindings): string {
   const sections = [
+    section('Markdown front matter (in script[data-front-matter])', html?.frontMatter === undefined || html.frontMatter.length === 0 ? [] : [`  keys: ${html.frontMatter.join(', ')}`]),
+    section('Markdown sections (a "css" selector for each)', (html?.outline ?? []).map(entry => `  ${'  '.repeat(entry.level - 1)}${entry.selector}`)),
+    section('HTML tables (a "table" extract selector for each)', (html?.tables ?? []).map(table => `  ${table.table}  ${table.selector}${table.hint === undefined ? '' : `  (${table.hint})`}\n        ${table.text}`)),
     section('JSON-LD blocks', findings.jsonLd.map(block => `  type=${block.types}, ${block.keys} keys`)),
     section('Inline JSON (candidates)', findings.inlineJson.map(block => `  ${block.where}, ${block.size} chars, keys: ${block.keys.slice(0, 8).join(', ')}`)),
     section('.json URLs referenced', findings.jsonUrls.map(url_ => `  ${url_}`)),

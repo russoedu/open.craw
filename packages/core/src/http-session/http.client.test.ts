@@ -89,6 +89,12 @@ beforeAll(async () => {
 
         break
       }
+      case '/readme': {
+        outgoing.setHeader('content-type', 'text/markdown; charset=utf-8')
+        outgoing.end('# Hi\n\n| a | b |\n|---|---|\n| 1 | 2 |\n')
+
+        break
+      }
       case '/latin': {
         outgoing.setHeader('content-type', 'text/plain; charset=ISO-8859-1')
         outgoing.end(Buffer.from([0x43, 0xE9]))
@@ -242,6 +248,21 @@ describe('HttpClient', () => {
       await writeFile(join(directory, 'rows.ndjson'), '[1]\n[2]\n')
       const local = await client.send({ url: pathToFileURL(join(directory, 'rows.ndjson')).href })
       expect(local.body).toEqual({ kind: 'json', data: [[1], [2]] })
+    } finally {
+      await client.dispose()
+    }
+  })
+
+  it('renders Markdown by content type, as, or extension into sectioned HTML', async () => {
+    const client = await HttpClient.open()
+    try {
+      const served = await client.send({ url: `${base}/readme` })
+      expect(served.format).toBe('markdown')
+      expect(served.body.kind === 'html' && served.body.html).toContain('<section data-heading="Hi" data-level="1"><h1 id="hi">Hi</h1>')
+      const plain = await client.send({ url: `${base}/page`, as: 'markdown' })
+      expect(plain.body.kind).toBe('html')
+      const local = await client.send({ url: pathToFileURL(join(__dirname, '..', 'markdown-document', 'fixtures', 'listino.md')).href })
+      expect(local.body.kind === 'html' && local.body.html).toContain('data-front-matter')
     } finally {
       await client.dispose()
     }

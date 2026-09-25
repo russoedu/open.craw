@@ -4,4 +4,5 @@ export { parseCsv, detectDelimiter, CSV_DELIMITERS } from './csv-parser.algorith
 export { csvWorkbook, sheetNameOf } from './csv-workbook.mapper'
 export { readXlsxWorkbook } from './read-xlsx.client'
 export { findGridTables, fillDown } from './grid-table.algorithm'
+export { htmlTableSheets } from './html-tables.mapper'
 export type { GridTable, GridTableQuery } from './grid-table.algorithm'

@@ -90,7 +90,7 @@ optional `when` template that must render truthy for the step to run.
 | `wait` | web | – | one of `selector`, `ms`, `state: 'networkidle'` |
 | `evaluate` | web | value | `script`, JavaScript run in the page. Trusted recipes only. |
 | `screenshot` | web | – | `path` |
-| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'jsonl' \| 'html' \| 'text' \| 'pdf' \| 'csv' \| 'xlsx' \| 'pptx' \| 'yaml'`, `encoding?`, `delimiter?` (CSV), `scalars?` (YAML) |
+| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'jsonl' \| 'html' \| 'text' \| 'pdf' \| 'csv' \| 'xlsx' \| 'pptx' \| 'yaml' \| 'markdown'`, `encoding?`, `delimiter?` (CSV), `scalars?` (YAML) |
 | `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex' \| 'table'`, `take`, `many?`, `from?`; `table` also `columns?`, `until?`, `align?` (PDF), `fillDown?`, `sheet?`, `headerRows?`, `includeHidden?` (workbook), `slide?`, `shapes?` (deck) |
 | `set` | both | value | `value` (template or literal) |
 | `collect` | both | – | `into` (a list id bound in an enclosing scope), `value` (template or literal); appends, so values outlive the `forEach` iteration or `paginate` page that found them |
@@ -139,6 +139,13 @@ extract parses — is read as it is, and only when that fails, unwrapped from co
 prefix (`)]}'`, `while(1);`, `for(;;);`), a JSONP call or a script assignment; the rest must be strict JSON.
 `probe` on JSON, JSON Lines or YAML shows the structure (four levels, a sample per leaf) and every array of
 objects with its path and shared keys.
+
+Markdown (`as: 'markdown'`, `text/markdown`, `.md`) is rendered with `marked` (GFM) into an HTML document:
+each heading and its content wrapped in `<section data-heading data-level>` (nesting by level), headings
+slugged, a leading YAML front matter parsed (YAML 1.2) into `<script type="application/json"
+data-front-matter>` in the head, raw HTML kept (parsed, never run). `table` reads an HTML document's
+`<table>`s (fetched, rendered Markdown, or the live page in web mode) as grids — rows in order, `th`/`td`
+alike, `colspan`/`rowspan` as merged ranges, nested tables on their own — through the grid table reader.
 
 `take` is `text` (default), `html`, `value`, `json` or `attr:<name>`. `xpath` works on live pages only; on
 fetched HTML use `css`; on JSON use `jsonpath`. A `jsonpath` extract whose `from` is text parses it as JSON; a list of

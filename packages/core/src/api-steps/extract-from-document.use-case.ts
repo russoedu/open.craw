@@ -2,7 +2,7 @@ import { deckText, findDeckTables, isDeckDocument } from '../deck-document'
 import type { ExtractionScope, ScopeDocument } from '../extraction-scope'
 import { findTables, isPdfDocument, pdfText } from '../pdf-document'
 import type { TableQuery } from '../pdf-document'
-import { fillDown, findGridTables, isWorkbookDocument, workbookText } from '../workbook-document'
+import { fillDown, findGridTables, htmlTableSheets, isWorkbookDocument, workbookText } from '../workbook-document'
 import type { ExtractStep } from '../recipe-schema'
 import { parseJsonText, selectHtml, selectJson, selectRegex, takeFromHtml, takeFromJson, tryParseJson } from '../selection'
 import { hasPlaceholder, renderText } from '../template'
@@ -12,9 +12,9 @@ import { NoMatchError } from '../step-flow'
  * Runs an `extract` step against a static document: the value bound under
  * `from`, else the scope's current document. `css` reads HTML, `jsonpath`
  * reads JSON (or a read PDF, workbook or deck as data), `table` reads the
- * tables of a PDF, a workbook (a spreadsheet, a CSV) or a deck (a
- * presentation), `regex` reads any document as text; `xpath` needs a live page
- * and is refused here.
+ * tables of a PDF, a workbook (a spreadsheet, a CSV), a deck (a presentation)
+ * or HTML (its `<table>`s), `regex` reads any document as text; `xpath` needs
+ * a live page and is refused here.
  *
  * A `jsonpath` extract whose `from` is text parses that text as JSON, and a
  * list of texts (every `<script type="application/ld+json">` of a page) becomes
@@ -78,9 +78,27 @@ export function renderSelector (selector: string, scope: ExtractionScope): strin
   return hasPlaceholder(selector) ? renderText(selector, path => scope.lookup(path)) : selector
 }
 
-/** The tables a `table` extract finds in a PDF, a workbook or a deck. */
+/**
+ * The tables a `table` extract finds in a document: a PDF's, a workbook's, a
+ * deck's, or an HTML document's `<table>`s (a fetched page, rendered Markdown,
+ * a live page's content).
+ *
+ * @param document - The document.
+ * @param step - The extract step.
+ * @param scope - Where its selector renders.
+ * @returns The tables.
+ */
+export function tablesIn (document: ScopeDocument, step: ExtractStep, scope: ExtractionScope): unknown[] {
+  return readTables(document, step, renderSelector(step.selector, scope))
+}
+
 function readTables (document: ScopeDocument, step: ExtractStep, selector: string): unknown[] {
   const query = tableQuery(step, selector)
+  if (document.kind === 'html') {
+    refuseOptions(step, ['sheet', 'slide', 'shapes'], 'workbooks and decks', 'HTML')
+
+    return findGridTables({ kind: 'workbook', sheets: htmlTableSheets(document.html) }, { ...query, headerRows: step.headerRows, fillDown: step.fillDown })
+  }
   if (document.kind === 'workbook') {
     refuseOptions(step, ['slide', 'shapes'], 'decks (presentations)', 'a workbook')
 
@@ -91,7 +109,7 @@ function readTables (document: ScopeDocument, step: ExtractStep, selector: strin
 
     return findDeckTables(document, { ...query, slide: optionalPattern(step.slide, 'slide'), shapes: step.shapes, headerRows: step.headerRows, fillDown: step.fillDown, includeHidden: step.includeHidden })
   }
-  if (document.kind !== 'pdf') throw new Error(`table reads a PDF, a workbook (a spreadsheet, a CSV) or a deck (a presentation); the current document is ${document.kind} (request it with "as": "pdf", "csv", "xlsx" or "pptx")`)
+  if (document.kind !== 'pdf') throw new Error(`table reads a PDF, a workbook (a spreadsheet, a CSV), a deck (a presentation) or HTML tables; the current document is ${document.kind} (request it with "as": "pdf", "csv", "xlsx", "pptx" or "html")`)
   refuseOptions(step, ['sheet', 'headerRows', 'includeHidden', 'slide', 'shapes'], 'workbooks and decks', 'a PDF')
   const tables = findTables(document, query)
 

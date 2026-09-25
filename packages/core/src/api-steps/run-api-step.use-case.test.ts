@@ -280,7 +280,7 @@ describe('ApiStepRunner', () => {
 
   it('refuses a table extract on a document that is not a PDF or a workbook, and workbook options on a PDF', async () => {
     const wrong: InputRecipe = { ...recipe, steps: [{ type: 'request', id: 'list', url: '{{start.url}}', as: 'json' }, { type: 'extract', id: 't', selector: 'x', kind: 'table' }] }
-    await expect(crawl(wrong, fakeSender())).rejects.toThrow(/table reads a PDF, a workbook \(a spreadsheet, a CSV\) or a deck \(a presentation\); the current document is json/)
+    await expect(crawl(wrong, fakeSender())).rejects.toThrow(/table reads a PDF, a workbook \(a spreadsheet, a CSV\), a deck \(a presentation\) or HTML tables; the current document is json/)
     const bytes = readFileSync(join(__dirname, '..', 'pdf-document', 'fixtures', 'discounts.pdf'))
     const pdf = await readPdf(new Uint8Array(bytes))
     const sender: HttpSender = { send: async request => ({ status: 200, url: request.url, headers: {}, body: pdf }) }
