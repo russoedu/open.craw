@@ -1,0 +1,5 @@
+export { readXlsx } from './read-xlsx.use-case'
+export type { ReadXlsxOptions } from './read-xlsx.use-case'
+export type { CellValue, Sheet, Workbook, ValueMode, SheetFilter } from './workbook.model'
+export { OfficeReadError } from '../read-error'
+export type { OfficeReadErrorCode } from '../read-error'

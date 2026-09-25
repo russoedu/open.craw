@@ -109,6 +109,20 @@
         "script": "mcp:build",
         "problemMatcher": [],
         "group": "build"
+      },
+      {
+        "label": "office-reader: qa",
+        "type": "npm",
+        "script": "office-reader:qa",
+        "problemMatcher": [],
+        "group": "qa"
+      },
+      {
+        "label": "office-reader: build",
+        "type": "npm",
+        "script": "office-reader:build",
+        "problemMatcher": [],
+        "group": "build"
       }
     ]
   },

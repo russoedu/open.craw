@@ -1,0 +1,6 @@
+export { readXlsx } from './spreadsheet'
+export type { ReadXlsxOptions, CellValue, Sheet, Workbook, ValueMode, SheetFilter } from './spreadsheet'
+export { OfficeReadError } from './read-error'
+export type { OfficeReadErrorCode } from './read-error'
+export type { OfficeSource } from './source-bytes'
+export type { PackageLimits } from './ooxml-package'

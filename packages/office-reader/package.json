@@ -1,0 +1,72 @@
+{
+  "name": "@opencraw/office-reader",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/index.esm.js",
+  "module": "./dist/index.esm.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "default": "./dist/index.esm.js"
+    },
+    "./xlsx": {
+      "types": "./dist/src/spreadsheet/index.d.ts",
+      "import": "./dist/xlsx.esm.js",
+      "default": "./dist/xlsx.esm.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!**/*.tsbuildinfo",
+    "!**/*.d.ts.map",
+    "!**/*.js.map"
+  ],
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "htmlparser2": "^10.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "Reads Office files (.xlsx workbooks, .pptx presentations) into plain objects: cells with merged ranges and hidden rows, slides with positioned text, tables and chart data. No Node built-ins beyond reading a path: runs in Node, browsers, workers and edge runtimes.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/russoedu/open.craw.git",
+    "directory": "packages/office-reader"
+  },
+  "keywords": [
+    "xlsx",
+    "excel",
+    "spreadsheet",
+    "pptx",
+    "powerpoint",
+    "presentation",
+    "office",
+    "ooxml",
+    "reader",
+    "parser",
+    "json"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "nx": {
+    "targets": {
+      "e2e": {
+        "executor": "nx:run-commands",
+        "dependsOn": [
+          "build"
+        ],
+        "options": {
+          "command": "tsc -p tsconfig.e2e.json && jest --config jest.e2e.config.cts",
+          "cwd": "packages/office-reader"
+        }
+      }
+    }
+  }
+}
