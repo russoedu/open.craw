@@ -33,6 +33,7 @@ describe('traceLine', () => {
     expect(traceLine({ type: 'record:reject', at, recipeId: 'r', url: 'https://x/p', field: 'title', reason: 'missing' })).toBe('  ✖ record rejected: title: missing')
     expect(traceLine({ type: 'recipe:finish', at, recipeId: 'tmdb', emitted: 10, rejected: 0, duplicates: 0, skipped: 0, pages: 2, durationMs: 3006 })).toBe('■ tmdb: 10 emitted, 0 rejected, 0 duplicates, 2 pages, 3006 ms')
     expect(traceLine({ type: 'recipe:finish', at, recipeId: 'tmdb', emitted: 0, rejected: 0, duplicates: 0, skipped: 10, pages: 2, durationMs: 12 })).toBe('■ tmdb: 0 emitted, 0 rejected, 0 duplicates, 10 skipped, 2 pages, 12 ms')
+    expect(traceLine({ type: 'recipe:finish', at, recipeId: 'it', emitted: 9, rejected: 0, duplicates: 0, skipped: 0, stepsSkipped: 1, pages: 8, durationMs: 12 })).toBe('■ it: 9 emitted, 0 rejected, 0 duplicates, 1 steps skipped, 8 pages, 12 ms')
     expect(traceLine({ type: 'record:skipped', at, recipeId: 'tmdb', url: 'u', key: '["u"]' })).toBe('  ⤼ skipped ["u"]')
     expect(traceLine({ type: 'recipe:finish', at, recipeId: 'imdb', emitted: 0, rejected: 0, duplicates: 0, skipped: 0, pages: 1, durationMs: 9, error: 'step steps.1 (wait) failed' })).toContain('✖ stopped: step steps.1 (wait) failed')
   })

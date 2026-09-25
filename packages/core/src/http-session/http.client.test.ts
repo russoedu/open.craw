@@ -1,6 +1,11 @@
+import { readFileSync } from 'node:fs'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import type { Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { HttpClient } from './http.client'
 import { HttpError } from './http-response.contract'
 
@@ -33,6 +38,12 @@ beforeAll(async () => {
       case '/page': {
         outgoing.setHeader('content-type', 'text/html')
         outgoing.end('<html lang="en"><body><h1>Hi</h1></body></html>')
+
+        break
+      }
+      case '/discounts': {
+        outgoing.setHeader('content-type', 'application/pdf')
+        outgoing.end(readFileSync(join(__dirname, '..', 'pdf-document', 'fixtures', 'discounts.pdf')))
 
         break
       }
@@ -100,6 +111,29 @@ describe('HttpClient', () => {
       await expect(client.send({ url: `${base}/page`, as: 'json' })).rejects.toThrow(/not JSON/)
       const missing = client.send({ url: `${base}/missing` })
       await expect(missing).rejects.toThrow('HTTP 404')
+    } finally {
+      await client.dispose()
+    }
+  })
+
+  it('reads a PDF by content type, and local files by extension', async () => {
+    const client = await HttpClient.open()
+    try {
+      const pdf = await client.send({ url: `${base}/discounts` })
+      expect(pdf.body.kind).toBe('pdf')
+      expect(pdf.body).toMatchObject({ kind: 'pdf', pages: [{ number: 1 }, { number: 2 }] })
+      const pdfPath = join(__dirname, '..', 'pdf-document', 'fixtures', 'discounts.pdf')
+      const local = await client.send({ url: pathToFileURL(pdfPath).href })
+      expect(local).toMatchObject({ status: 200, body: { kind: 'pdf' } })
+      const directory = await mkdtemp(join(tmpdir(), 'http-client-'))
+      const jsonUrl = pathToFileURL(join(directory, 'data.json')).href
+      await writeFile(join(directory, 'data.json'), '{"a":1}')
+      const json = await client.send({ url: jsonUrl })
+      expect(json.body).toEqual({ kind: 'json', data: { a: 1 } })
+      const text = await client.send({ url: jsonUrl, as: 'text' })
+      expect(text.body).toEqual({ kind: 'text', text: '{"a":1}' })
+      const missing = pathToFileURL(join(directory, 'missing.pdf')).href
+      await expect(client.send({ url: missing })).rejects.toThrow(/ENOENT/)
     } finally {
       await client.dispose()
     }

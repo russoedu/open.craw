@@ -1240,7 +1240,8 @@
               "enum": [
                 "json",
                 "html",
-                "text"
+                "text",
+                "pdf"
               ]
             }
           },
@@ -1328,7 +1329,8 @@
                 "css",
                 "xpath",
                 "jsonpath",
-                "regex"
+                "regex",
+                "table"
               ]
             },
             "take": {
@@ -1354,6 +1356,28 @@
             "from": {
               "type": "string",
               "pattern": "^[A-Z_]\\w*$"
+            },
+            "columns": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "until": {
+              "type": "string",
+              "minLength": 1
+            },
+            "align": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "top",
+                "center",
+                "bottom"
+              ]
             }
           },
           "required": [

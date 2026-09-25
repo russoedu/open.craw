@@ -1,3 +1,4 @@
+import type { PdfDocument } from '../pdf-document'
 import type { BodyKind, HttpMethod } from '../recipe-schema'
 
 /** One HTTP request as the api runner sends it, templates already rendered. */
@@ -14,9 +15,7 @@ export interface HttpRequest {
 
 /** A parsed response body. Structurally the same as a scope document, on purpose. */
 export type HttpBody =
-  | { kind: 'json', data: unknown } |
-  { kind: 'html', html: string } |
-  { kind: 'text', text: string }
+  PdfDocument | { kind: 'json', data: unknown } | { kind: 'html', html: string } | { kind: 'text', text: string }
 
 export interface HttpResponse {
   status:  number

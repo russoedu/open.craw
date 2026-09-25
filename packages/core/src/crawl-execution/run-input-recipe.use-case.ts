@@ -51,7 +51,7 @@ export interface RecipeRunDependencies {
  */
 export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, deps: RecipeRunDependencies): Promise<RecipeReport> {
   const started = Date.now()
-  const report: RecipeReport = { recipeId: input.id, mode: input.mode, emitted: 0, rejected: 0, duplicates: 0, skipped: 0, pages: 0, durationMs: 0 }
+  const report: RecipeReport = { recipeId: input.id, mode: input.mode, emitted: 0, rejected: 0, duplicates: 0, skipped: 0, stepsSkipped: 0, pages: 0, durationMs: 0 }
   const limits = input.limits ?? {}
   // A web recipe drives one page, so only api mode runs iterations in parallel.
   const gate = new RunGate(input.mode === 'web' ? 1 : (limits.concurrency ?? 1), limits.delayMs ?? 0)
@@ -59,6 +59,7 @@ export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, 
   let chain: Promise<unknown> = Promise.resolve()
   const unsubscribe = deps.events.subscribe((event) => {
     if (event.type === 'page:visit' && event.recipeId === input.id) report.pages += 1
+    if (event.type === 'step:skip' && event.recipeId === input.id) report.stepsSkipped += 1
   })
   deps.events.emit({ type: 'recipe:start', recipeId: input.id, mode: input.mode })
   deps.dedupe.startRecipe()
@@ -93,7 +94,7 @@ export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, 
     await runner?.dispose()
     unsubscribe()
     report.durationMs = Date.now() - started
-    deps.events.emit({ type: 'recipe:finish', recipeId: input.id, emitted: report.emitted, rejected: report.rejected, duplicates: report.duplicates, skipped: report.skipped, pages: report.pages, durationMs: report.durationMs, error: report.error })
+    deps.events.emit({ type: 'recipe:finish', recipeId: input.id, emitted: report.emitted, rejected: report.rejected, duplicates: report.duplicates, skipped: report.skipped, stepsSkipped: report.stepsSkipped, pages: report.pages, durationMs: report.durationMs, error: report.error })
   }
 
   return report
