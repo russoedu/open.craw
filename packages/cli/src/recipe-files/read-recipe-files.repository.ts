@@ -1,58 +1,33 @@
-import { readdir, readFile, stat } from 'node:fs/promises'
-import { extname, join, resolve } from 'node:path'
+import { readRecipeSource } from '@open.craw/core'
+import type { RecipeSource } from '@open.craw/core'
 
-/** Decoded recipe files, split by their `kind`. */
+/** Decoded recipes, split by their `kind`. */
 export interface RecipeFiles {
+  /** `path` is the file, `path:line` in a JSON Lines file, or a label (`recipes[0]`) for one from memory. */
   outputs: { path: string, recipe: unknown }[]
   inputs:  { path: string, recipe: unknown }[]
-  /** JSON files that are neither; listed so a typo in `kind` does not pass silently. */
+  /** Documents that are neither; listed so a typo in `kind` does not pass silently. */
   others:  string[]
 }
 
 /**
- * Reads recipe files, expanding directories to their `.json` files (sorted, not
- * recursive), and sorts them by `kind`.
+ * Reads recipes, expanding directories to their `.json` and `.jsonl` files
+ * (sorted, not recursive), and sorts them by `kind`. The command line passes
+ * paths; the MCP server also passes recipes it was handed inline.
  *
- * @param paths - Files or directories.
- * @returns The decoded files.
- * @throws Error naming a file that is not JSON.
+ * @param sources - Files or directories, or any other recipe source core reads.
+ * @returns The decoded recipes.
+ * @throws Error naming a file that is not JSON or JSON Lines.
  */
-export async function readRecipeFiles (paths: readonly string[]): Promise<RecipeFiles> {
-  const files = await expand(paths)
+export async function readRecipeFiles (sources: RecipeSource): Promise<RecipeFiles> {
   const result: RecipeFiles = { outputs: [], inputs: [], others: [] }
-  for (const path of files) {
-    const recipe = await readJson(path)
-    const kind = (recipe as { kind?: unknown } | null)?.kind
-    if (kind === 'output') result.outputs.push({ path, recipe })
-    else if (kind === 'input') result.inputs.push({ path, recipe })
-    else result.others.push(path)
+  const documents = await readRecipeSource(sources)
+  for (const document of documents) {
+    const kind = (document.content as { kind?: unknown } | null)?.kind
+    if (kind === 'output') result.outputs.push({ path: document.source, recipe: document.content })
+    else if (kind === 'input') result.inputs.push({ path: document.source, recipe: document.content })
+    else result.others.push(document.source)
   }
 
   return result
-}
-
-async function expand (paths: readonly string[]): Promise<string[]> {
-  const files: string[] = []
-  for (const path of paths) {
-    const target = resolve(path)
-    const info = await stat(target)
-    if (info.isDirectory()) {
-      const entries = await readdir(target)
-      const names = entries.filter(name => extname(name) === '.json').sort((a, b) => a.localeCompare(b))
-      files.push(...names.map(name => join(target, name)))
-    } else {
-      files.push(target)
-    }
-  }
-
-  return files
-}
-
-async function readJson (path: string): Promise<unknown> {
-  const text = await readFile(path, 'utf8')
-  try {
-    return JSON.parse(text) as unknown
-  } catch (error) {
-    throw new Error(`${path}: not JSON (${(error as Error).message})`, { cause: error })
-  }
 }

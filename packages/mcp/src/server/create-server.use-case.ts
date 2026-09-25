@@ -24,12 +24,12 @@ export function createServer (): McpServer {
   )
   server.registerTool(
     'validate',
-    { description: 'Load and bind recipe files (an output recipe plus its input recipes): parse each against its schema, check every mapping resolves, report every problem with its JSON path.', inputSchema: validateInputShape },
+    { description: 'Load and bind recipes (an output recipe plus its input recipes), from files or passed inline: parse each against its schema, check every mapping resolves, report every problem with its JSON path.', inputSchema: validateInputShape },
     args => validateTool(args),
   )
   server.registerTool(
     'run',
-    { description: 'Crawl the recipes at the given paths. Use dryRun to check a recipe under construction (one record per input, returned inline); use "out" for anything beyond a handful of records.', inputSchema: runInputShape },
+    { description: 'Crawl the recipes at the given paths, or passed inline as "recipes". Use dryRun to check a recipe under construction (one record per input, returned inline); use "out" for anything beyond a handful of records.', inputSchema: runInputShape },
     args => runTool(args),
   )
   server.registerTool(

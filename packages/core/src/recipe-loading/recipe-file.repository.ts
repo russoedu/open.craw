@@ -1,38 +1,29 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { extname, join, resolve } from 'node:path'
+import type { RecipeDocument } from './recipe-source.contract'
+import { parseRecipeText } from './recipe-text.mapper'
 
-/** A decoded recipe file, before validation. */
-export interface RecipeFile {
-  path:    string
-  content: unknown
-}
+const RECIPE_EXTENSIONS = new Set(['.json', '.jsonl'])
 
 /**
- * Reads one `.json` file, or every `.json` file directly inside a directory.
+ * Reads one recipe file, or every `.json` and `.jsonl` file directly inside a
+ * directory. A file holds one recipe, an array of them, or JSON Lines.
  *
  * @param location - A file or directory path.
- * @returns The decoded files, sorted by path.
- * @throws When a file is not valid JSON.
+ * @returns The decoded recipes, files sorted by path.
+ * @throws When the path does not exist or a file is neither JSON nor JSON Lines.
  */
-export async function readRecipeFiles (location: string): Promise<RecipeFile[]> {
+export async function readRecipeFiles (location: string): Promise<RecipeDocument[]> {
   const absolute = resolve(location)
   const info = await stat(absolute)
-  const paths = info.isDirectory() ? await jsonFilesIn(absolute) : [absolute]
+  const paths = info.isDirectory() ? await recipeFilesIn(absolute) : [absolute]
+  const files = await Promise.all(paths.map(async path => parseRecipeText(await readFile(path, 'utf8'), path)))
 
-  return Promise.all(paths.map(async path => ({ path, content: await readJson(path) })))
+  return files.flat()
 }
 
-async function jsonFilesIn (directory: string): Promise<string[]> {
+async function recipeFilesIn (directory: string): Promise<string[]> {
   const names = await readdir(directory)
 
-  return names.filter(name => name.endsWith('.json')).sort((a, b) => a.localeCompare(b)).map(name => join(directory, name))
-}
-
-async function readJson (path: string): Promise<unknown> {
-  const text = await readFile(path, 'utf8')
-  try {
-    return JSON.parse(text)
-  } catch (error) {
-    throw new Error(`${path}: not valid JSON (${(error as Error).message})`, { cause: error })
-  }
+  return names.filter(name => RECIPE_EXTENSIONS.has(extname(name))).sort((a, b) => a.localeCompare(b)).map(name => join(directory, name))
 }

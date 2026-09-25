@@ -15,7 +15,7 @@ describe('readRecipeFiles', () => {
   it('reads single files and names one that is not JSON', async () => {
     const files = await readRecipeFiles([join(fixtures, 'one.input.json')])
     expect(files.inputs).toHaveLength(1)
-    await expect(readRecipeFiles([join(__dirname, 'index.ts')])).rejects.toThrow(/not JSON/)
+    await expect(readRecipeFiles([join(__dirname, 'index.ts')])).rejects.toThrow(/not valid JSON/)
     await expect(readRecipeFiles([join(fixtures, 'missing.json')])).rejects.toThrow()
   })
 })

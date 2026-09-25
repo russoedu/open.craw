@@ -1,6 +1,7 @@
 import type { Server } from 'node:http'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { startFixtureSite, stopFixtureSite } from '../../core/e2e/fixture-site'
 
@@ -30,6 +31,11 @@ function textOf (result: Awaited<ReturnType<Client['callTool']>>): unknown {
   const content = result.content as { type: string, text?: string }[]
 
   return JSON.parse(content[0].text ?? '{}')
+}
+
+/** A recipe file as one line of JSON Lines. */
+function oneLine (path: string): string {
+  return JSON.stringify(JSON.parse(readFileSync(path, 'utf8')))
 }
 
 describe('open-craw mcp server', () => {
@@ -64,5 +70,13 @@ describe('open-craw mcp server', () => {
     const body = textOf(result) as { report: { recipes: { recipeId: string, emitted: number }[] }, records?: unknown[] }
     expect(body.report.recipes).toEqual([expect.objectContaining({ recipeId: 'shop-web', emitted: 1 })])
     expect(body.records).toHaveLength(1)
+  }, 30000)
+
+  it('run: takes the recipes inline as JSON Lines, for a host that cannot write files', async () => {
+    const jsonLines = ['product.output.json', 'shop-web.input.json'].map(name => oneLine(join(recipesDir, name))).join('\n')
+    const result = await client.callTool({ name: 'run', arguments: { recipes: jsonLines, dryRun: true } })
+    expect(result.isError).toBeFalsy()
+    const body = textOf(result) as { report: { recipes: { recipeId: string, emitted: number }[] }, records?: unknown[] }
+    expect(body.report.recipes).toEqual([expect.objectContaining({ recipeId: 'shop-web', emitted: 1 })])
   }, 30000)
 })

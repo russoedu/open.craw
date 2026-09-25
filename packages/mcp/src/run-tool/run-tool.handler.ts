@@ -3,12 +3,14 @@ import { RecipeBindingError, RecipeSet, RecipeValidationError, createCrawler, js
 import type { CrawlReport } from '@open.craw/core'
 import { loadForRun, resolveAccess } from '@open.craw/cli'
 import { z } from 'zod'
+import { recipeSourceOf, recipeSourceShape } from '../recipe-source'
+import type { RecipeSourceArgs } from '../recipe-source'
 
 const RECORD_CAP = 50
 
 /** Input schema for the `run` tool. */
 export const runInputShape = {
-  paths:       z.array(z.string()).min(1).describe('Recipe files or directories: exactly one output recipe, any number of input recipes.'),
+  ...recipeSourceShape,
   out:         z.string().optional().describe('Write records to this JSON Lines file instead of returning them inline. Use for a crawl expected to produce more than a handful of records.'),
   append:      z.boolean().optional().describe('Keep what "out" holds and add to it; each line carries _key. Needs "out".'),
   resume:      z.boolean().optional().describe('Skip records "out" already has. Needs "append".'),
@@ -21,8 +23,7 @@ export const runInputShape = {
   access:      z.string().optional().describe('An access profile (a proxy) from the server\'s access config file, OPEN_CRAW_ACCESS, used by every recipe that names none. The error for an unknown name lists the profiles.'),
 }
 
-interface RunArgs {
-  paths:        string[],
+interface RunArgs extends RecipeSourceArgs {
   out?:         string,
   append?:      boolean,
   resume?:      boolean,
@@ -44,7 +45,8 @@ export interface RunResult {
 }
 
 /**
- * The `run` tool: crawls the recipes at `paths` and returns what happened,
+ * The `run` tool: crawls the recipes in `paths` or `recipes` (exactly one
+ * output recipe, any number of inputs) and returns what happened,
  * structured, instead of the cli's printed summary.
  *
  * @param args - The tool's parsed input.
@@ -53,7 +55,7 @@ export interface RunResult {
 export async function runTool (args: RunArgs): Promise<CallToolResult> {
   let set: RecipeSet
   try {
-    set = await loadForRun(args.paths, args.only ?? [])
+    set = await loadForRun(recipeSourceOf(args), args.only ?? [])
   } catch (error) {
     return { content: [{ type: 'text', text: loadErrorText(error) }], isError: true }
   }

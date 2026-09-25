@@ -1,17 +1,16 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { RecipeBindingError, RecipeValidationError, bindRecipeSet, parseInputRecipe, parseOutputRecipe } from '@open.craw/core'
 import { readRecipeFiles } from '@open.craw/cli'
-import { z } from 'zod'
+import { recipeSourceOf, recipeSourceShape } from '../recipe-source'
+import type { RecipeSourceArgs } from '../recipe-source'
 
 /** Input schema for the `validate` tool. */
-export const validateInputShape = {
-  paths: z.array(z.string()).min(1).describe('Recipe files or directories (every .json file in a directory is read).'),
-}
+export const validateInputShape = recipeSourceShape
 
 interface Issue {
   path:    string
   message: string
-  /** The file, or the recipe id when the issue came from binding rather than a single file. */
+  /** The file (`path:line` in JSON Lines), `recipes[i]` / `recipes:line` for inline recipes, or the recipe id when the issue came from binding. */
   source:  string
 }
 
@@ -24,15 +23,20 @@ export interface ValidateResult {
 }
 
 /**
- * The `validate` tool: loads and binds recipe files, returning every problem
+ * The `validate` tool: loads and binds recipes, returning every problem
  * with its JSON path instead of a printed report, so an agent authoring a
  * recipe can check it without a round trip through a terminal.
  *
  * @param args - The tool's parsed input.
  * @returns The MCP tool result.
  */
-export async function validateTool (args: { paths: string[] }): Promise<CallToolResult> {
-  const files = await readRecipeFiles(args.paths)
+export async function validateTool (args: RecipeSourceArgs): Promise<CallToolResult> {
+  let files: Awaited<ReturnType<typeof readRecipeFiles>>
+  try {
+    files = await readRecipeFiles(recipeSourceOf(args))
+  } catch (error) {
+    return reply({ ok: false, inputs: [], issues: issuesOf(error, '') })
+  }
   const issues: Issue[] = files.others.map(path => ({ path: '', message: '"kind" is missing or not "input"/"output"', source: path }))
   if (files.outputs.length === 0) issues.push({ path: '', message: 'no output recipe found', source: '' })
   if (files.outputs.length > 1) issues.push({ path: '', message: `more than one output recipe: ${files.outputs.map(file => file.path).join(', ')}`, source: '' })
@@ -65,6 +69,10 @@ export async function validateTool (args: { paths: string[] }): Promise<CallTool
   }
   result.ok = issues.length === 0
 
+  return reply(result)
+}
+
+function reply (result: ValidateResult): CallToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result as unknown as Record<string, unknown> }
 }
 
