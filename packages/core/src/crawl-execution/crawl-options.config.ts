@@ -23,4 +23,6 @@ export interface CrawlOptions {
    * `skipped`. Needs a sink that can answer, such as `jsonLinesSink(path, { append: true })`.
    */
   resume?:          boolean
+  /** Attach the scope snapshot to `record:emit` and `record:reject` events, for inspecting what a mapping saw. */
+  debug?:           boolean
 }

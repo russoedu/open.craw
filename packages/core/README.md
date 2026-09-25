@@ -17,6 +17,7 @@ npx playwright install chromium   # web recipes and browser bootstraps only
 | `createCrawler(options)` | Builds an engine: `hooks`, `sink` (`memorySink()` default, `jsonLinesSink(path, { append? })`), `onEvent`, `browser` settings, `dedupe` (`run` / `recipe` / `off`), `onRecipeError` (`continue` / `stop`), `resume` (skip keys the sink already has). |
 | `crawler.run(set)` | Runs every input recipe in sequence; returns a `CrawlReport`. |
 | `crawler.close()` | Closes the browser, if one was launched. |
+| `HttpClient`, `BrowserClient` | The same clients the engine's runners use, for tooling built on top of `@open.craw/core` (`@open.craw/cli`'s `probe` command uses both). |
 | `parseInputRecipe`, `parseOutputRecipe`, `inputRecipeJsonSchema`, `outputRecipeJsonSchema` | The contracts, for tooling. |
 
 Hooks are plain functions `(input, args, context) => value`, referenced from recipes by name in a `hook`

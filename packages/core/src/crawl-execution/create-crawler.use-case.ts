@@ -42,6 +42,7 @@ export function createCrawler (options: CrawlOptions = {}): Crawler {
       dedupe:          new DedupePolicy(options.dedupe),
       storageStateDir: options.storageStateDir,
       resume:          options.resume === true,
+      debug:           options.debug === true,
 
       ignoreHTTPSErrors: options.browser?.ignoreHTTPSErrors,
     }, options.onRecipeError ?? 'continue'),

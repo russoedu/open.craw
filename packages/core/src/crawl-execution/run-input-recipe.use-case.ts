@@ -24,6 +24,8 @@ export interface RecipeRunDependencies {
   ignoreHTTPSErrors?: boolean
   /** Skip records the sink already has (`sink.has`). */
   resume?:            boolean
+  /** Attach the scope snapshot to record events. */
+  debug?:             boolean
 }
 
 /**
@@ -116,12 +118,12 @@ export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, 
       } else {
         await deps.sink.write(record)
         report.emitted += 1
-        deps.events.emit({ type: 'record:emit', recipeId: input.id, url, key: record.key, data: record.data })
+        deps.events.emit({ type: 'record:emit', recipeId: input.id, url, key: record.key, data: record.data, scope: deps.debug === true ? snapshot : undefined })
       }
     } catch (error) {
       if (!(error instanceof RecordRejectedError)) throw error
       report.rejected += 1
-      deps.events.emit({ type: 'record:reject', recipeId: input.id, url, field: error.field, reason: error.reason })
+      deps.events.emit({ type: 'record:reject', recipeId: input.id, url, field: error.field, reason: error.reason, scope: deps.debug === true ? snapshot : undefined })
     }
     if (limits.maxRecords !== undefined && report.emitted >= limits.maxRecords) stopped = true
 

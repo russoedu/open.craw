@@ -8,7 +8,7 @@ import type { BrowserSessionConfig } from '../src/index'
  * JSON API behind that cookie which paginates with `nextPage`. Web mode and api
  * mode must produce the same records from it.
  */
-export const FIXTURE_PORT = 4545
+export const FIXTURE_PORT = Number(process.env.OPEN_CRAW_FIXTURE_PORT ?? '4545')
 export const FIXTURE_BASE = `http://127.0.0.1:${FIXTURE_PORT}`
 
 const PAGES = 3
