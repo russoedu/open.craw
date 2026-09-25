@@ -74,15 +74,21 @@ export async function startForwardProxy (password: string | undefined, port = PR
     delete headers['proxy-connection']
     const upstream = httpRequest({ host: target.hostname, port: target.port, path: `${target.pathname}${target.search}`, method: incoming.method, headers }, (response) => {
       outgoing.writeHead(response.statusCode ?? 502, response.headers)
+      response.on('error', () => outgoing.destroy())
       response.pipe(outgoing)
     })
     upstream.on('error', () => {
       if (!outgoing.headersSent) outgoing.writeHead(502)
       outgoing.end()
     })
+    incoming.on('error', () => upstream.destroy())
     incoming.pipe(upstream)
   })
   server.on('connect', (incoming: IncomingMessage, client: Duplex, head: Buffer) => {
+    // Before anything else: Chromium resets tunnels it abandons (a 407 before its
+    // authenticated retry, a context closed on rotation), and an unhandled reset
+    // is an uncaught exception that fails whichever test is running.
+    client.on('error', () => client.destroy())
     const credentials = password === undefined ? { username: 'anonymous', password } : credentialsOf(incoming)
     if (credentials === undefined || credentials.password !== password) {
       client.end(`HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: ${CHALLENGE}\r\n\r\n`)
@@ -98,7 +104,7 @@ export async function startForwardProxy (password: string | undefined, port = PR
       client.pipe(upstream)
     })
     upstream.on('error', () => client.destroy())
-    client.on('error', () => upstream.destroy())
+    client.on('close', () => upstream.destroy())
   })
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
