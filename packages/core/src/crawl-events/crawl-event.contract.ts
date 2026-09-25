@@ -10,6 +10,8 @@ export type CrawlEvent =
   | (Base & { type: 'recipe:start', mode: 'web' | 'api' }) |
   (Base & { type: 'recipe:finish', emitted: number, rejected: number, duplicates: number, skipped: number, pages: number, durationMs: number, error?: string }) |
   (Base & { type: 'page:visit', url: string, number: number }) |
+  /** How a recipe run reaches the network. Never carries credentials. */
+  (Base & { type: 'access:lease', profile: string, kind: string, server?: string, session?: string }) |
   (Base & { type: 'step:start', stepType: string, stepId?: string, path: string }) |
   (Base & { type: 'step:finish', stepType: string, stepId?: string, path: string, durationMs: number }) |
   (Base & { type: 'step:retry', stepType: string, stepId?: string, path: string, attempt: number, error: string }) |

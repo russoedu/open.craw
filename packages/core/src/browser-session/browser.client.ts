@@ -8,11 +8,17 @@ export type StorageState = Awaited<ReturnType<BrowserContext['storageState']>>
 
 /** What a session starts from. */
 export interface SessionOptions {
-  storageState?: StorageState
-  cookies?:      Parameters<BrowserContext['addCookies']>[0]
-  headers?:      Record<string, string>
-  userAgent?:    string
-  viewport?:     { width: number, height: number }
+  storageState?:      StorageState
+  cookies?:           Parameters<BrowserContext['addCookies']>[0]
+  headers?:           Record<string, string>
+  userAgent?:         string
+  viewport?:          { width: number, height: number }
+  /** A proxy for this context only; overrides the launch-level `proxy`. */
+  proxy?:             { server: string, username?: string, password?: string, bypass?: string }
+  /** Also accept invalid certificates in this context (a proxy that intercepts HTTPS). */
+  ignoreHTTPSErrors?: boolean
+  /** Resource types this context never loads (`image`, `font`, `media`...), to save proxy bandwidth. */
+  blockResources?:    readonly string[]
 }
 
 /** One browser context with one page: the unit a recipe runs in. */
@@ -27,6 +33,24 @@ export class BrowserSession {
   async close (): Promise<void> {
     await this.context.close()
   }
+}
+
+/**
+ * Aborts every request of the given resource types in a context. Per-GB
+ * proxies bill images and fonts like everything else; a crawl rarely needs them.
+ *
+ * @param context - The browser context.
+ * @param types - Playwright resource types to skip.
+ */
+async function blockResources (context: BrowserContext, types: ReadonlySet<string>): Promise<void> {
+  await context.route('**/*', async (route) => {
+    if (types.has(route.request().resourceType())) {
+      await route.abort()
+
+      return
+    }
+    await route.continue()
+  })
 }
 
 /** A launched browser; sessions are opened from it and closed independently. */
@@ -52,11 +76,13 @@ export class BrowserClient {
       extraHTTPHeaders:  options.headers,
       userAgent:         options.userAgent,
       viewport:          options.viewport,
-      ignoreHTTPSErrors: this.config.ignoreHTTPSErrors,
+      proxy:             options.proxy,
+      ignoreHTTPSErrors: this.config.ignoreHTTPSErrors === true || options.ignoreHTTPSErrors === true,
     }
     const context = await this.browser.newContext(contextOptions)
     if (this.config.timeoutMs !== undefined) context.setDefaultTimeout(this.config.timeoutMs)
     if (options.cookies !== undefined && options.cookies.length > 0) await context.addCookies(options.cookies)
+    if (options.blockResources !== undefined && options.blockResources.length > 0) await blockResources(context, new Set(options.blockResources))
     const page = await context.newPage()
 
     return new BrowserSession(context, page)

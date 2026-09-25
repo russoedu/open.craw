@@ -1,3 +1,4 @@
+import type { AccessConfig, AccessPlugin } from '../access'
 import type { BrowserSessionConfig } from '../browser-session'
 import type { CrawlListener } from '../crawl-events'
 import type { HookMap } from '../hooks'
@@ -25,4 +26,12 @@ export interface CrawlOptions {
   resume?:          boolean
   /** Attach the scope snapshot to `record:emit` and `record:reject` events, for inspecting what a mapping saw. */
   debug?:           boolean
+  /**
+   * Where traffic goes: named proxy profiles (presets for common providers,
+   * credentials as `{{env.NAME}}`) and the default one. Recipes pick a profile
+   * with `session.access.profile`. Without it every recipe goes direct.
+   */
+  access?:          AccessConfig
+  /** Plugins `{ kind: 'plugin', name }` profiles refer to. */
+  accessPlugins?:   AccessPlugin[]
 }

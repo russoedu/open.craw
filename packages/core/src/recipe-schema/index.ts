@@ -10,7 +10,7 @@ export type {
 export { transformRuleSchema, mappingRuleSchema } from './transform-rule.contract'
 export type { TransformRule, TransformOp, MappingRule, FromRule, EachRule } from './transform-rule.contract'
 export { inputRecipeSchema, sessionSpecSchema, startPointSchema } from './input-recipe.contract'
-export type { InputRecipe, SessionSpec, SessionBootstrap, StartPoint, CrawlLimits, RecipeCookie } from './input-recipe.contract'
+export type { InputRecipe, SessionSpec, SessionBootstrap, SessionAccess, StartPoint, CrawlLimits, RecipeCookie } from './input-recipe.contract'
 export { parseInputRecipe, parseOutputRecipe, recipeKindOf } from './recipe.validator'
 export { RecipeValidationError } from './recipe-validation.error'
 export type { RecipeIssue } from './recipe-validation.error'

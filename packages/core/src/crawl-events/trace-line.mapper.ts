@@ -15,6 +15,8 @@ export function traceLine (event: CrawlEvent): string | undefined {
     }
     case 'recipe:finish': { return `■ ${event.recipeId}: ${event.emitted} emitted, ${event.rejected} rejected, ${event.duplicates} duplicates, ${event.skipped > 0 ? `${event.skipped} skipped, ` : ''}${event.pages} pages, ${event.durationMs} ms${event.error === undefined ? '' : `\n  ✖ stopped: ${event.error}`}`
     }
+    case 'access:lease': { return `${indent(1)}⇄ access ${event.profile} (${event.kind}${event.server === undefined ? '' : ` ${event.server}`}${event.session === undefined ? '' : `, session ${event.session}`})`
+    }
     case 'page:visit': { return `${indent(1)}⇢ page ${event.number}  ${event.url}`
     }
     case 'step:start': { return undefined

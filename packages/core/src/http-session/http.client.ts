@@ -13,6 +13,8 @@ export interface HttpClientOptions {
   userAgent?:         string
   timeoutMs?:         number
   ignoreHTTPSErrors?: boolean
+  /** Send every request through this proxy. */
+  proxy?:             { server: string, username?: string, password?: string, bypass?: string }
 }
 
 /**
@@ -28,6 +30,7 @@ export class HttpClient implements HttpSender {
       userAgent:         options.userAgent,
       ignoreHTTPSErrors: options.ignoreHTTPSErrors,
       timeout:           options.timeoutMs,
+      proxy:             options.proxy,
     })
 
     return new HttpClient(context, options.timeoutMs)

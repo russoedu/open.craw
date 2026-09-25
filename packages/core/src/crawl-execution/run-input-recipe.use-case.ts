@@ -1,3 +1,4 @@
+import type { AccessBroker, AccessLease } from '../access'
 import { ApiStepRunner } from '../api-steps'
 import type { BrowserClient } from '../browser-session'
 import type { EventBus } from '../crawl-events'
@@ -10,7 +11,7 @@ import type { DedupePolicy, RecordSink } from '../record-sink'
 import { RunGate, runSteps } from '../step-flow'
 import type { EmitOutcome, StepRunner } from '../step-flow'
 import { WebStepRunner } from '../web-steps'
-import { resolveStorageState } from './bootstrap-session.use-case'
+import { accessOptions, resolveStorageState } from './bootstrap-session.use-case'
 import type { RecipeReport } from './crawl-report.model'
 
 export interface RecipeRunDependencies {
@@ -26,6 +27,8 @@ export interface RecipeRunDependencies {
   resume?:            boolean
   /** Attach the scope snapshot to record events. */
   debug?:             boolean
+  /** Leases each recipe run its network access. */
+  access:             AccessBroker
 }
 
 /**
@@ -57,8 +60,10 @@ export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, 
   deps.events.emit({ type: 'recipe:start', recipeId: input.id, mode: input.mode })
   deps.dedupe.startRecipe()
   let runner: StepRunner | undefined
+  let lease: AccessLease | undefined
   try {
-    runner = await openRunner(input, deps, gate)
+    lease = await leaseAccess(input, deps)
+    runner = await openRunner(input, deps, gate, lease)
     for (const point of input.start) {
       const scope = new ExtractionScope()
       scope.set('vars', { ...input.vars, ...point.vars })
@@ -79,6 +84,7 @@ export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, 
     deps.events.emit({ type: 'error', recipeId: input.id, message: report.error })
   } finally {
     await runner?.dispose()
+    await lease?.release?.()
     unsubscribe()
     report.durationMs = Date.now() - started
     deps.events.emit({ type: 'recipe:finish', recipeId: input.id, emitted: report.emitted, rejected: report.rejected, duplicates: report.duplicates, skipped: report.skipped, pages: report.pages, durationMs: report.durationMs, error: report.error })
@@ -131,16 +137,39 @@ export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, 
   }
 }
 
-async function openRunner (input: InputRecipe, deps: RecipeRunDependencies, gate: RunGate): Promise<StepRunner> {
-  const storageState = await resolveStorageState(input, deps)
+/**
+ * The recipe run's access lease, announced as an event. A recipe that asks for
+ * a country while no profile applies gets a warning rather than silence.
+ */
+async function leaseAccess (input: InputRecipe, deps: RecipeRunDependencies): Promise<AccessLease> {
+  const wanted = input.session?.access
+  const lease = await deps.access.lease({ recipeId: input.id, profile: wanted?.profile, country: wanted?.country, sticky: wanted?.sticky })
+  deps.events.emit({ type: 'access:lease', recipeId: input.id, profile: lease.profile, kind: lease.kind, server: lease.proxy?.server, session: lease.session })
+  if (lease.kind === 'direct' && wanted?.country !== undefined) {
+    deps.events.emit({ type: 'warning', recipeId: input.id, message: `session.access.country "${wanted.country}" is ignored: no proxy profile applies to this recipe` })
+  }
+
+  return lease
+}
+
+async function openRunner (input: InputRecipe, deps: RecipeRunDependencies, gate: RunGate, lease: AccessLease): Promise<StepRunner> {
+  const storageState = await resolveStorageState(input, deps, lease)
   const session = input.session
+  const access = accessOptions(lease, session?.headers)
   if (input.mode === 'web') {
     const browser = await deps.browser()
-    const browserSession = await browser.newSession({ storageState, cookies: session?.cookies, headers: session?.headers, userAgent: session?.userAgent, viewport: session?.viewport })
+    const browserSession = await browser.newSession({ storageState, cookies: session?.cookies, userAgent: session?.userAgent, viewport: session?.viewport, ...access })
 
     return new WebStepRunner(browserSession, input, deps.events, gate)
   }
-  const client = await HttpClient.open({ storageState, headers: session?.headers, userAgent: session?.userAgent, timeoutMs: input.limits?.timeoutMs, ignoreHTTPSErrors: deps.ignoreHTTPSErrors })
+  const client = await HttpClient.open({
+    storageState,
+    headers:           access.headers,
+    userAgent:         session?.userAgent,
+    timeoutMs:         input.limits?.timeoutMs,
+    ignoreHTTPSErrors: deps.ignoreHTTPSErrors === true || access.ignoreHTTPSErrors === true,
+    proxy:             access.proxy,
+  })
 
   return new ApiStepRunner(client, input, deps.events, gate)
 }

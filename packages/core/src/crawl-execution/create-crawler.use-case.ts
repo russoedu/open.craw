@@ -1,3 +1,4 @@
+import { AccessBroker } from '../access'
 import { BrowserClient } from '../browser-session'
 import { EventBus } from '../crawl-events'
 import { HookRegistry } from '../hooks'
@@ -18,12 +19,14 @@ export interface Crawler {
  * Creates a crawler. The browser is launched lazily, on the first recipe or
  * bootstrap that needs it, and shared by every run until `close`.
  *
- * @param options - Hooks, sink, events, browser settings, policies.
+ * @param options - Hooks, sink, events, browser settings, access, policies.
  * @returns The crawler.
+ * @throws AccessConfigError when the access config cannot work.
  */
 export function createCrawler (options: CrawlOptions = {}): Crawler {
   const sink = options.sink ?? memorySink()
   if (options.resume === true && sink.has === undefined) throw new Error('resume needs a sink that can tell which keys it has (jsonLinesSink with append, memorySink, or a custom sink with `has`)')
+  const access = new AccessBroker(options.access, options.accessPlugins)
   const hooks = new HookRegistry(options.hooks)
   const events = new EventBus(options.onEvent)
   let browser: Promise<BrowserClient> | undefined
@@ -43,6 +46,7 @@ export function createCrawler (options: CrawlOptions = {}): Crawler {
       storageStateDir: options.storageStateDir,
       resume:          options.resume === true,
       debug:           options.debug === true,
+      access,
 
       ignoreHTTPSErrors: options.browser?.ignoreHTTPSErrors,
     }, options.onRecipeError ?? 'continue'),

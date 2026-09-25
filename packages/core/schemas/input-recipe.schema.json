@@ -185,6 +185,23 @@
             "keep"
           ],
           "additionalProperties": false
+        },
+        "access": {
+          "type": "object",
+          "properties": {
+            "profile": {
+              "type": "string",
+              "pattern": "^[\\w-]+$"
+            },
+            "country": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            },
+            "sticky": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

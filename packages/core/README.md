@@ -14,11 +14,12 @@ npx playwright install chromium   # web recipes and browser bootstraps only
 | Export | Purpose |
 |---|---|
 | `loadRecipeSet({ output, inputs })` | Reads, validates and binds recipe files (or decoded JSON). Throws `RecipeValidationError` / `RecipeBindingError` with every problem and its JSON path. |
-| `createCrawler(options)` | Builds an engine: `hooks`, `sink` (`memorySink()` default, `jsonLinesSink(path, { append? })`), `onEvent`, `browser` settings, `dedupe` (`run` / `recipe` / `off`), `onRecipeError` (`continue` / `stop`), `resume` (skip keys the sink already has). |
+| `createCrawler(options)` | Builds an engine: `hooks`, `sink` (`memorySink()` default, `jsonLinesSink(path, { append? })`), `onEvent`, `browser` settings, `dedupe` (`run` / `recipe` / `off`), `onRecipeError` (`continue` / `stop`), `resume` (skip keys the sink already has), `access` + `accessPlugins` (proxy profiles, see [access.md](../../docs/recipes/access.md)). |
+| `loadAccessConfig(path)`, `AccessBroker`, `ACCESS_PRESETS` | Access configs: load and validate one, lease a profile outside a crawl (the cli's `probe` does), list the provider presets. |
 | `crawler.run(set)` | Runs every input recipe in sequence; returns a `CrawlReport`. |
 | `crawler.close()` | Closes the browser, if one was launched. |
 | `HttpClient`, `BrowserClient` | The same clients the engine's runners use, for tooling built on top of `@open.craw/core` (`@open.craw/cli`'s `probe` command uses both). |
-| `parseInputRecipe`, `parseOutputRecipe`, `inputRecipeJsonSchema`, `outputRecipeJsonSchema` | The contracts, for tooling. |
+| `parseInputRecipe`, `parseOutputRecipe`, `inputRecipeJsonSchema`, `outputRecipeJsonSchema`, `accessConfigJsonSchema` | The contracts, for tooling. |
 
 Hooks are plain functions `(input, args, context) => value`, referenced from recipes by name in a `hook`
 step or a `hook` transform.
@@ -36,6 +37,7 @@ step-flow         forEach / paginate / emit / policies        api-steps         
 web-steps         goto / click / extract runner               transformation    the built-in ops
 output-mapping    ids -> validated records                     record-sink       memory, JSON Lines, dedupe
 recipe-loading    files -> a bound RecipeSet                   crawl-execution   sessions, runs, reports
+access            proxy profiles, presets, leases, plugins
 ```
 
 `e2e/` holds the fixture shop and the browser suite (`nx run core:e2e`); `tools/` emits `schemas/`.

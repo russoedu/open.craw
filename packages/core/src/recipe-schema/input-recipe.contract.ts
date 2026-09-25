@@ -32,6 +32,19 @@ export interface SessionBootstrap {
   saveTo?: string
 }
 
+/**
+ * What the site needs from the network, never how to get it: the runner's
+ * access config maps a profile name to a provider and credentials.
+ */
+export interface SessionAccess {
+  /** An access profile of the runner's config; its default when omitted. */
+  profile?: string
+  /** ISO 3166 country the traffic should come from, for profiles that target by country. */
+  country?: string
+  /** `false` lets the provider rotate IPs per request; the profile decides when omitted. */
+  sticky?:  boolean
+}
+
 export interface SessionSpec {
   headers?:          Record<string, string>
   cookies?:          RecipeCookie[]
@@ -40,6 +53,7 @@ export interface SessionSpec {
   /** Reuse a storage state saved by a previous bootstrap. */
   storageStatePath?: string
   bootstrap?:        SessionBootstrap
+  access?:           SessionAccess
 }
 
 export interface CrawlLimits {
@@ -93,6 +107,12 @@ const bootstrapSchema: z.ZodType<SessionBootstrap> = z.strictObject({
   saveTo: z.string().optional(),
 })
 
+const sessionAccessSchema: z.ZodType<SessionAccess> = z.strictObject({
+  profile: z.string().regex(/^[\w-]+$/, 'a profile name is letters, digits, hyphens and underscores').optional(),
+  country: z.string().regex(/^[A-Z]{2}$/i, 'a country is a two-letter ISO code').optional(),
+  sticky:  z.boolean().optional(),
+})
+
 export const sessionSpecSchema: z.ZodType<SessionSpec> = z.strictObject({
   headers:          z.record(z.string(), z.string()).optional(),
   cookies:          z.array(cookieSchema).optional(),
@@ -100,6 +120,7 @@ export const sessionSpecSchema: z.ZodType<SessionSpec> = z.strictObject({
   viewport:         z.strictObject({ width: z.int().positive(), height: z.int().positive() }).optional(),
   storageStatePath: z.string().optional(),
   bootstrap:        bootstrapSchema.optional(),
+  access:           sessionAccessSchema.optional(),
 })
 
 const limitsSchema: z.ZodType<CrawlLimits> = z.strictObject({

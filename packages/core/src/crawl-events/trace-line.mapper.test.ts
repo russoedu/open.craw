@@ -10,6 +10,11 @@ describe('traceLine', () => {
     expect(traceLine({ type: 'step:start', at, recipeId: 'r', stepType: 'goto', path: 'steps.0' })).toBeUndefined()
   })
 
+  it('shows the access lease without credentials', () => {
+    expect(traceLine({ type: 'access:lease', at, recipeId: 'r', profile: 'residential', kind: 'proxy', server: 'https://brd.superproxy.io:44445', session: 'abc' })).toBe('  ⇄ access residential (proxy https://brd.superproxy.io:44445, session abc)')
+    expect(traceLine({ type: 'access:lease', at, recipeId: 'r', profile: 'direct', kind: 'direct' })).toBe('  ⇄ access direct (direct)')
+  })
+
   it('shows which branch an if took', () => {
     expect(traceLine({ type: 'step:branch', at, recipeId: 'r', path: 'steps.1', branch: 'then' })).toBe('  ⑂ steps.1  then')
   })
