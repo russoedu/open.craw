@@ -14,6 +14,7 @@ Several input recipes can feed one output; a run processes them one after anothe
 |---|---|
 | [`@open.craw/core`](./packages/core) | The engine: recipe contracts and validation, the step walk, both runners, mapping, sinks. |
 | [`@open.craw/cli`](./packages/cli) | `open-craw validate` / `run` / `probe` — inspect a site, check a recipe, run a crawl from the terminal. |
+| [`@open.craw/mcp`](./packages/mcp) | The same probe/validate/run/list primitives as an MCP server, for an agent instead of a terminal. |
 
 ## Quick start
 
