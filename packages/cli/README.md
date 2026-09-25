@@ -20,7 +20,8 @@ open-craw probe <url> [options]
 
 ### `validate`
 
-Loads every recipe file (or every `.json` file in a directory), parses it against its schema and binds
+Loads every recipe file (or every `.json` and `.jsonl` file in a directory; a `.jsonl` file holds one
+recipe per line), parses it against its schema and binds
 the input recipes to the output recipe, printing every problem with its JSON path. Exit code 1 if anything
 fails.
 

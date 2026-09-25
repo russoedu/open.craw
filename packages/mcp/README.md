@@ -6,7 +6,8 @@ directly: probe a page, validate recipes, run a crawl, list what's already autho
 
 This does **not** auto-author recipes from a sentence. The four tools are the same primitives the
 `open-craw` cli gives a terminal; the calling agent still writes the JSON recipes, using `probe` and
-`validate` to iterate, the same way this project's own example recipes were built by hand.
+`validate` to iterate, the same way this project's own example recipes were built by hand. An agent that
+can write files passes their `paths`; one that can't (a chat-only host) passes the `recipes` inline.
 
 ## Register it
 
@@ -50,22 +51,25 @@ Returns `{ url, status, findings: { jsonLd, inlineJson, jsonUrls, scriptHosts, a
 
 ### `validate`
 
-Loads and binds recipe files (an output recipe plus its input recipes): parses each against its schema,
-checks every mapping resolves, reports every problem with its JSON path.
+Loads and binds recipes (an output recipe plus its input recipes), from files or passed inline: parses each
+against its schema, checks every mapping resolves, reports every problem with its JSON path.
 
 | Input | Meaning |
 |---|---|
-| `paths` | Recipe files or directories. |
+| `paths` | Recipe files (`.json`, `.jsonl`) or directories of them. |
+| `recipes` | Instead of `paths`: the recipes themselves, as an array of recipe objects or as JSON / JSON Lines text. For a host that can't write files. An inline recipe's issues name it by position: `recipes[1]`, or `recipes:2` for a line. |
+
+Give exactly one of `paths` and `recipes`.
 
 Returns `{ ok, output?, inputs: string[], issues: [{ path, message, source }] }`.
 
 ### `run`
 
-Crawls the recipes at the given paths.
+Crawls the recipes at the given paths, or passed inline.
 
 | Input | Meaning |
 |---|---|
-| `paths` | Recipe files or directories: exactly one output recipe, any number of input recipes. |
+| `paths` or `recipes` | As in `validate`: exactly one output recipe, any number of input recipes. |
 | `out?` | Write records to this JSON Lines file instead of returning them inline. Use this for anything beyond a handful of records — the tool result is not the place for a large crawl's output. |
 | `append?`, `resume?` | As in the cli (`resume` needs `append`). |
 | `only?` | Run only these input recipe ids. |

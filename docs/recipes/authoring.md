@@ -576,6 +576,13 @@ const report = await crawler.run(recipes)
 await crawler.close()
 ```
 
+`loadRecipeSet` takes the output recipe apart from the inputs; `loadRecipes(source)` takes one source holding
+all of them and finds the output recipe by its `kind`. Either reads recipes from anywhere, not only files:
+a path to a `.json` or `.jsonl` file or a directory of them, JSON or JSON Lines text, the same as bytes
+(`Buffer`, `ArrayBuffer`, `Blob`, `File`, a stream), decoded objects, or an array mixing these. A server
+holding uploaded recipes in memory calls `loadRecipes(blob)` and never writes a file. The cli takes paths
+only.
+
 `loadRecipeSet` parses every file against its schema (`RecipeValidationError` lists every problem with its
 JSON path) and then **binds** the inputs to the output (`RecipeBindingError`): every mapping key names an
 output field, every `from` starts with a known id, required fields are covered, web steps stay in web

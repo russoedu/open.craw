@@ -215,6 +215,13 @@ const report = await crawler.run(recipes)
 await crawler.close()
 ```
 
+Recipes load from any source, not only files: `loadRecipes(source)` takes one source holding the output
+recipe and its inputs (found by `kind`), `loadRecipeSet({ output, inputs })` takes them apart. A source is a
+path (a `.json` or `.jsonl` file, or a directory of them), JSON or JSON Lines text (a string starting with
+`{` or `[`), the same text as bytes (`Buffer`, typed array, `ArrayBuffer`, `Blob`, `File`, a stream),
+decoded recipe objects, or an array mixing these, so a server can run recipes it holds in memory. Every
+validation error names the recipe's origin: its path, `path:line`, a `File`'s name, or its position.
+
 ## 6. Example
 
 The recipes in `packages/core/e2e/recipes/` are the reference example: one `product` output recipe, a `web`
