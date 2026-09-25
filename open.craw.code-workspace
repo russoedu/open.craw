@@ -95,6 +95,20 @@
         "script": "cli:build",
         "problemMatcher": [],
         "group": "build"
+      },
+      {
+        "label": "mcp: qa",
+        "type": "npm",
+        "script": "mcp:qa",
+        "problemMatcher": [],
+        "group": "qa"
+      },
+      {
+        "label": "mcp: build",
+        "type": "npm",
+        "script": "mcp:build",
+        "problemMatcher": [],
+        "group": "build"
       }
     ]
   },

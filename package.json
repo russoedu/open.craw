@@ -20,7 +20,9 @@
     "playwright:install": "playwright install chromium",
     "cli:qa": "nx run cli:lint && nx run cli:test",
     "cli:build": "nx run cli:build",
-    "cli:e2e": "nx run cli:e2e"
+    "cli:e2e": "nx run cli:e2e",
+    "mcp:qa": "nx run mcp:lint && nx run mcp:test",
+    "mcp:build": "nx run mcp:build"
   },
   "private": true,
   "devDependencies": {
