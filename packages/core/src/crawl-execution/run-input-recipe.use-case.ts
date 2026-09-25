@@ -12,6 +12,8 @@ import { RunGate, runSteps } from '../step-flow'
 import type { EmitOutcome, StepRunner } from '../step-flow'
 import { WebStepRunner } from '../web-steps'
 import { accessOptions, resolveStorageState } from './bootstrap-session.use-case'
+import { RotatingRunner } from './rotating-runner.use-case'
+import type { LeasedRunner } from './rotating-runner.use-case'
 import type { RecipeReport } from './crawl-report.model'
 
 export interface RecipeRunDependencies {
@@ -60,10 +62,14 @@ export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, 
   deps.events.emit({ type: 'recipe:start', recipeId: input.id, mode: input.mode })
   deps.dedupe.startRecipe()
   let runner: StepRunner | undefined
-  let lease: AccessLease | undefined
   try {
-    lease = await leaseAccess(input, deps)
-    runner = await openRunner(input, deps, gate, lease)
+    const onBlock = input.session?.onBlock
+    runner = await RotatingRunner.open({
+      recipe:       input,
+      events:       deps.events,
+      maxRotations: onBlock?.rotate === true ? (onBlock.attempts ?? 2) : 0,
+      open:         attempt => openLeased(input, deps, gate, attempt),
+    })
     for (const point of input.start) {
       const scope = new ExtractionScope()
       scope.set('vars', { ...input.vars, ...point.vars })
@@ -84,7 +90,6 @@ export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, 
     deps.events.emit({ type: 'error', recipeId: input.id, message: report.error })
   } finally {
     await runner?.dispose()
-    await lease?.release?.()
     unsubscribe()
     report.durationMs = Date.now() - started
     deps.events.emit({ type: 'recipe:finish', recipeId: input.id, emitted: report.emitted, rejected: report.rejected, duplicates: report.duplicates, skipped: report.skipped, pages: report.pages, durationMs: report.durationMs, error: report.error })
@@ -141,15 +146,26 @@ export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, 
  * The recipe run's access lease, announced as an event. A recipe that asks for
  * a country while no profile applies gets a warning rather than silence.
  */
-async function leaseAccess (input: InputRecipe, deps: RecipeRunDependencies): Promise<AccessLease> {
+async function leaseAccess (input: InputRecipe, deps: RecipeRunDependencies, attempt: number): Promise<AccessLease> {
   const wanted = input.session?.access
-  const lease = await deps.access.lease({ recipeId: input.id, profile: wanted?.profile, country: wanted?.country, sticky: wanted?.sticky })
+  const lease = await deps.access.lease({ recipeId: input.id, profile: wanted?.profile, country: wanted?.country, sticky: wanted?.sticky, attempt })
   deps.events.emit({ type: 'access:lease', recipeId: input.id, profile: lease.profile, kind: lease.kind, server: lease.proxy?.server, session: lease.session })
-  if (lease.kind === 'direct' && wanted?.country !== undefined) {
+  if (attempt === 1 && lease.kind === 'direct' && wanted?.country !== undefined) {
     deps.events.emit({ type: 'warning', recipeId: input.id, message: `session.access.country "${wanted.country}" is ignored: no proxy profile applies to this recipe` })
   }
 
   return lease
+}
+
+/** A lease and a runner opened on it; the lease is released again when opening fails. */
+async function openLeased (input: InputRecipe, deps: RecipeRunDependencies, gate: RunGate, attempt: number): Promise<LeasedRunner> {
+  const lease = await leaseAccess(input, deps, attempt)
+  try {
+    return { runner: await openRunner(input, deps, gate, lease), lease }
+  } catch (error) {
+    await lease.release?.()
+    throw error
+  }
 }
 
 async function openRunner (input: InputRecipe, deps: RecipeRunDependencies, gate: RunGate, lease: AccessLease): Promise<StepRunner> {

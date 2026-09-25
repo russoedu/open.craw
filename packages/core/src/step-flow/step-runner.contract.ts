@@ -1,5 +1,6 @@
 import type { ExtractionScope, LiveElement } from '../extraction-scope'
 import type { PaginateNext, Step } from '../recipe-schema'
+import type { BlockedError } from './blocked.error'
 
 /** What `paginate` learns from the runner after a page body ran. */
 export type NextPageResult =
@@ -22,5 +23,11 @@ export interface StepRunner {
   nextPage:  (next: PaginateNext, scope: ExtractionScope) => Promise<NextPageResult>
   /** Snapshots every element matching a rendered selector, for `forEach` over `selector`. Web mode only. */
   elements?: (selector: string, scope: ExtractionScope) => Promise<LiveElement[]>
+  /**
+   * Called when a step is blocked. `true` means the runner now reaches the
+   * network another way (a new access lease) and the step should run again;
+   * `false` means it cannot, and the block fails the step like any error.
+   */
+  rotate?:   (error: BlockedError) => Promise<boolean>
   dispose:   () => Promise<void>
 }

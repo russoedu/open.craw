@@ -55,7 +55,7 @@ export class HttpClient implements HttpSender {
     })
     const body = await readBody(response, httpRequest.as)
     const result: HttpResponse = { status: response.status(), url: response.url(), headers: response.headers(), body }
-    if (response.status() >= 400) throw new HttpError(response.status(), response.url(), body)
+    if (response.status() >= 400) throw new HttpError(response.status(), response.url(), body, response.headers())
 
     return result
   }

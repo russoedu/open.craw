@@ -1,6 +1,7 @@
 import { EventBus } from '../crawl-events'
 import { ExtractionScope } from '../extraction-scope'
 import { HookRegistry } from '../hooks'
+import { HttpError } from '../http-session'
 import type { HttpRequest, HttpResponse, HttpSender } from '../http-session'
 import type { InputRecipe } from '../recipe-schema'
 import { runSteps } from '../step-flow'
@@ -165,5 +166,17 @@ describe('ApiStepRunner', () => {
     expect(await runner.nextPage({ url: '/api/products?page={{page.number}}' }, scope)).toEqual({ kind: 'url', url: 'http://shop/api/products?page=1' })
     await expect(runner.nextPage({ selector: 'a.next' }, scope)).rejects.toThrow(/needs a browser/)
     await expect(runner.runLeaf({ type: 'goto', url: 'x' }, scope)).rejects.toThrow(/needs a browser/)
+  })
+
+  it('turns a blocked response into a BlockedError, and leaves other errors alone', async () => {
+    const waf: HttpSender = { send: async request => ({ status: 202, url: request.url, headers: { 'x-amzn-waf-action': 'challenge' }, body: { kind: 'html', html: '' } }) }
+    const forbidden: HttpSender = { send: async (request) => { throw new HttpError(403, request.url, { kind: 'text', text: 'no' }, {}) } }
+    const missing: HttpSender = { send: async (request) => { throw new HttpError(404, request.url, { kind: 'text', text: 'gone' }, {}) } }
+    const custom: HttpSender = { send: async request => ({ status: 200, url: request.url, headers: {}, body: { kind: 'html', html: '<p>Please verify you are human</p>' } }) }
+    const one: InputRecipe = { ...recipe, steps: [{ type: 'request', id: 'list', url: '{{page.url}}' }] }
+    await expect(crawl(one, waf)).rejects.toThrow('blocked at http://shop/api/products?page=1: x-amzn-waf-action: challenge')
+    await expect(crawl(one, forbidden)).rejects.toThrow('blocked at http://shop/api/products?page=1: HTTP 403')
+    await expect(crawl(one, missing)).rejects.toThrow('HTTP 404 for http://shop/api/products?page=1')
+    await expect(crawl({ ...one, session: { blockedWhen: { text: 'verify you are human' } } }, custom)).rejects.toThrow('body matches')
   })
 })

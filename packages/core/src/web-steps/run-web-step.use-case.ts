@@ -34,9 +34,8 @@ export class WebStepRunner implements StepRunner {
   }
 
   async runLeaf (step: Step, scope: ExtractionScope): Promise<void> {
-    const limits = this.recipe.limits ?? {}
     switch (step.type) {
-      case 'goto': { return navigate(step, this.page, scope, limits, this.gate, this.events, this.recipe.id)
+      case 'goto': { return navigate(step, this.page, scope, this.recipe, this.gate, this.events)
       }
       case 'click': { await click(step, this.page, scope); break
       }
@@ -67,7 +66,7 @@ export class WebStepRunner implements StepRunner {
     if ('url' in next) {
       const target = renderText(next.url, path => scope.lookup(path))
       if (target === '') return null
-      await navigate({ type: 'goto', url: target }, this.page, scope, this.recipe.limits ?? {}, this.gate, this.events, this.recipe.id)
+      await navigate({ type: 'goto', url: target }, this.page, scope, this.recipe, this.gate, this.events)
 
       return { kind: 'url', url: this.page.url() }
     }

@@ -19,8 +19,10 @@ export interface ProxyHit {
 }
 
 export interface ForwardProxy {
-  server: Server
-  hits:   ProxyHit[]
+  server:        Server
+  hits:          ProxyHit[]
+  /** The next username the proxy has not seen is treated as a blocked IP: its page requests get 403 "Access Denied". */
+  blockNextUser: () => void
 }
 
 const CHALLENGE = 'Basic realm="open.craw e2e"'
@@ -42,6 +44,9 @@ function credentialsOf (incoming: IncomingMessage): { username: string, password
  */
 export async function startForwardProxy (password: string): Promise<ForwardProxy> {
   const hits: ProxyHit[] = []
+  const seen = new Set<string>()
+  const blocked = new Set<string>()
+  let blockNext = false
   const server = createServer((incoming, outgoing) => {
     const credentials = credentialsOf(incoming)
     if (credentials?.password !== password) {
@@ -52,6 +57,17 @@ export async function startForwardProxy (password: string): Promise<ForwardProxy
     }
     const target = new URL(incoming.url ?? '/')
     hits.push({ username: credentials.username, method: incoming.method ?? 'GET', url: target.href })
+    if (!seen.has(credentials.username)) {
+      seen.add(credentials.username)
+      if (blockNext) blocked.add(credentials.username)
+      blockNext = false
+    }
+    if (blocked.has(credentials.username)) {
+      outgoing.writeHead(403, { 'content-type': 'text/html' })
+      outgoing.end('<!doctype html><html lang="en"><body><h1>Access Denied</h1></body></html>')
+
+      return
+    }
     const headers = { ...incoming.headers }
     delete headers['proxy-authorization']
     delete headers['proxy-connection']
@@ -88,7 +104,7 @@ export async function startForwardProxy (password: string): Promise<ForwardProxy
     server.listen(PROXY_PORT, '127.0.0.1', resolve)
   })
 
-  return { server, hits }
+  return { server, hits, blockNextUser: () => { blockNext = true } }
 }
 
 /** Stops the proxy, dropping open connections. */

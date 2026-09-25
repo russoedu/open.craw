@@ -17,7 +17,11 @@ export function traceLine (event: CrawlEvent): string | undefined {
     }
     case 'access:lease': { return `${indent(1)}⇄ access ${event.profile} (${event.kind}${event.server === undefined ? '' : ` ${event.server}`}${event.session === undefined ? '' : `, session ${event.session}`})`
     }
-    case 'page:visit': { return `${indent(1)}⇢ page ${event.number}  ${event.url}`
+    case 'access:blocked': { return `${indent(1)}⛔ blocked ${event.url}: ${event.reason}`
+    }
+    case 'access:rotate': { return `${indent(1)}↻ new access lease (attempt ${event.attempt})`
+    }
+    case 'page:visit': { return `${indent(1)}⇢ page ${event.number}  ${event.url}${event.status === undefined || (event.status >= 200 && event.status < 300) ? '' : `  [${event.status}]`}`
     }
     case 'step:start': { return undefined
     }

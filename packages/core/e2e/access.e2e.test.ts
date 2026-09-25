@@ -1,6 +1,6 @@
 import type { Server } from 'node:http'
 import { join } from 'node:path'
-import { createCrawler, loadRecipeSet, memorySink } from '../src/index'
+import { createCrawler, loadRecipeSet, memorySink, RecipeSet } from '../src/index'
 import type { AccessConfig, CrawlEvent } from '../src/index'
 import { browserConfig, expectedRecords, FIXTURE_PORT, startFixtureSite, stopFixtureSite } from './fixture-site'
 import { PROXY_PORT, startForwardProxy, stopForwardProxy } from './forward-proxy'
@@ -82,6 +82,43 @@ describe('access profiles (real chromium, local forward proxy)', () => {
       const report = await crawler.run(set)
       expect(report.recipes[0].error).toContain('needs the environment variable OPEN_CRAW_E2E_UNSET')
       expect(proxy.hits).toHaveLength(0)
+    } finally {
+      await crawler.close()
+    }
+  }, 60000)
+
+  it('rotates to a new session when the first one is blocked, and finishes the crawl', async () => {
+    const set = await loadRecipeSet({ output: join(recipes, 'product.output.json'), inputs: [join(recipes, 'shop-web.input.json')] })
+    const input = { ...set.inputs[0], session: { ...set.inputs[0].session, onBlock: { rotate: true, attempts: 2 } } }
+    const sink = memorySink()
+    const events: CrawlEvent[] = []
+    const crawler = createCrawler({ browser: browserConfig(), sink, access: access(), onEvent: (event) => { events.push(event) } })
+    proxy.blockNextUser()
+    try {
+      const report = await crawler.run(new RecipeSet(set.output, [input]))
+      expect(report.recipes[0].error).toBeUndefined()
+      expect(stripDates(sink.records)).toEqual(expectedRecords())
+    } finally {
+      await crawler.close()
+    }
+    const leases = events.flatMap(event => (event.type === 'access:lease' ? [event.session] : []))
+    expect(leases).toHaveLength(2)
+    expect(leases[0]).not.toBe(leases[1])
+    expect(events.filter(event => event.type === 'access:blocked')).toEqual([expect.objectContaining({ status: 403, url: expect.stringContaining('/catalog?page=1') as unknown as string })])
+    expect(events.filter(event => event.type === 'access:rotate')).toEqual([expect.objectContaining({ attempt: 2 })])
+    // The blocked session got the refused catalog page (and Chromium's own favicon request), never a product page.
+    const blockedHits = proxy.hits.filter(hit => hit.username === `tester-${leases[0]}`)
+    expect(blockedHits.some(hit => hit.url.includes('/catalog?page=1'))).toBe(true)
+    expect(blockedHits.some(hit => hit.url.includes('/product/'))).toBe(false)
+  }, 120000)
+
+  it('fails the recipe with the block, not a later selector miss, when it may not rotate', async () => {
+    const set = await loadRecipeSet({ output: join(recipes, 'product.output.json'), inputs: [join(recipes, 'shop-web.input.json')] })
+    const crawler = createCrawler({ browser: browserConfig(), access: access() })
+    proxy.blockNextUser()
+    try {
+      const report = await crawler.run(set)
+      expect(report.recipes[0].error).toContain(`blocked at http://127.0.0.1:${FIXTURE_PORT}/catalog?page=1: HTTP 403`)
     } finally {
       await crawler.close()
     }

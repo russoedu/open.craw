@@ -35,7 +35,7 @@ export interface HttpSender {
 export class HttpError extends Error {
   override readonly name = 'HttpError'
 
-  constructor (readonly status: number, readonly url: string, readonly body: HttpBody) {
+  constructor (readonly status: number, readonly url: string, readonly body: HttpBody, readonly headers: Record<string, string> = {}) {
     super(`HTTP ${status} for ${url}`)
   }
 }

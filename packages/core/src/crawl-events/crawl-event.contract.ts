@@ -9,9 +9,14 @@ interface Base { at: string, recipeId: string }
 export type CrawlEvent =
   | (Base & { type: 'recipe:start', mode: 'web' | 'api' }) |
   (Base & { type: 'recipe:finish', emitted: number, rejected: number, duplicates: number, skipped: number, pages: number, durationMs: number, error?: string }) |
-  (Base & { type: 'page:visit', url: string, number: number }) |
+  /** `status` is the HTTP status of the navigation or request, when there was a response. */
+  (Base & { type: 'page:visit', url: string, number: number, status?: number }) |
   /** How a recipe run reaches the network. Never carries credentials. */
   (Base & { type: 'access:lease', profile: string, kind: string, server?: string, session?: string }) |
+  /** A response matched the recipe's block rule. */
+  (Base & { type: 'access:blocked', url: string, status: number, reason: string }) |
+  /** The run gave up its access lease after a block and is taking a new one. */
+  (Base & { type: 'access:rotate', attempt: number, reason: string }) |
   (Base & { type: 'step:start', stepType: string, stepId?: string, path: string }) |
   (Base & { type: 'step:finish', stepType: string, stepId?: string, path: string, durationMs: number }) |
   (Base & { type: 'step:retry', stepType: string, stepId?: string, path: string, attempt: number, error: string }) |

@@ -202,6 +202,52 @@
             }
           },
           "additionalProperties": false
+        },
+        "blockedWhen": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 599
+              }
+            },
+            "header": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "minLength": 1
+              },
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "onBlock": {
+          "type": "object",
+          "properties": {
+            "rotate": {
+              "type": "boolean"
+            },
+            "attempts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "rotate"
+          ],
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

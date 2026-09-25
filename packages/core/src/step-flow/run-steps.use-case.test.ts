@@ -5,6 +5,7 @@ import { HookRegistry } from '../hooks'
 import type { InputRecipe, PaginateNext, Step } from '../recipe-schema'
 import { RunGate } from './run-gate.policy'
 import { runSteps } from './run-steps.use-case'
+import { BlockedError } from './blocked.error'
 import { StepFailure } from './step-failure.error'
 import type { NextPageResult, StepRunner } from './step-runner.contract'
 
@@ -68,6 +69,27 @@ async function run (steps: Step[], runner: StepRunner, options: { limit?: number
 }
 
 const loop = (over: string, inner: Step[] = []): Step => ({ type: 'forEach', over, as: 'ms', emit: true, steps: [{ type: 'hook', id: 'waited', name: 'wait', args: { ms: '{{ms}}' } }, ...inner] })
+
+function blockingRunner (blocks: number, canRotate: (count: number) => boolean): FakeRunner & { rotations: number } {
+  const runner = fakeRunner({ 'http://x/1': ['a'] }) as FakeRunner & { rotations: number }
+  const leaf = runner.runLeaf
+  let left = blocks
+  runner.rotations = 0
+  runner.runLeaf = async (step, scope) => {
+    if (step.type === 'extract' && left > 0) {
+      left -= 1
+      throw new BlockedError('http://x/1', 403, 'HTTP 403')
+    }
+    await leaf(step, scope)
+  }
+  runner.rotate = async () => {
+    runner.rotations += 1
+
+    return canRotate(runner.rotations)
+  }
+
+  return runner
+}
 
 describe('runSteps', () => {
   it('runs forEach in a fresh child scope per item and emits per iteration', async () => {
@@ -264,6 +286,22 @@ describe('runSteps', () => {
         { type: 'forEach', over: 'items', as: 'i', steps: [{ type: 'extract', id: 'x', selector: 'h1', kind: 'css' }] },
       ]
       await expect(run(steps, runner, { gate: new RunGate(3, 0) })).rejects.toThrow(StepFailure)
+    })
+  })
+
+  describe('when a step is blocked', () => {
+    it('retries the step after the runner rotates, without spending retry attempts', async () => {
+      const runner = blockingRunner(2, () => true)
+      const { emitted, events } = await run([{ type: 'extract', id: 'x', selector: 'h1', kind: 'css' }, { type: 'emit' }], runner)
+      expect(runner.rotations).toBe(2)
+      expect(emitted[0].x).toBe('a')
+      expect(events.filter(event => event.type === 'step:retry')).toHaveLength(0)
+    })
+
+    it('fails the step like any error once the runner cannot rotate', async () => {
+      const runner = blockingRunner(3, count => count < 2)
+      await expect(run([{ type: 'extract', id: 'x', selector: 'h1', kind: 'css' }], runner)).rejects.toThrow('steps.0 (extract) failed: blocked at http://x/1: HTTP 403')
+      expect(runner.rotations).toBe(2)
     })
   })
 })

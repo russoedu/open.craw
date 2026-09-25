@@ -19,7 +19,7 @@ export class ApiStepRunner implements StepRunner {
   ) {}
 
   async runLeaf (step: Step, scope: ExtractionScope): Promise<void> {
-    if (step.type === 'request') return sendRequest(step, scope, this.client, this.recipe.limits ?? {}, this.gate, this.events, this.recipe.id)
+    if (step.type === 'request') return sendRequest(step, scope, this.client, this.recipe, this.gate, this.events)
     if (step.type === 'extract') return extractFromDocument(step, scope)
     throw new Error(`"${step.type}" needs a browser; this recipe runs in api mode`)
   }

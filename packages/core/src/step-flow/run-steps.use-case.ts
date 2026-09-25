@@ -7,6 +7,7 @@ import { runForEach } from './for-each.use-case'
 import { runPaginate } from './paginate.use-case'
 import { backoffFor, resolveErrorPolicy, sleep } from './retry.policy'
 import type { RunGate } from './run-gate.policy'
+import { BlockedError } from './blocked.error'
 import { StepFailure } from './step-failure.error'
 import type { StepRunner } from './step-runner.contract'
 
@@ -59,7 +60,8 @@ export async function runSteps (steps: readonly Step[], scope: ExtractionScope, 
 async function runWithPolicy (step: Step, scope: ExtractionScope, walk: StepWalk): Promise<EmitOutcome> {
   const policy = resolveErrorPolicy(step, walk.recipe)
   const attempts = policy.policy === 'retry' ? policy.attempts : 1
-  for (let attempt = 1; ; attempt += 1) {
+  let attempt = 1
+  for (;;) {
     const started = Date.now()
     walk.events.emit({ type: 'step:start', recipeId: walk.recipe.id, stepType: step.type, stepId: step.id, path: walk.path })
     try {
@@ -69,10 +71,13 @@ async function runWithPolicy (step: Step, scope: ExtractionScope, walk: StepWalk
       return outcome
     } catch (error) {
       if (error instanceof StepFailure) throw error
+      // A block the runner can rotate away from is retried on the new access, without spending a retry attempt.
+      if (error instanceof BlockedError && walk.runner.rotate !== undefined && await walk.runner.rotate(error)) continue
       const message = error instanceof Error ? error.message : String(error)
       if (policy.policy === 'retry' && attempt < attempts) {
-        walk.events.emit({ type: 'step:retry', recipeId: walk.recipe.id, stepType: step.type, stepId: step.id, path: walk.path, attempt: attempt + 1, error: message })
-        await sleep(backoffFor(policy, attempt + 1))
+        attempt += 1
+        walk.events.emit({ type: 'step:retry', recipeId: walk.recipe.id, stepType: step.type, stepId: step.id, path: walk.path, attempt, error: message })
+        await sleep(backoffFor(policy, attempt))
         continue
       }
       if (policy.policy === 'skip') {

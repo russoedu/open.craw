@@ -45,6 +45,26 @@ export interface SessionAccess {
   sticky?:  boolean
 }
 
+/**
+ * What counts as the site refusing the crawl, checked on every navigation and
+ * request. Any condition that matches is a block. When omitted: status 403 or
+ * 429, or an AWS WAF challenge (`x-amzn-waf-action: challenge`).
+ */
+export interface BlockRule {
+  status?: number[]
+  /** Header name to a regular expression its value must match (case-insensitive). */
+  header?: Record<string, string>
+  /** A regular expression the response body must match (case-insensitive). */
+  text?:   string
+}
+
+/** What to do when blocked: take a new access lease (a new IP), reopen the session, and retry the step. */
+export interface BlockRotation {
+  rotate:    boolean
+  /** How many rotations a recipe run may use. Default 2. */
+  attempts?: number
+}
+
 export interface SessionSpec {
   headers?:          Record<string, string>
   cookies?:          RecipeCookie[]
@@ -54,6 +74,8 @@ export interface SessionSpec {
   storageStatePath?: string
   bootstrap?:        SessionBootstrap
   access?:           SessionAccess
+  blockedWhen?:      BlockRule
+  onBlock?:          BlockRotation
 }
 
 export interface CrawlLimits {
@@ -113,6 +135,25 @@ const sessionAccessSchema: z.ZodType<SessionAccess> = z.strictObject({
   sticky:  z.boolean().optional(),
 })
 
+const regexSource = z.string().min(1).refine((source) => {
+  try {
+    return new RegExp(source, 'i').source.length > 0
+  } catch {
+    return false
+  }
+}, 'not a valid regular expression')
+
+const blockRuleSchema: z.ZodType<BlockRule> = z.strictObject({
+  status: z.array(z.int().min(100).max(599)).optional(),
+  header: z.record(z.string().min(1), regexSource).optional(),
+  text:   regexSource.optional(),
+})
+
+const blockRotationSchema: z.ZodType<BlockRotation> = z.strictObject({
+  rotate:   z.boolean(),
+  attempts: z.int().min(1).max(10).optional(),
+})
+
 export const sessionSpecSchema: z.ZodType<SessionSpec> = z.strictObject({
   headers:          z.record(z.string(), z.string()).optional(),
   cookies:          z.array(cookieSchema).optional(),
@@ -121,6 +162,8 @@ export const sessionSpecSchema: z.ZodType<SessionSpec> = z.strictObject({
   storageStatePath: z.string().optional(),
   bootstrap:        bootstrapSchema.optional(),
   access:           sessionAccessSchema.optional(),
+  blockedWhen:      blockRuleSchema.optional(),
+  onBlock:          blockRotationSchema.optional(),
 })
 
 const limitsSchema: z.ZodType<CrawlLimits> = z.strictObject({

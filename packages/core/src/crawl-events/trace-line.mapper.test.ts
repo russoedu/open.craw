@@ -15,6 +15,13 @@ describe('traceLine', () => {
     expect(traceLine({ type: 'access:lease', at, recipeId: 'r', profile: 'direct', kind: 'direct' })).toBe('  ⇄ access direct (direct)')
   })
 
+  it('shows blocks, rotations and a non-2xx page status', () => {
+    expect(traceLine({ type: 'access:blocked', at, recipeId: 'r', url: 'https://x/', status: 403, reason: 'HTTP 403' })).toBe('  ⛔ blocked https://x/: HTTP 403')
+    expect(traceLine({ type: 'access:rotate', at, recipeId: 'r', attempt: 2, reason: 'blocked' })).toBe('  ↻ new access lease (attempt 2)')
+    expect(traceLine({ type: 'page:visit', at, recipeId: 'r', url: 'https://x/', number: 1, status: 202 })).toBe('  ⇢ page 1  https://x/')
+    expect(traceLine({ type: 'page:visit', at, recipeId: 'r', url: 'https://x/', number: 1, status: 403 })).toBe('  ⇢ page 1  https://x/  [403]')
+  })
+
   it('shows which branch an if took', () => {
     expect(traceLine({ type: 'step:branch', at, recipeId: 'r', path: 'steps.1', branch: 'then' })).toBe('  ⑂ steps.1  then')
   })
