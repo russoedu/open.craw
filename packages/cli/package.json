@@ -1,0 +1,85 @@
+{
+  "name": "@open.craw/cli",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/index.esm.js",
+  "module": "./dist/index.esm.js",
+  "types": "./dist/src/index.d.ts",
+  "bin": {
+    "open-craw": "./bin/open-craw.mjs"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "default": "./dist/index.esm.js"
+    }
+  },
+  "files": [
+    "dist",
+    "bin",
+    "!**/*.tsbuildinfo",
+    "!**/*.d.ts.map",
+    "!**/*.js.map"
+  ],
+  "dependencies": {
+    "@open.craw/core": "^0.0.1",
+    "playwright": "^1.63.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "Command-line tools for open.craw: probe a page for scrapable data, validate recipes, run a crawl.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/russoedu/open.craw.git",
+    "directory": "packages/cli"
+  },
+  "keywords": [
+    "crawler",
+    "scraper",
+    "cli",
+    "recipe"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "sideEffects": false,
+  "nx": {
+    "targets": {
+      "typecheck": {
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "lint": {
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "e2e": {
+        "executor": "nx:run-commands",
+        "dependsOn": [
+          "build",
+          {
+            "projects": [
+              "@open.craw/core"
+            ],
+            "target": "e2e"
+          }
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          "{workspaceRoot}/packages/core/e2e/**"
+        ],
+        "options": {
+          "command": "tsc -p tsconfig.e2e.json && jest --config jest.e2e.config.cts",
+          "cwd": "packages/cli"
+        }
+      }
+    }
+  }
+}

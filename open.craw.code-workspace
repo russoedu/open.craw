@@ -81,6 +81,20 @@
         "script": "core:build",
         "problemMatcher": [],
         "group": "build"
+      },
+      {
+        "label": "cli: qa",
+        "type": "npm",
+        "script": "cli:qa",
+        "problemMatcher": [],
+        "group": "qa"
+      },
+      {
+        "label": "cli: build",
+        "type": "npm",
+        "script": "cli:build",
+        "problemMatcher": [],
+        "group": "build"
       }
     ]
   },

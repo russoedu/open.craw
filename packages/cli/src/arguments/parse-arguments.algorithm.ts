@@ -1,0 +1,86 @@
+import { parseArgs } from 'node:util'
+import type { Command, CommonOptions } from './command.contract'
+
+export const USAGE = `open-craw <command> [options]
+
+Commands
+  validate <recipe files or directories...>   Parse and bind the recipes; list every problem with its path.
+  run <recipe files or directories...>        Crawl. Records go to --out as JSON Lines, or to stdout.
+  probe <url>                                 Fetch a page and report where its data lives.
+
+Options for run
+  --out <file>        Write records to this JSON Lines file (default: stdout).
+  --append            Keep what --out holds and add to it (each line carries _key).
+  --resume            Skip records --out already has (needs --append).
+  --only <id>         Run only this input recipe (repeatable).
+  --dry-run           One record per input, printed with the scope it was mapped from.
+  --trace             Print the crawl trace to stderr.
+  --headed            Show the browser.
+
+Options for probe
+  --browser           Also render the page in a browser and list the JSON it fetches.
+
+Options for both
+  --browser-path <p>  A browser binary other than the one Playwright installed (or OPEN_CRAW_CHROMIUM).
+  --insecure-tls      Accept an intercepting proxy's certificate (or OPEN_CRAW_INSECURE_TLS=1).
+  --user-agent <ua>   The user agent to send.
+  --help, --version`
+
+const OPTIONS = {
+  'out':          { type: 'string' },
+  'append':       { type: 'boolean' },
+  'resume':       { type: 'boolean' },
+  'only':         { type: 'string', multiple: true },
+  'dry-run':      { type: 'boolean' },
+  'trace':        { type: 'boolean' },
+  'headed':       { type: 'boolean' },
+  'browser':      { type: 'boolean' },
+  'browser-path': { type: 'string' },
+  'insecure-tls': { type: 'boolean' },
+  'user-agent':   { type: 'string' },
+  'help':         { type: 'boolean', short: 'h' },
+  'version':      { type: 'boolean', short: 'v' },
+} as const
+
+/**
+ * Turns argv into a command.
+ *
+ * @param argv - The arguments after the program name.
+ * @param env - The environment, for the defaults some options have.
+ * @returns The command.
+ * @throws Error with a usage message on bad input.
+ */
+export function parseArguments (argv: readonly string[], env: Record<string, string | undefined> = {}): Command {
+  const { values, positionals } = parseArgs({ args: [...argv], options: OPTIONS, allowPositionals: true, strict: true })
+  if (values.help === true) return { name: 'help' }
+  if (values.version === true) return { name: 'version' }
+  const [name, ...rest] = positionals
+  const options: CommonOptions = {
+    browserPath: values['browser-path'] ?? env.OPEN_CRAW_CHROMIUM,
+    insecureTls: values['insecure-tls'] === true || env.OPEN_CRAW_INSECURE_TLS === '1',
+    userAgent:   values['user-agent'],
+  }
+  switch (name) {
+    case undefined: { return { name: 'help' }
+    }
+    case 'validate': {
+      if (rest.length === 0) throw new Error('validate needs at least one recipe file or directory')
+
+      return { name: 'validate', paths: rest }
+    }
+    case 'run': {
+      if (rest.length === 0) throw new Error('run needs at least one recipe file or directory')
+      if (values.resume === true && values.append !== true) throw new Error('--resume needs --append (and --out)')
+      if ((values.append === true || values.resume === true) && values.out === undefined) throw new Error('--append and --resume need --out')
+
+      return { name: 'run', paths: rest, out: values.out, append: values.append === true, resume: values.resume === true, trace: values.trace === true, dryRun: values['dry-run'] === true, only: values.only ?? [], headed: values.headed === true, options }
+    }
+    case 'probe': {
+      if (rest.length !== 1) throw new Error('probe needs exactly one URL')
+
+      return { name: 'probe', url: rest[0], browser: values.browser === true, options }
+    }
+    default: { throw new Error(`unknown command "${name}"`)
+    }
+  }
+}
