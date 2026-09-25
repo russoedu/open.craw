@@ -61,7 +61,7 @@ export async function runRecipes (command: Extract<Command, { name: 'run' }>, te
     const report = await crawler.run(new RecipeSet(set.output, inputs))
     if (command.out === undefined && !command.dryRun) for (const record of (sink as ReturnType<typeof memorySink>).records) terminal.out(JSON.stringify(record.data))
     for (const recipe of report.recipes) {
-      terminal.err(`${recipe.recipeId}: ${recipe.emitted} emitted, ${recipe.rejected} rejected, ${recipe.duplicates} duplicates, ${recipe.skipped} skipped, ${recipe.pages} pages, ${recipe.durationMs} ms${recipe.error === undefined ? '' : `, stopped: ${recipe.error}`}`)
+      terminal.err(`${recipe.recipeId}: ${recipe.emitted} emitted, ${recipe.rejected} rejected, ${recipe.duplicates} duplicates, ${recipe.skipped} skipped, ${recipe.stepsSkipped > 0 ? `${recipe.stepsSkipped} steps skipped (see --trace), ` : ''}${recipe.pages} pages, ${recipe.durationMs} ms${recipe.error === undefined ? '' : `, stopped: ${recipe.error}`}`)
     }
     if (!command.dryRun) terminal.err(`${report.records} records${report.sink.location === undefined ? '' : ` written to ${report.sink.location}`}`)
 

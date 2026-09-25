@@ -1,10 +1,14 @@
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { AccessBroker, BrowserClient, HttpClient } from '@opencraw/core'
 import type { AccessLease } from '@opencraw/core'
 import { resolveAccess } from '../access'
 import type { CommonOptions } from '../arguments'
 import type { Terminal } from '../terminal'
 import { findData } from './find-data.algorithm'
-import { probeReport } from './probe-report.mapper'
+import { describePdf } from './pdf-findings.mapper'
+import type { PdfFindings } from './pdf-findings.mapper'
+import { pdfReport, probeReport } from './probe-report.mapper'
 
 const BROWSER_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36'
 const OBSERVE_MS = 4000
@@ -16,6 +20,8 @@ export interface ProbeResult {
   findings: ReturnType<typeof findData>
   /** JSON responses observed while the page rendered; empty unless `options.browser` was set. */
   observed: string[]
+  /** Present when the URL is a PDF: its rows and likely table headers. */
+  pdf?:     PdfFindings
 }
 
 /**
@@ -26,7 +32,10 @@ export interface ProbeResult {
  * involved: the cli's `probePage` and `@opencraw/mcp`'s probe tool both
  * build on this, one printing the result, the other returning it as data.
  *
- * @param url - The page to probe.
+ * A PDF (by content type, or a local `.pdf` path) is read instead: its rows,
+ * and the rows that look like table headers.
+ *
+ * @param url - The page to probe, or a local file path.
  * @param options - Browser path, TLS and user agent, plus whether to render.
  * @returns What was found.
  * @throws Error when the fetch itself fails.
@@ -41,11 +50,14 @@ export async function probeUrl (url: string, options: { browser: boolean } & Com
     headers:           lease.headers,
   })
   try {
-    const response = await client.send({ url, as: 'html' })
-    const html = response.body.kind === 'html' ? response.body.html : ''
-    const observed = options.browser ? await observeBrowserJson(url, options, lease) : []
+    const target = /^[a-z][\w+.-]+:/i.test(url) ? url : pathToFileURL(resolve(url)).href
+    const response = await client.send({ url: target })
+    const { body } = response
+    if (body.kind === 'pdf') return { url: response.url, status: response.status, findings: findData(''), observed: [], pdf: describePdf(body) }
+    const text = body.kind === 'html' ? body.html : (body.kind === 'text' ? body.text : JSON.stringify(body.data))
+    const observed = options.browser && !target.startsWith('file:') ? await observeBrowserJson(url, options, lease) : []
 
-    return { url: response.url, status: response.status, findings: findData(html), observed }
+    return { url: response.url, status: response.status, findings: findData(text), observed }
   } finally {
     await client.dispose()
   }
@@ -62,7 +74,7 @@ export async function probeUrl (url: string, options: { browser: boolean } & Com
 export async function probePage (url: string, options: { browser: boolean } & CommonOptions, terminal: Terminal): Promise<number> {
   try {
     const result = await probeUrl(url, options)
-    terminal.out(probeReport(result.url, result.status, result.findings, result.observed))
+    terminal.out(result.pdf === undefined ? probeReport(result.url, result.status, result.findings, result.observed) : pdfReport(result.url, result.pdf))
 
     return 0
   } catch (error) {
