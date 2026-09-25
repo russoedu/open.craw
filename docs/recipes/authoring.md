@@ -219,7 +219,7 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 
 | Step | Fields | Notes |
 |---|---|---|
-| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `html`, `text`, `pdf`, `csv`), `encoding?`, `delimiter?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF or workbook, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`). 4xx/5xx fail the step. |
+| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `html`, `text`, `pdf`, `csv`, `xlsx`), `encoding?`, `delimiter?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF or workbook, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`). 4xx/5xx fail the step. |
 
 Text bodies are decoded from, in order: a byte-order mark, `encoding` (any WHATWG label: `windows-1252`,
 `iso-8859-15`, `shift_jis`), the charset the server declares, UTF-8, and Windows-1252 for text that is not
@@ -441,7 +441,7 @@ order. Rules:
 | an id holding a **list of texts** | with `jsonpath`: every entry that parses as JSON becomes one element of an array and the path runs over the array | same |
 | an id holding **data** (an object, a list of objects) | with `jsonpath` | same |
 | an id holding a **read PDF** (a `request` with `as: "pdf"`) | with `table`, `regex` or `jsonpath` (§4.6) | same |
-| an id holding a **read workbook** (a CSV) | with `table`, `regex` or `jsonpath` (§4.7) | same |
+| an id holding a **read workbook** (a spreadsheet or a CSV) | with `table`, `regex` or `jsonpath` (§4.7) | same |
 
 JSON-LD wrapped in `/* <![CDATA[ */ ... /* ]]> */` or `<!-- -->` guards is unwrapped before parsing. The
 common pattern, both sites in the examples use it:
@@ -562,9 +562,20 @@ looks like a table header, with a ready `selector`. The Stellantis example
 
 `fillDown` (below, §4.7) works on PDF tables too.
 
-### 4.7 CSV and workbooks
+### 4.7 Spreadsheets and CSV
 
-`request` with `as: "csv"` (or a response served as `text/csv`, `application/csv` or
+Both read into a **workbook**: sheets of cells that the same three extract kinds read.
+
+**Spreadsheets.** `request` with `as: "xlsx"` (or a response served with a spreadsheet content type, or a
+local `file:…xlsx` / `…xlsm`) reads every worksheet with
+[`@opencraw/office-reader`](../../packages/office-reader). Numbers and booleans keep their type, so
+`13955.625` is a number that no locale guess can misread. Dates become ISO text (`2026-06-01`,
+`2026-06-01T09:30:00`), errors their text (`#DIV/0!`), and empty cells `''`. Formulas give their cached
+value; nothing is evaluated, and display formats are not applied (a percentage stays `0.125`). Hidden sheets
+and rows are read, and `table` skips them unless `includeHidden`. Merged ranges are recorded, and `table`
+fills them. A legacy `.xls`, a password-protected file or an `.ods` fails the step, with what to do.
+
+**CSV.** `request` with `as: "csv"` (or a response served as `text/csv`, `application/csv` or
 `text/tab-separated-values`, or a local `file:…csv` / `…tsv`) reads the file into a **workbook**: a CSV is a
 workbook with one sheet, named after the file (`…/prezzo_alle_8.csv` → `prezzo_alle_8`). Every cell stays
 text; `number` with a `locale` and `date` with a `format` convert them in the mapping.
@@ -582,11 +593,13 @@ The same three extract kinds read it:
 |---|---|---|
 | `table` | tables, found by their header row | the list itself, below any title lines |
 | `regex` | the text: cells separated by a tab, rows by a newline, sheets by a blank line | a date in a title line: `Estrazione del (\S+)` |
-| `jsonpath` | the structure: `{ kind: "workbook", sheets: [{ name, rows: [["cell", …], …] }], csv: { encoding, delimiter } }` | a file with no header row: `$.sheets[0].rows[*]` |
+| `jsonpath` | the structure: `{ kind: "workbook", sheets: [{ name, rows: [["cell", …], …] }], csv: { encoding, delimiter } }` | a file with no header row: `$.sheets[0].rows[*]`; `merges`, `hidden` and `hiddenRows` too, for a spreadsheet |
 
 A grid needs no geometry, so a workbook table is simpler than a PDF one: column *i* of a row belongs to header
 cell *i*. The `selector` matches the header row (its non-empty cells joined by spaces, whitespace collapsed),
-and each table is `{ sheet, title, header, rows }`.
+and each table is `{ sheet, title, header, rows }`. Before reading, every merged range's value is copied
+into the cells it covers: a brand merged down its models reads on every row, and a group header merged
+across its sub-columns names each of them.
 
 ```json
 { "type": "request", "url": "{{start.url}}" },
@@ -607,8 +620,20 @@ and each table is `{ sheet, title, header, rows }`.
 | `sheet` | A pattern for the names of the sheets to read (default: all). |
 | `includeHidden` | Read hidden sheets and rows too. |
 
-`opencraw probe <url or file.csv>` reports the encoding and delimiter it used, the first rows, and every row
-that looks like a header, with a ready `selector`.
+A spreadsheet table under a two-row merged header (the German KBA registration statistics):
+
+```json
+{ "type": "extract", "id": "table", "kind": "table", "sheet": "^FZ 10\\.1$", "selector": "^Marke Modellreihe",
+  "headerRows": 2, "until": "^NEUZULASSUNGEN INSGESAMT",
+  "columns": { "brand": "^Marke$", "model": "^Modellreihe$", "month": "^Insgesamt August", "bev": "^mit Elektroantrieb \\(BEV\\) August" } }
+```
+
+`Insgesamt` is merged over *August 2026 · Jan.–August 2026 · Anteil in %*, so the three columns read as
+`Insgesamt August 2026` and so on, and the brand merged down its models' rows fills every row.
+
+`opencraw probe <url or file>` lists a workbook's sheets, the first rows, and every row that looks like a
+header, with a ready `selector` (and a `headerRows` hint when the header has merged cells). For a CSV it
+also reports the encoding and the delimiter it used.
 
 ## 5. Mapping
 

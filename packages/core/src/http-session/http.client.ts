@@ -5,7 +5,7 @@ import { request } from 'playwright'
 import type { APIRequestContext, APIResponse } from 'playwright'
 import { readPdf } from '../pdf-document'
 import type { BodyKind } from '../recipe-schema'
-import { csvWorkbook, sheetNameOf } from '../workbook-document'
+import { csvWorkbook, readXlsxWorkbook, sheetNameOf } from '../workbook-document'
 import { HttpError } from './http-response.contract'
 import type { HttpBody, HttpRequest, HttpResponse, HttpSender } from './http-response.contract'
 import { charsetOf, decodeText } from './text-decoding.algorithm'
@@ -86,8 +86,8 @@ async function readBody (response: APIResponse, httpRequest: HttpRequest): Promi
 }
 
 /**
- * A `file:` URL, read from disk: a PDF, CSV or JSON a recipe gets from a
- * folder instead of a server. The format is `as`, else the file extension.
+ * A `file:` URL, read from disk: a PDF, spreadsheet, CSV or JSON a recipe
+ * gets from a folder instead of a server. The format is `as`, else the file extension.
  */
 async function readLocalFile (httpRequest: HttpRequest): Promise<HttpResponse> {
   const path = fileURLToPath(httpRequest.url)
@@ -98,6 +98,7 @@ async function readLocalFile (httpRequest: HttpRequest): Promise<HttpResponse> {
 
 async function parseBody (format: BodyKind, bytes: Uint8Array, url: string, reading: { encoding?: string, delimiter?: string, charset?: string }): Promise<HttpBody> {
   if (format === 'pdf') return readPdf(bytes, url)
+  if (format === 'xlsx') return readXlsxWorkbook(bytes, url)
   const { text, encoding } = decodeText(bytes, reading)
   if (format === 'csv') return csvWorkbook(text, { name: sheetNameOf(url), encoding, delimiter: reading.delimiter })
   if (format === 'json') {
@@ -114,6 +115,8 @@ async function parseBody (format: BodyKind, bytes: Uint8Array, url: string, read
 function formatFromContentType (contentType: string): BodyKind {
   const type = contentType.toLowerCase().split(';', 1)[0].trim()
   if (CSV_TYPES.has(type)) return 'csv'
+  // A legacy .xls goes to the spreadsheet reader too, which says what to do with it.
+  if (type.includes('spreadsheetml') || type.startsWith('application/vnd.ms-excel')) return 'xlsx'
   if (type.includes('json')) return 'json'
   if (type.includes('pdf')) return 'pdf'
   if (type.includes('html') || type.includes('xml')) return 'html'
@@ -124,7 +127,7 @@ function formatFromContentType (contentType: string): BodyKind {
 const CSV_TYPES = new Set(['text/csv', 'application/csv', 'text/x-csv', 'application/x-csv', 'text/comma-separated-values', 'text/tab-separated-values'])
 
 function formatFromExtension (extension: string): BodyKind {
-  const formats: Record<string, BodyKind> = { '.json': 'json', '.pdf': 'pdf', '.csv': 'csv', '.tsv': 'csv', '.html': 'html', '.htm': 'html', '.xml': 'html' }
+  const formats: Record<string, BodyKind> = { '.json': 'json', '.pdf': 'pdf', '.csv': 'csv', '.tsv': 'csv', '.xlsx': 'xlsx', '.xlsm': 'xlsx', '.xls': 'xlsx', '.html': 'html', '.htm': 'html', '.xml': 'html' }
 
   return formats[extension.toLowerCase()] ?? 'text'
 }

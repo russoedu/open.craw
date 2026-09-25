@@ -90,7 +90,7 @@ optional `when` template that must render truthy for the step to run.
 | `wait` | web | – | one of `selector`, `ms`, `state: 'networkidle'` |
 | `evaluate` | web | value | `script`, JavaScript run in the page. Trusted recipes only. |
 | `screenshot` | web | – | `path` |
-| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'html' \| 'text' \| 'pdf' \| 'csv'`, `encoding?`, `delimiter?` (CSV) |
+| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'html' \| 'text' \| 'pdf' \| 'csv' \| 'xlsx'`, `encoding?`, `delimiter?` (CSV) |
 | `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex' \| 'table'`, `take`, `many?`, `from?`; `table` also `columns?`, `until?`, `align?` (PDF), `fillDown?`, `sheet?`, `headerRows?`, `includeHidden?` (workbook) |
 | `set` | both | value | `value` (template or literal) |
 | `collect` | both | – | `into` (a list id bound in an enclosing scope), `value` (template or literal); appends, so values outlive the `forEach` iteration or `paginate` page that found them |
@@ -112,6 +112,13 @@ the header row, maps column *i* to header *i*, skips empty rows, ends at `until`
 end, and returns `{ sheet, title, header, rows }`; merged ranges are filled, `headerRows` joins a header over
 several rows, `fillDown` fills blank cells from the row above (PDF tables too). Text bodies of every kind are
 decoded the same way.
+
+A spreadsheet (`as: 'xlsx'`, a spreadsheet content type, `.xlsx`/`.xlsm`) is read by `@opencraw/office-reader`
+into the same workbook shape: numbers and booleans typed, dates ISO text, errors their text, formulas their
+cached value, with hidden sheets and rows and merged ranges. `.xls`, encrypted files and `.ods` fail with what
+to do. `@opencraw/office-reader` is a standalone package: `readXlsx(source, { sheets, values, limits })` from
+a path, bytes, a Blob or a stream, in Node or a browser; zip entries capped by declared size, XML entities never
+expanded.
 
 `take` is `text` (default), `html`, `value`, `json` or `attr:<name>`. `xpath` works on live pages only; on
 fetched HTML use `css`; on JSON use `jsonpath`. A `jsonpath` extract whose `from` is text parses it as JSON; a list of

@@ -1,8 +1,16 @@
-/** One sheet of a workbook: a grid of cells as text. A CSV is a workbook of one sheet. */
+/**
+ * A cell: text, or, from a spreadsheet, the number or boolean it holds
+ * (`13955.625` stays a number, so no locale guess can misread it). Dates are
+ * ISO text (`2026-06-01`, `2026-06-01T09:30:00`), errors their text
+ * (`#DIV/0!`), an empty cell `''`. A CSV's cells are all text.
+ */
+export type WorkbookCell = string | number | boolean
+
+/** One sheet of a workbook. A CSV is a workbook of one sheet. */
 export interface Sheet {
   name:        string
   /** Top to bottom; a row holds as many cells as were read (rows can be ragged). */
-  rows:        string[][]
+  rows:        WorkbookCell[][]
   /** A sheet hidden in the workbook: `table` skips it unless `includeHidden`. */
   hidden?:     boolean
   /** Rows hidden in the sheet (0-based): `table` skips them unless `includeHidden`. */
@@ -21,7 +29,7 @@ export interface CsvFormat {
   delimiter: string
 }
 
-/** A spreadsheet or a CSV read into sheets of text cells: what `extract` works on. */
+/** A spreadsheet or a CSV read into sheets of cells: what `extract` works on. */
 export interface WorkbookDocument {
   kind:   'workbook'
   sheets: Sheet[]
@@ -39,7 +47,7 @@ export interface WorkbookDocument {
 export function workbookText (document: WorkbookDocument): string {
   return document.sheets
     .filter(sheet => sheet.hidden !== true)
-    .map(sheet => visibleRows(sheet).map(row => row.join('\t')).join('\n'))
+    .map(sheet => visibleRows(sheet).map(row => row.map(String).join('\t')).join('\n'))
     .join('\n\n')
 }
 
@@ -53,7 +61,7 @@ export function isWorkbookDocument (value: unknown): value is WorkbookDocument {
   return typeof value === 'object' && value !== null && (value as { kind?: unknown }).kind === 'workbook' && Array.isArray((value as { sheets?: unknown }).sheets)
 }
 
-function visibleRows (sheet: Sheet): string[][] {
+function visibleRows (sheet: Sheet): WorkbookCell[][] {
   if (sheet.hiddenRows === undefined || sheet.hiddenRows.length === 0) return sheet.rows
   const hidden = new Set(sheet.hiddenRows)
 

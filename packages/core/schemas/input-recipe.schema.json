@@ -1242,7 +1242,8 @@
                 "html",
                 "text",
                 "pdf",
-                "csv"
+                "csv",
+                "xlsx"
               ]
             },
             "encoding": {

@@ -1,4 +1,4 @@
-import type { Sheet, WorkbookDocument } from './workbook-document.model'
+import type { Sheet, WorkbookCell, WorkbookDocument } from './workbook-document.model'
 
 /** What a table extract looks for in a workbook. */
 export interface GridTableQuery {
@@ -25,8 +25,8 @@ export interface GridTable {
   title:  string
   /** The column keys, left to right. */
   header: string[]
-  /** One object per row, keyed by column. */
-  rows:   Record<string, string>[]
+  /** One object per row, keyed by column; text trimmed, numbers and booleans as they are. */
+  rows:   Record<string, WorkbookCell>[]
 }
 
 interface Column {
@@ -67,11 +67,11 @@ export function findGridTables (document: WorkbookDocument, query: GridTableQuer
  * @param keys - The columns to fill.
  * @returns The rows, filled (new objects; the input is not changed).
  */
-export function fillDown (rows: readonly Record<string, string>[], keys: readonly string[]): Record<string, string>[] {
-  const last = new Map<string, string>()
+export function fillDown<Row extends Record<string, unknown>> (rows: readonly Row[], keys: readonly string[]): Row[] {
+  const last = new Map<string, unknown>()
 
   return rows.map((row) => {
-    const filled = { ...row }
+    const filled: Record<string, unknown> = { ...row }
     for (const key of keys) {
       const value = filled[key]
       if (value === undefined || value === '') {
@@ -82,7 +82,7 @@ export function fillDown (rows: readonly Record<string, string>[], keys: readonl
       }
     }
 
-    return filled
+    return filled as Row
   })
 }
 
@@ -123,7 +123,7 @@ function sheetTables (sheet: Sheet, query: GridTableQuery): GridTable[] {
  * column with no header text but data below is keyed by its letter (`A`); one
  * with neither is dropped. A key seen before gets a counter (`Price 2`).
  */
-function columnsOf (grid: readonly string[][], headerIndexes: readonly number[], body: readonly number[]): Column[] {
+function columnsOf (grid: readonly WorkbookCell[][], headerIndexes: readonly number[], body: readonly number[]): Column[] {
   const width = Math.max(0, ...[...headerIndexes, ...body].map(index => grid[index]?.length ?? 0))
   const seen = new Map<string, number>()
   const columns: Column[] = []
@@ -133,7 +133,7 @@ function columnsOf (grid: readonly string[][], headerIndexes: readonly number[],
       const text = clean(grid[row]?.[index] ?? '')
       if (text !== '' && !parts.includes(text)) parts.push(text)
     }
-    const hasData = body.some(row => (grid[row]?.[index] ?? '').trim() !== '')
+    const hasData = body.some(row => clean(grid[row]?.[index] ?? '') !== '')
     if (!hasData && parts.length === 0) continue
     const base = parts.length === 0 ? columnLetter(index) : parts.join(' ')
     const count = (seen.get(base) ?? 0) + 1
@@ -144,10 +144,14 @@ function columnsOf (grid: readonly string[][], headerIndexes: readonly number[],
   return columns
 }
 
-function named (row: readonly string[], columns: readonly Column[], patterns: Record<string, RegExp> | undefined): Record<string, string> {
-  const value = (column: Column): string => (row[column.index] ?? '').trim()
+function named (row: readonly WorkbookCell[], columns: readonly Column[], patterns: Record<string, RegExp> | undefined): Record<string, WorkbookCell> {
+  const value = (column: Column): WorkbookCell => {
+    const cell = row[column.index] ?? ''
+
+    return typeof cell === 'string' ? cell.trim() : cell
+  }
   if (patterns === undefined) return Object.fromEntries(columns.map(column => [column.key, value(column)]))
-  const record: Record<string, string> = {}
+  const record: Record<string, WorkbookCell> = {}
   for (const [key, pattern] of Object.entries(patterns)) {
     const column = columns.find(candidate => pattern.test(candidate.key))
     if (column !== undefined) record[key] = value(column)
@@ -157,7 +161,7 @@ function named (row: readonly string[], columns: readonly Column[], patterns: Re
 }
 
 /** The sheet's rows with every merged range's value copied into the cells it covers. */
-function filledGrid (sheet: Sheet): string[][] {
+function filledGrid (sheet: Sheet): WorkbookCell[][] {
   if (sheet.merges === undefined || sheet.merges.length === 0) return sheet.rows
   const grid = sheet.rows.map(row => [...row])
   for (const reference of sheet.merges) {
@@ -202,10 +206,10 @@ function columnLetter (index: number): string {
 }
 
 /** A row as a header pattern sees it: its non-empty cells, whitespace collapsed, joined by spaces. */
-function plain (row: readonly string[] | undefined): string {
+function plain (row: readonly WorkbookCell[] | undefined): string {
   return (row ?? []).map(text => clean(text)).filter(text => text !== '').join(' ')
 }
 
-function clean (text: string): string {
-  return text.replaceAll(/\s+/g, ' ').trim()
+function clean (cell: WorkbookCell): string {
+  return String(cell).replaceAll(/\s+/g, ' ').trim()
 }

@@ -53,6 +53,12 @@ beforeAll(async () => {
 
         break
       }
+      case '/incentivi': {
+        outgoing.setHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        outgoing.end(readFileSync(join(__dirname, '..', '..', '..', 'office-reader', 'src', 'spreadsheet', 'fixtures', 'incentivi.xlsx')))
+
+        break
+      }
       case '/latin': {
         outgoing.setHeader('content-type', 'text/plain; charset=ISO-8859-1')
         outgoing.end(Buffer.from([0x43, 0xE9]))
@@ -136,11 +142,28 @@ describe('HttpClient', () => {
       const forced = await client.send({ url: `${base}/listino.csv`, as: 'csv', delimiter: ',', encoding: 'utf8' })
       expect(forced.body).toMatchObject({ csv: { encoding: expect.stringMatching(/^utf-8$/), delimiter: ',' } })
       // A delimiter only concerns a CSV: a body the content type reads as something else ignores it.
-      expect((await client.send({ url: `${base}/page`, delimiter: ';' })).body.kind).toBe('html')
+      const page = await client.send({ url: `${base}/page`, delimiter: ';' })
+      expect(page.body.kind).toBe('html')
       const tsv = await client.send({ url: pathToFileURL(join(__dirname, '..', 'workbook-document', 'fixtures', 'listino.tsv')).href })
       expect(tsv.body).toMatchObject({ kind: 'workbook', sheets: [{ name: 'listino', rows: [['Marke', 'Modell', 'Preis'], ['Škoda', 'Elroq', '33.900'], ['Volkswagen', 'ID.3', '36.900']] }], csv: { encoding: 'utf-16le', delimiter: '\t' } })
       const latin = await client.send({ url: `${base}/latin` })
       expect(latin.body).toEqual({ kind: 'text', text: 'Cé' })
+    } finally {
+      await client.dispose()
+    }
+  })
+
+  it('reads a spreadsheet by content type or extension into a workbook, and says what to do with a legacy one', async () => {
+    const client = await HttpClient.open()
+    try {
+      const served = await client.send({ url: `${base}/incentivi` })
+      expect(served.body).toMatchObject({ kind: 'workbook', sheets: [{ name: 'Incentivi giugno', hiddenRows: [6] }, { name: 'Archivio', hidden: true }, { name: 'Maggio' }] })
+      const local = await client.send({ url: pathToFileURL(join(__dirname, '..', '..', '..', 'office-reader', 'src', 'spreadsheet', 'fixtures', 'incentivi.xlsx')).href })
+      expect(local.body.kind === 'workbook' && local.body.sheets[0].rows[4]).toEqual(['Fiat', 'Pandina', 15_950, 13_955.625, 0.125, '2026-06-01', true, 'Solo rottamazione'])
+      const directory = await mkdtemp(join(tmpdir(), 'http-client-'))
+      await writeFile(join(directory, 'old.xls'), new Uint8Array([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]))
+      const legacy = pathToFileURL(join(directory, 'old.xls')).href
+      await expect(client.send({ url: legacy })).rejects.toThrow(/old\.xls: a legacy binary Office file .* save it as \.xlsx/)
     } finally {
       await client.dispose()
     }

@@ -136,6 +136,12 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
 
     return
   }
+  if (url.pathname === '/incentivi.xlsx') {
+    outgoing.writeHead(200, { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    outgoing.end(readFileSync(join(__dirname, '..', '..', 'office-reader', 'src', 'spreadsheet', 'fixtures', 'incentivi.xlsx')))
+
+    return
+  }
   if (url.pathname === '/discounts.pdf') {
     outgoing.writeHead(200, { 'content-type': 'application/pdf' })
     outgoing.end(readFileSync(join(__dirname, '..', 'src', 'pdf-document', 'fixtures', 'discounts.pdf')))

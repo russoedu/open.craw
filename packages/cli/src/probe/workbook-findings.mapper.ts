@@ -57,7 +57,7 @@ function filledRows (sheet: Sheet): { index: number, cells: string[] }[] {
   const hidden = new Set(sheet.hiddenRows)
 
   return sheet.rows.flatMap((row, index) => {
-    const cells = row.map(cell => cell.replaceAll(/\s+/g, ' ').trim()).filter(cell => cell !== '')
+    const cells = row.map(cell => String(cell).replaceAll(/\s+/g, ' ').trim()).filter(cell => cell !== '')
 
     return cells.length === 0 || hidden.has(index) ? [] : [{ index, cells }]
   })

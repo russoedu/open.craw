@@ -62,14 +62,16 @@ opencraw probe https://example.com/product/1
 opencraw probe https://example.com/configurator --browser
 ```
 
-A PDF or a CSV (a URL served as `application/pdf` or `text/csv`, or a local `.pdf`, `.csv` or `.tsv` path)
-is read instead: `probe` lists its first rows and every row that looks like a table header, with the
-`selector` a `table` extract needs. For a CSV it also names the encoding and the delimiter it detected.
+A PDF, a spreadsheet or a CSV (a URL served as `application/pdf`, a spreadsheet type or `text/csv`, or a
+local `.pdf`, `.xlsx`, `.csv` or `.tsv` path) is read instead: `probe` lists its sheets or pages, its first
+rows, and every row that looks like a table header, with the `selector` a `table` extract needs. For a CSV it
+also names the encoding and the delimiter it detected.
 
 ```sh
 opencraw probe https://example.com/price-list.pdf
 opencraw probe ./sheets/september.pdf
 opencraw probe ./exports/listino.csv
+opencraw probe ./exports/incentivi.xlsx
 ```
 
 Use it before writing an input recipe, to find the shape a site's data actually takes (§9 of

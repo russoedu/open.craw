@@ -53,8 +53,9 @@ endpoints only a script fetches after load.
 
 Returns `{ url, status, findings: { jsonLd, inlineJson, jsonUrls, scriptHosts, apiLinks }, observed }`. For a
 PDF (served as `application/pdf`, or a local path) it adds `pdf: { pages, rows, headers }`: the first rows and
-every likely table header with the `selector` a `table` extract needs. For a CSV (served as `text/csv`, or a
-local `.csv` / `.tsv` path) it adds `workbook: { csv: { encoding, delimiter }, sheets, rows, headers }`.
+every likely table header with the `selector` a `table` extract needs. For a spreadsheet or a CSV (served as a
+spreadsheet type or `text/csv`, or a local `.xlsx`, `.csv` or `.tsv` path) it adds
+`workbook: { csv?: { encoding, delimiter }, sheets, rows, headers }`.
 
 ### `validate`
 

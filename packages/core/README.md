@@ -21,7 +21,7 @@ npx playwright install chromium   # web recipes and browser bootstraps only
 | `crawler.run(set)` | Runs every input recipe in sequence; returns a `CrawlReport`. |
 | `crawler.close()` | Closes the browser, if one was launched. |
 | `readPdf(bytes)`, `findTables(pdf, query)`, `pdfText(pdf)` | The PDF reader and table extractor `request as: "pdf"` and `extract kind: "table"` use, for tooling. |
-| `csvWorkbook(text, options)`, `parseCsv(text, delimiter)`, `detectDelimiter(text)`, `findGridTables(workbook, query)`, `workbookText(workbook)` | The CSV reader and the workbook table extractor `request as: "csv"` and `extract kind: "table"` use, for tooling. |
+| `csvWorkbook(text, options)`, `parseCsv(text, delimiter)`, `detectDelimiter(text)`, `findGridTables(workbook, query)`, `workbookText(workbook)` | The CSV reader and the workbook table extractor `request as: "csv"` / `"xlsx"` and `extract kind: "table"` use, for tooling. Spreadsheets are read by [`@opencraw/office-reader`](../office-reader). |
 | `HttpClient`, `BrowserClient` | The same clients the engine's runners use, for tooling built on top of `@opencraw/core` (`@opencraw/cli`'s `probe` command uses both). |
 | `parseInputRecipe`, `parseOutputRecipe`, `inputRecipeJsonSchema`, `outputRecipeJsonSchema`, `accessConfigJsonSchema` | The contracts, for tooling. |
 

@@ -20,6 +20,7 @@
     "!**/*.js.map"
   ],
   "dependencies": {
+    "@opencraw/office-reader": "^0.0.1",
     "cheerio": "^1.2.0",
     "domhandler": "^6.0.1",
     "jsonpath-plus": "^10.4.0",
@@ -54,7 +55,8 @@
       "e2e": {
         "executor": "nx:run-commands",
         "dependsOn": [
-          "build"
+          "build",
+          "^build"
         ],
         "options": {
           "command": "tsc -p tsconfig.e2e.json && jest --config jest.e2e.config.cts",
@@ -70,6 +72,16 @@
           "command": "node tools/emit-json-schemas.mjs",
           "cwd": "packages/core"
         }
+      },
+      "typecheck": {
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "lint": {
+        "dependsOn": [
+          "^build"
+        ]
       }
     }
   }
