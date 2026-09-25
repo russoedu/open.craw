@@ -5,7 +5,7 @@ export const CRAWL_MODES = ['web', 'api'] as const
 export const SELECTOR_KINDS = ['css', 'xpath', 'jsonpath', 'regex', 'table'] as const
 /** `take` also accepts `attr:<name>`, which is validated by pattern rather than listed. */
 export const TAKE_KINDS = ['text', 'html', 'value', 'json'] as const
-export const BODY_KINDS = ['json', 'html', 'text', 'pdf'] as const
+export const BODY_KINDS = ['json', 'html', 'text', 'pdf', 'csv'] as const
 /** How a PDF table aligns a row's values against a cell wrapped over several lines. */
 export const TABLE_ALIGNS = ['auto', 'top', 'center', 'bottom'] as const
 export const FIELD_TYPES = ['string', 'number', 'integer', 'boolean', 'date', 'datetime', 'currency', 'url', 'enum', 'array', 'object', 'json'] as const

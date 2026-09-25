@@ -4,8 +4,11 @@ import { fileURLToPath } from 'node:url'
 import { request } from 'playwright'
 import type { APIRequestContext, APIResponse } from 'playwright'
 import { readPdf } from '../pdf-document'
+import type { BodyKind } from '../recipe-schema'
+import { csvWorkbook, sheetNameOf } from '../workbook-document'
 import { HttpError } from './http-response.contract'
 import type { HttpBody, HttpRequest, HttpResponse, HttpSender } from './http-response.contract'
+import { charsetOf, decodeText } from './text-decoding.algorithm'
 
 /** Playwright's storage state: cookies plus per-origin local storage. */
 export type StorageState = Awaited<ReturnType<APIRequestContext['storageState']>>
@@ -58,7 +61,7 @@ export class HttpClient implements HttpSender {
       data:    httpRequest.body as string | Record<string, unknown> | undefined,
       timeout: httpRequest.timeoutMs ?? this.timeoutMs,
     })
-    const body = await readBody(response, httpRequest.as)
+    const body = await readBody(response, httpRequest)
     const result: HttpResponse = { status: response.status(), url: response.url(), headers: response.headers(), body }
     if (response.status() >= 400) throw new HttpError(response.status(), response.url(), body, response.headers())
 
@@ -75,27 +78,29 @@ export class HttpClient implements HttpSender {
   }
 }
 
-async function readBody (response: APIResponse, as: HttpRequest['as']): Promise<HttpBody> {
-  const kind = as ?? kindFromContentType(response.headers()['content-type'] ?? '')
+async function readBody (response: APIResponse, httpRequest: HttpRequest): Promise<HttpBody> {
+  const contentType = response.headers()['content-type'] ?? ''
+  const format = httpRequest.as ?? formatFromContentType(contentType)
 
-  return parseBody(kind, await response.body(), response.url())
+  return parseBody(format, await response.body(), response.url(), { ...httpRequest, charset: charsetOf(contentType) })
 }
 
 /**
- * A `file:` URL, read from disk: a PDF or JSON a recipe gets from a folder
- * instead of a server. The kind is `as`, else the file extension.
+ * A `file:` URL, read from disk: a PDF, CSV or JSON a recipe gets from a
+ * folder instead of a server. The format is `as`, else the file extension.
  */
 async function readLocalFile (httpRequest: HttpRequest): Promise<HttpResponse> {
   const path = fileURLToPath(httpRequest.url)
   const bytes = await readFile(path)
 
-  return { status: 200, url: httpRequest.url, headers: {}, body: await parseBody(httpRequest.as ?? kindFromExtension(extname(path)), bytes, httpRequest.url) }
+  return { status: 200, url: httpRequest.url, headers: {}, body: await parseBody(httpRequest.as ?? formatFromExtension(extname(path)), bytes, httpRequest.url, httpRequest) }
 }
 
-async function parseBody (kind: HttpBody['kind'], bytes: Uint8Array, url: string): Promise<HttpBody> {
-  if (kind === 'pdf') return readPdf(bytes, url)
-  const text = new TextDecoder().decode(bytes)
-  if (kind === 'json') {
+async function parseBody (format: BodyKind, bytes: Uint8Array, url: string, reading: { encoding?: string, delimiter?: string, charset?: string }): Promise<HttpBody> {
+  if (format === 'pdf') return readPdf(bytes, url)
+  const { text, encoding } = decodeText(bytes, reading)
+  if (format === 'csv') return csvWorkbook(text, { name: sheetNameOf(url), encoding, delimiter: reading.delimiter })
+  if (format === 'json') {
     try {
       return { kind: 'json', data: JSON.parse(text) as unknown }
     } catch (error) {
@@ -103,11 +108,12 @@ async function parseBody (kind: HttpBody['kind'], bytes: Uint8Array, url: string
     }
   }
 
-  return kind === 'html' ? { kind: 'html', html: text } : { kind: 'text', text }
+  return format === 'html' ? { kind: 'html', html: text } : { kind: 'text', text }
 }
 
-function kindFromContentType (contentType: string): HttpBody['kind'] {
-  const type = contentType.toLowerCase()
+function formatFromContentType (contentType: string): BodyKind {
+  const type = contentType.toLowerCase().split(';', 1)[0].trim()
+  if (CSV_TYPES.has(type)) return 'csv'
   if (type.includes('json')) return 'json'
   if (type.includes('pdf')) return 'pdf'
   if (type.includes('html') || type.includes('xml')) return 'html'
@@ -115,8 +121,10 @@ function kindFromContentType (contentType: string): HttpBody['kind'] {
   return 'text'
 }
 
-function kindFromExtension (extension: string): HttpBody['kind'] {
-  const kinds: Record<string, HttpBody['kind']> = { '.json': 'json', '.pdf': 'pdf', '.html': 'html', '.htm': 'html', '.xml': 'html' }
+const CSV_TYPES = new Set(['text/csv', 'application/csv', 'text/x-csv', 'application/x-csv', 'text/comma-separated-values', 'text/tab-separated-values'])
 
-  return kinds[extension.toLowerCase()] ?? 'text'
+function formatFromExtension (extension: string): BodyKind {
+  const formats: Record<string, BodyKind> = { '.json': 'json', '.pdf': 'pdf', '.csv': 'csv', '.tsv': 'csv', '.html': 'html', '.htm': 'html', '.xml': 'html' }
+
+  return formats[extension.toLowerCase()] ?? 'text'
 }

@@ -47,6 +47,18 @@ beforeAll(async () => {
 
         break
       }
+      case '/listino.csv': {
+        outgoing.setHeader('content-type', 'text/csv')
+        outgoing.end(readFileSync(join(__dirname, '..', 'workbook-document', 'fixtures', 'listino.csv')))
+
+        break
+      }
+      case '/latin': {
+        outgoing.setHeader('content-type', 'text/plain; charset=ISO-8859-1')
+        outgoing.end(Buffer.from([0x43, 0xE9]))
+
+        break
+      }
       case '/redirect': {
         outgoing.statusCode = 302
         outgoing.setHeader('location', '/page')
@@ -111,6 +123,24 @@ describe('HttpClient', () => {
       await expect(client.send({ url: `${base}/page`, as: 'json' })).rejects.toThrow(/not JSON/)
       const missing = client.send({ url: `${base}/missing` })
       await expect(missing).rejects.toThrow('HTTP 404')
+    } finally {
+      await client.dispose()
+    }
+  })
+
+  it('reads a CSV by content type or extension into a workbook, decoding and detecting as it goes', async () => {
+    const client = await HttpClient.open()
+    try {
+      const csv = await client.send({ url: `${base}/listino.csv` })
+      expect(csv.body).toMatchObject({ kind: 'workbook', sheets: [{ name: 'listino' }], csv: { encoding: 'windows-1252', delimiter: ';' } })
+      const forced = await client.send({ url: `${base}/listino.csv`, as: 'csv', delimiter: ',', encoding: 'utf8' })
+      expect(forced.body).toMatchObject({ csv: { encoding: expect.stringMatching(/^utf-8$/), delimiter: ',' } })
+      // A delimiter only concerns a CSV: a body the content type reads as something else ignores it.
+      expect((await client.send({ url: `${base}/page`, delimiter: ';' })).body.kind).toBe('html')
+      const tsv = await client.send({ url: pathToFileURL(join(__dirname, '..', 'workbook-document', 'fixtures', 'listino.tsv')).href })
+      expect(tsv.body).toMatchObject({ kind: 'workbook', sheets: [{ name: 'listino', rows: [['Marke', 'Modell', 'Preis'], ['Škoda', 'Elroq', '33.900'], ['Volkswagen', 'ID.3', '36.900']] }], csv: { encoding: 'utf-16le', delimiter: '\t' } })
+      const latin = await client.send({ url: `${base}/latin` })
+      expect(latin.body).toEqual({ kind: 'text', text: 'Cé' })
     } finally {
       await client.dispose()
     }

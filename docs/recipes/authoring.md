@@ -219,7 +219,11 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 
 | Step | Fields | Notes |
 |---|---|---|
-| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `html`, `text`, `pdf`) | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF). A `file:` URL reads a local file, its kind from `as` or the extension. 4xx/5xx fail the step. |
+| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `html`, `text`, `pdf`, `csv`), `encoding?`, `delimiter?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF or workbook, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`). 4xx/5xx fail the step. |
+
+Text bodies are decoded from, in order: a byte-order mark, `encoding` (any WHATWG label: `windows-1252`,
+`iso-8859-15`, `shift_jis`), the charset the server declares, UTF-8, and Windows-1252 for text that is not
+UTF-8 (the usual European export). `delimiter` (one character) overrides a CSV's detected delimiter (§4.7).
 
 `body` is templated **all the way down**: a string body is one template, and in an object or list body
 every string inside it is one, at any depth. A string that is exactly one placeholder keeps the value's type
@@ -437,6 +441,7 @@ order. Rules:
 | an id holding a **list of texts** | with `jsonpath`: every entry that parses as JSON becomes one element of an array and the path runs over the array | same |
 | an id holding **data** (an object, a list of objects) | with `jsonpath` | same |
 | an id holding a **read PDF** (a `request` with `as: "pdf"`) | with `table`, `regex` or `jsonpath` (§4.6) | same |
+| an id holding a **read workbook** (a CSV) | with `table`, `regex` or `jsonpath` (§4.7) | same |
 
 JSON-LD wrapped in `/* <![CDATA[ */ ... /* ]]> */` or `<!-- -->` guards is unwrapped before parsing. The
 common pattern, both sites in the examples use it:
@@ -554,6 +559,56 @@ How it reads a table, which is what makes real-world sheets work:
 Find the selectors with `opencraw probe <url or file.pdf>`: for a PDF it lists the rows and every row that
 looks like a table header, with a ready `selector`. The Stellantis example
 (`examples/stellantis-it-discounts/`) reads eight monthly discount sheets this way.
+
+`fillDown` (below, §4.7) works on PDF tables too.
+
+### 4.7 CSV and workbooks
+
+`request` with `as: "csv"` (or a response served as `text/csv`, `application/csv` or
+`text/tab-separated-values`, or a local `file:…csv` / `…tsv`) reads the file into a **workbook**: a CSV is a
+workbook with one sheet, named after the file (`…/prezzo_alle_8.csv` → `prezzo_alle_8`). Every cell stays
+text; `number` with a `locale` and `date` with a `format` convert them in the mapping.
+
+- **Encoding** as in §3.2: a Windows-1252 export with no charset reads right without `encoding`.
+- **Delimiter** is detected among `,` `;` tab `|`: the one that splits the first lines into the most
+  consistent number of fields, so a title line above the header does not mislead it, and `;` with decimal
+  commas (`Panda;15.950,00`) is read as `;`. Set `delimiter` on the `request` when detection gets it wrong.
+- **Quotes**: a quoted field may hold the delimiter, line breaks and `""`; a quote inside an unquoted field is
+  kept as is (`1.0 Hybrid "Cross"`). Rows are kept ragged, nothing is trimmed.
+
+The same three extract kinds read it:
+
+| `kind` | Reads | Use for |
+|---|---|---|
+| `table` | tables, found by their header row | the list itself, below any title lines |
+| `regex` | the text: cells separated by a tab, rows by a newline, sheets by a blank line | a date in a title line: `Estrazione del (\S+)` |
+| `jsonpath` | the structure: `{ kind: "workbook", sheets: [{ name, rows: [["cell", …], …] }], csv: { encoding, delimiter } }` | a file with no header row: `$.sheets[0].rows[*]` |
+
+A grid needs no geometry, so a workbook table is simpler than a PDF one: column *i* of a row belongs to header
+cell *i*. The `selector` matches the header row (its non-empty cells joined by spaces, whitespace collapsed),
+and each table is `{ sheet, title, header, rows }`.
+
+```json
+{ "type": "request", "url": "{{start.url}}" },
+{ "type": "extract", "id": "table", "selector": "^Marca Modello", "kind": "table", "until": "^Totale",
+  "fillDown": ["brand", "model"],
+  "columns": { "brand": "^Marca$", "model": "^Modello$", "version": "^Versione$", "price": "^Prezzo" } },
+{ "type": "set", "id": "rows", "value": "{{table.rows}}" },
+{ "type": "forEach", "over": "rows", "as": "row", "emit": true, "steps": [] }
+```
+
+| Field | Meaning |
+|---|---|
+| `selector` | Matches the header row. Title lines above it and empty rows below it are skipped. |
+| `until` | Matches the row that ends a table. A table also ends at the next header and at the sheet's end. `"^$"` ends it at the first empty row: several tables on one sheet, separated by blank rows. |
+| `columns` | Output key → header pattern. Without it the header texts are the keys; a column with data but no header text is keyed by its letter (`A`, `B`…), and a repeated header gets a counter (`Price 2`). |
+| `fillDown` | Output keys whose empty cells take the value of the row above: exports that write a brand or a model once over its versions. |
+| `headerRows` | How many rows the header spans (default 1): a column's key joins its header texts (`Total` over `August` → `Total August`). |
+| `sheet` | A pattern for the names of the sheets to read (default: all). |
+| `includeHidden` | Read hidden sheets and rows too. |
+
+`opencraw probe <url or file.csv>` reports the encoding and delimiter it used, the first rows, and every row
+that looks like a header, with a ready `selector`.
 
 ## 5. Mapping
 

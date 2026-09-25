@@ -1,6 +1,7 @@
 import type { ExtractionScope, ScopeDocument } from '../extraction-scope'
 import { findTables, isPdfDocument, pdfText } from '../pdf-document'
 import type { TableQuery } from '../pdf-document'
+import { fillDown, findGridTables, isWorkbookDocument, workbookText } from '../workbook-document'
 import type { ExtractStep } from '../recipe-schema'
 import { parseJsonText, selectHtml, selectJson, selectRegex, takeFromHtml, takeFromJson, tryParseJson } from '../selection'
 import { hasPlaceholder, renderText } from '../template'
@@ -9,8 +10,9 @@ import { NoMatchError } from '../step-flow'
 /**
  * Runs an `extract` step against a static document: the value bound under
  * `from`, else the scope's current document. `css` reads HTML, `jsonpath`
- * reads JSON (or a read PDF's rows), `table` reads a PDF's tables, `regex`
- * reads any document as text; `xpath` needs a live page and is refused here.
+ * reads JSON (or a read PDF or workbook as data), `table` reads the tables of
+ * a PDF or a workbook (a spreadsheet, a CSV), `regex` reads any document as
+ * text; `xpath` needs a live page and is refused here.
  *
  * A `jsonpath` extract whose `from` is text parses that text as JSON, and a
  * list of texts (every `<script type="application/ld+json">` of a page) becomes
@@ -28,19 +30,18 @@ export function extractFromDocument (step: ExtractStep, scope: ExtractionScope):
   let values: unknown[]
   switch (step.kind) {
     case 'jsonpath': {
-      if (document.kind !== 'json' && document.kind !== 'pdf') throw new Error(`jsonpath needs a JSON document; the current document is ${document.kind}`)
-      values = selectJson(document.kind === 'pdf' ? document : document.data, selector).map(node => takeFromJson(node, take))
+      if (document.kind !== 'json' && document.kind !== 'pdf' && document.kind !== 'workbook') throw new Error(`jsonpath needs a JSON document; the current document is ${document.kind}`)
+      values = selectJson(document.kind === 'json' ? document.data : document, selector).map(node => takeFromJson(node, take))
 
       break
     }
     case 'table': {
-      if (document.kind !== 'pdf') throw new Error(`table reads a PDF; the current document is ${document.kind} (request it with "as": "pdf")`)
-      values = findTables(document, tableQuery(step, selector))
+      values = readTables(document, step, selector)
 
       break
     }
     case 'css': {
-      if (document.kind !== 'html') throw new Error(`css needs an HTML document; the current document is ${document.kind}`)
+      if (document.kind !== 'html') throw new Error(`css needs an HTML document; the current document is ${document.kind}${document.kind === 'workbook' || document.kind === 'pdf' ? ' (read it with kind "table")' : ''}`)
       values = selectHtml(document.html, selector).map(match => takeFromHtml(match, take))
 
       break
@@ -75,15 +76,34 @@ export function renderSelector (selector: string, scope: ExtractionScope): strin
   return hasPlaceholder(selector) ? renderText(selector, path => scope.lookup(path)) : selector
 }
 
+/** The tables a `table` extract finds in a PDF or a workbook. */
+function readTables (document: ScopeDocument, step: ExtractStep, selector: string): unknown[] {
+  const query = tableQuery(step, selector)
+  if (document.kind === 'workbook') {
+    return findGridTables(document, { ...query, sheet: optionalPattern(step.sheet, 'sheet'), headerRows: step.headerRows, fillDown: step.fillDown, includeHidden: step.includeHidden })
+  }
+  if (document.kind !== 'pdf') throw new Error(`table reads a PDF or a workbook (a spreadsheet, a CSV); the current document is ${document.kind} (request it with "as": "pdf" or "as": "csv")`)
+  for (const option of ['sheet', 'headerRows', 'includeHidden'] as const) {
+    if (step[option] !== undefined) throw new Error(`"${option}" reads workbooks (spreadsheets, CSV); the current document is a PDF`)
+  }
+  const tables = findTables(document, query)
+
+  return step.fillDown === undefined ? tables : tables.map(table => ({ ...table, rows: fillDown(table.rows, step.fillDown ?? []) }))
+}
+
 /**
  * A table extract's query: the selector matches the header row, the other
- * patterns come from the step; all case-insensitive, since PDFs capitalise
- * headings freely.
+ * patterns come from the step; all case-insensitive, since PDFs and
+ * spreadsheets capitalise headings freely.
  */
 function tableQuery (step: ExtractStep, selector: string): TableQuery {
   const columns = step.columns === undefined ? undefined : Object.fromEntries(Object.entries(step.columns).map(([key, pattern]) => [key, patternOf(pattern, `columns.${key}`)]))
 
-  return { header: patternOf(selector, 'selector'), until: step.until === undefined ? undefined : patternOf(step.until, 'until'), columns, align: step.align }
+  return { header: patternOf(selector, 'selector'), until: optionalPattern(step.until, 'until'), columns, align: step.align }
+}
+
+function optionalPattern (source: string | undefined, where: string): RegExp | undefined {
+  return source === undefined ? undefined : patternOf(source, where)
 }
 
 function patternOf (source: string, where: string): RegExp {
@@ -94,11 +114,12 @@ function patternOf (source: string, where: string): RegExp {
   }
 }
 
-/** The text a regex extract reads: markup, text, a PDF's rows, or JSON re-serialised (a list of texts joined by newlines). */
+/** The text a regex extract reads: markup, text, a PDF's or a workbook's rows, or JSON re-serialised (a list of texts joined by newlines). */
 function textOf (document: ScopeDocument): string {
   if (document.kind === 'html') return document.html
   if (document.kind === 'text') return document.text
   if (document.kind === 'pdf') return pdfText(document)
+  if (document.kind === 'workbook') return workbookText(document)
   if (Array.isArray(document.data) && document.data.every(entry => typeof entry === 'string')) return document.data.join('\n')
 
   return typeof document.data === 'string' ? document.data : JSON.stringify(document.data)
@@ -113,8 +134,8 @@ function documentFor (step: ExtractStep, scope: ExtractionScope): ScopeDocument 
   }
   const source = scope.get(step.from)
   if (source === undefined) throw new Error(`"${step.from}" is not bound`)
-  if (isPdfDocument(source)) return source
-  if (step.kind === 'table') throw new Error(`"${step.from}" is not a PDF; request it with "as": "pdf"`)
+  if (isPdfDocument(source) || isWorkbookDocument(source)) return source
+  if (step.kind === 'table') throw new Error(`"${step.from}" is not a PDF or a workbook; request it with "as": "pdf" or "as": "csv"`)
   if (step.kind === 'regex') {
     if (typeof source === 'string') return { kind: 'text', text: source }
 

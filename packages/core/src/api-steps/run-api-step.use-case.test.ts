@@ -6,6 +6,7 @@ import { HookRegistry } from '../hooks'
 import { HttpError } from '../http-session'
 import type { HttpRequest, HttpResponse, HttpSender } from '../http-session'
 import { readPdf } from '../pdf-document'
+import { csvWorkbook } from '../workbook-document'
 import type { InputRecipe } from '../recipe-schema'
 import { runSteps } from '../step-flow'
 import { ApiStepRunner } from './run-api-step.use-case'
@@ -251,8 +252,39 @@ describe('ApiStepRunner', () => {
     expect(emitted.at(-1)).toMatchObject({ table: { page: 2 }, row: { model: 'G3 BEV', discount: '5,0%' } })
   })
 
-  it('refuses a table extract on a document that is not a PDF', async () => {
+  it('reads a CSV as a workbook: tables with filled groups, regex over its rows, jsonpath over its cells', async () => {
+    const text = new TextDecoder('windows-1252').decode(readFileSync(join(__dirname, '..', 'workbook-document', 'fixtures', 'listino.csv')))
+    const workbook = csvWorkbook(text, { name: 'listino', encoding: 'windows-1252' })
+    const sender: HttpSender = { send: async request => ({ status: 200, url: request.url, headers: {}, body: workbook }) }
+    const reading: InputRecipe = {
+      ...recipe,
+      start: [{ url: 'http://shop/listino.csv' }],
+      steps: [
+        { type: 'request', id: 'doc', url: '{{start.url}}', as: 'csv' },
+        { type: 'extract', id: 'month', selector: String.raw`autoveicoli – (\w+ \d{4})`, kind: 'regex' },
+        { type: 'extract', id: 'title', from: 'doc', selector: '$.sheets[0].rows[0][0]', kind: 'jsonpath' },
+        { type: 'extract', id: 'table', selector: '^marca modello', kind: 'table', until: '^totale', fillDown: ['brand', 'model'], columns: { brand: '^marca', model: '^modello', version: '^versione', price: '^prezzo' } },
+        { type: 'set', id: 'rows', value: '{{table.rows}}' },
+        { type: 'forEach', over: 'rows', as: 'row', emit: true, steps: [] },
+      ],
+    }
+    const emitted = await crawl(reading, sender)
+    expect(emitted.map(record => record.row)).toEqual([
+      { brand: 'Fiat', model: 'Pandina', version: '1.0 Hybrid "Cross"', price: '15.950,00' },
+      { brand: 'Fiat', model: 'Pandina', version: '1.0 Hybrid Icon', price: '16.450,00' },
+      { brand: 'Citroën', model: 'C3', version: 'Plus; automatica\nnuova', price: '19.300,00' },
+      { brand: 'Peugeot', model: '208', version: 'Allure', price: '21.450,00' },
+    ])
+    expect(emitted[0]).toMatchObject({ month: 'settembre 2026', title: 'Listino prezzi autoveicoli – settembre 2026', table: { sheet: 'listino', title: 'Marca' } })
+  })
+
+  it('refuses a table extract on a document that is not a PDF or a workbook, and workbook options on a PDF', async () => {
     const wrong: InputRecipe = { ...recipe, steps: [{ type: 'request', id: 'list', url: '{{start.url}}', as: 'json' }, { type: 'extract', id: 't', selector: 'x', kind: 'table' }] }
-    await expect(crawl(wrong, fakeSender())).rejects.toThrow(/table reads a PDF; the current document is json/)
+    await expect(crawl(wrong, fakeSender())).rejects.toThrow(/table reads a PDF or a workbook \(a spreadsheet, a CSV\); the current document is json/)
+    const bytes = readFileSync(join(__dirname, '..', 'pdf-document', 'fixtures', 'discounts.pdf'))
+    const pdf = await readPdf(new Uint8Array(bytes))
+    const sender: HttpSender = { send: async request => ({ status: 200, url: request.url, headers: {}, body: pdf }) }
+    const sheetOnPdf: InputRecipe = { ...recipe, steps: [{ type: 'request', url: '{{start.url}}', as: 'pdf' }, { type: 'extract', id: 't', selector: '^models', kind: 'table', headerRows: 2 }] }
+    await expect(crawl(sheetOnPdf, sender)).rejects.toThrow(/"headerRows" reads workbooks/)
   })
 })

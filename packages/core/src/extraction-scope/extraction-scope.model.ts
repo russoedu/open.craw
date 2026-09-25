@@ -9,11 +9,13 @@
  */
 
 import type { PdfDocument } from '../pdf-document'
+import type { WorkbookDocument } from '../workbook-document'
 import { getPath } from '../template'
 
 /** A fetched or rendered document a later `extract` can read. */
 export type ScopeDocument =
   | PdfDocument |
+  WorkbookDocument |
   { kind: 'json', data: unknown } |
   { kind: 'html', html: string } |
   { kind: 'text', text: string }

@@ -7,6 +7,10 @@ function pdfRecipe (step: Record<string, unknown>): unknown {
   return { kind: 'input', id: 'x', output: 'y', mode: 'api', start: [{ url: 'http://a' }], steps: [{ type: 'request', url: 'http://a', as: 'pdf' }, step], mapping: {} }
 }
 
+function request (step: Record<string, unknown>): unknown {
+  return { kind: 'input', id: 'x', output: 'y', mode: 'api', start: [{ url: 'http://a' }], steps: [{ type: 'request', url: 'http://a', ...step }], mapping: {} }
+}
+
 function fixture (name: string): unknown {
   return JSON.parse(readFileSync(join(__dirname, 'fixtures', name), 'utf8'))
 }
@@ -76,6 +80,17 @@ describe('parseInputRecipe', () => {
     expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: '^MODELS', kind: 'table', columns: { model: '^MODELS' }, until: '^NOTE', align: 'center' }))).not.toThrow()
     expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: 'h1', kind: 'css', columns: { model: 'x' } }))).toThrow(/"columns" belongs to kind "table"/)
     expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: 'x', kind: 'table', align: 'middle' }))).toThrow(/align/)
+    expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: '^Marke', kind: 'table', sheet: '^FZ', headerRows: 2, fillDown: ['brand'], includeHidden: true }))).not.toThrow()
+    expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: 'h1', kind: 'css', headerRows: 2 }))).toThrow(/"headerRows" belongs to kind "table"/)
+    expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: 'x', kind: 'table', headerRows: 0 }))).toThrow(/headerRows/)
+  })
+
+  it('takes a delimiter on a request read as CSV, and an encoding on any request', () => {
+    expect(() => parseInputRecipe(request({ as: 'csv', delimiter: ';', encoding: 'windows-1252' }))).not.toThrow()
+    expect(() => parseInputRecipe(request({ delimiter: ';' }))).not.toThrow()
+    expect(() => parseInputRecipe(request({ as: 'json', encoding: 'utf8' }))).not.toThrow()
+    expect(() => parseInputRecipe(request({ as: 'json', delimiter: ';' }))).toThrow(/"delimiter" reads CSV only/)
+    expect(() => parseInputRecipe(request({ as: 'csv', delimiter: ';;' }))).toThrow(/delimiter/)
   })
 
   it('rejects unknown keys (typos) anywhere', () => {

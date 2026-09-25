@@ -1,4 +1,5 @@
 import type { PdfDocument } from '../pdf-document'
+import type { WorkbookDocument } from '../workbook-document'
 import type { BodyKind, HttpMethod } from '../recipe-schema'
 
 /** One HTTP request as the api runner sends it, templates already rendered. */
@@ -10,12 +11,16 @@ export interface HttpRequest {
   body?:      unknown
   /** How to read the body; default: from the response content type. */
   as?:        BodyKind
+  /** The encoding of a text body (a WHATWG label); default: the BOM, the declared charset, UTF-8, else Windows-1252. */
+  encoding?:  string
+  /** A CSV body's delimiter (one character); default: detected. */
+  delimiter?: string
   timeoutMs?: number
 }
 
 /** A parsed response body. Structurally the same as a scope document, on purpose. */
 export type HttpBody =
-  PdfDocument | { kind: 'json', data: unknown } | { kind: 'html', html: string } | { kind: 'text', text: string }
+  PdfDocument | WorkbookDocument | { kind: 'json', data: unknown } | { kind: 'html', html: string } | { kind: 'text', text: string }
 
 export interface HttpResponse {
   status:  number

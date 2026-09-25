@@ -1241,8 +1241,18 @@
                 "json",
                 "html",
                 "text",
-                "pdf"
+                "pdf",
+                "csv"
               ]
+            },
+            "encoding": {
+              "type": "string",
+              "minLength": 1
+            },
+            "delimiter": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1
             }
           },
           "required": [
@@ -1378,6 +1388,26 @@
                 "center",
                 "bottom"
               ]
+            },
+            "sheet": {
+              "type": "string",
+              "minLength": 1
+            },
+            "headerRows": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "fillDown": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "includeHidden": {
+              "type": "boolean"
             }
           },
           "required": [

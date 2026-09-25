@@ -129,6 +129,13 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
     return
   }
   if (url.pathname === '/account') return html(LOGGED_IN)
+  if (url.pathname === '/listino.csv') {
+    // Windows-1252 with no charset declared, as many exports are served.
+    outgoing.writeHead(200, { 'content-type': 'text/csv' })
+    outgoing.end(readFileSync(join(__dirname, '..', 'src', 'workbook-document', 'fixtures', 'listino.csv')))
+
+    return
+  }
   if (url.pathname === '/discounts.pdf') {
     outgoing.writeHead(200, { 'content-type': 'application/pdf' })
     outgoing.end(readFileSync(join(__dirname, '..', 'src', 'pdf-document', 'fixtures', 'discounts.pdf')))

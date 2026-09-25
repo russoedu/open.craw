@@ -21,5 +21,7 @@ export type { HttpClientOptions, HttpRequest, HttpResponse, HttpBody } from './h
 export { tryParseJson } from './selection'
 export { readPdf, PdfReadError, findTables, pdfText } from './pdf-document'
 export type { PdfDocument, PdfPage, PdfRow, PdfCell, PdfTable, TableQuery, TableAlign } from './pdf-document'
+export { parseCsv, detectDelimiter, csvWorkbook, findGridTables, fillDown, workbookText, isWorkbookDocument } from './workbook-document'
+export type { WorkbookDocument, Sheet, CsvFormat, GridTable, GridTableQuery } from './workbook-document'
 export { StepFailure } from './step-flow'
 export { TransformError } from './transformation'

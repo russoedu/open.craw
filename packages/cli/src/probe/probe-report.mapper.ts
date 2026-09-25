@@ -1,5 +1,6 @@
 import type { ProbeFindings } from './find-data.algorithm'
 import type { PdfFindings } from './pdf-findings.mapper'
+import type { WorkbookFindings } from './workbook-findings.mapper'
 
 /**
  * Renders a probe's findings as text.
@@ -37,6 +38,33 @@ export function pdfReport (url: string, pdf: PdfFindings): string {
     section('Likely table headers (a "table" extract selector for each)', pdf.headers.map(header => `  p${header.page}  ${header.selector}\n        ${header.text}`)),
     section('First rows (cells separated by " | ")', pdf.rows.map(row => `  p${row.page}  ${row.text}`)),
   ].filter(line => line !== '').join('\n')
+}
+
+/**
+ * Formats what a probe found in a workbook (a CSV or a spreadsheet): its sheets,
+ * the rows that look like table headers with a selector for each, and the first
+ * rows.
+ *
+ * @param url - The workbook's URL.
+ * @param workbook - The findings.
+ * @returns The report.
+ */
+export function workbookReport (url: string, workbook: WorkbookFindings): string {
+  const read = workbook.csv === undefined ? 'workbook' : `CSV, ${workbook.csv.encoding}, delimited by ${delimiterName(workbook.csv.delimiter)}`
+
+  return [
+    `${url} (${read})`,
+    '',
+    section('Sheets', workbook.sheets.map(sheet => `  ${sheet.name}${sheet.hidden ? ' (hidden)' : ''}: ${sheet.rows} rows × ${sheet.columns} columns`)),
+    section('Likely table headers (a "table" extract selector for each)', workbook.headers.map(header => `  ${header.sheet} r${header.row}  ${header.selector}${header.hint === undefined ? '' : `  (${header.hint})`}\n        ${header.text}`)),
+    section('First rows (cells separated by " | ")', workbook.rows.map(row => `  ${row.sheet} r${row.row}  ${row.text}`)),
+  ].filter(line => line !== '').join('\n')
+}
+
+function delimiterName (delimiter: string): string {
+  const names: Record<string, string> = { '\t': 'tabs', ',': 'commas', ';': 'semicolons', '|': 'pipes' }
+
+  return names[delimiter] ?? `"${delimiter}"`
 }
 
 function section (title: string, rows: string[]): string {

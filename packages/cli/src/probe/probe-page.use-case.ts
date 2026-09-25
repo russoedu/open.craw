@@ -8,20 +8,24 @@ import type { Terminal } from '../terminal'
 import { findData } from './find-data.algorithm'
 import { describePdf } from './pdf-findings.mapper'
 import type { PdfFindings } from './pdf-findings.mapper'
-import { pdfReport, probeReport } from './probe-report.mapper'
+import { pdfReport, probeReport, workbookReport } from './probe-report.mapper'
+import { describeWorkbook } from './workbook-findings.mapper'
+import type { WorkbookFindings } from './workbook-findings.mapper'
 
 const BROWSER_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36'
 const OBSERVE_MS = 4000
 
 /** What fetching and, optionally, rendering a page found. */
 export interface ProbeResult {
-  url:      string
-  status:   number
-  findings: ReturnType<typeof findData>
+  url:       string
+  status:    number
+  findings:  ReturnType<typeof findData>
   /** JSON responses observed while the page rendered; empty unless `options.browser` was set. */
-  observed: string[]
+  observed:  string[]
   /** Present when the URL is a PDF: its rows and likely table headers. */
-  pdf?:     PdfFindings
+  pdf?:      PdfFindings
+  /** Present when the URL is a CSV or a spreadsheet: its sheets, rows and likely table headers. */
+  workbook?: WorkbookFindings
 }
 
 /**
@@ -32,8 +36,8 @@ export interface ProbeResult {
  * involved: the cli's `probePage` and `@opencraw/mcp`'s probe tool both
  * build on this, one printing the result, the other returning it as data.
  *
- * A PDF (by content type, or a local `.pdf` path) is read instead: its rows,
- * and the rows that look like table headers.
+ * A PDF or a CSV (by content type, or a local `.pdf` / `.csv` path) is read
+ * instead: its rows, and the rows that look like table headers.
  *
  * @param url - The page to probe, or a local file path.
  * @param options - Browser path, TLS and user agent, plus whether to render.
@@ -54,6 +58,7 @@ export async function probeUrl (url: string, options: { browser: boolean } & Com
     const response = await client.send({ url: target })
     const { body } = response
     if (body.kind === 'pdf') return { url: response.url, status: response.status, findings: findData(''), observed: [], pdf: describePdf(body) }
+    if (body.kind === 'workbook') return { url: response.url, status: response.status, findings: findData(''), observed: [], workbook: describeWorkbook(body) }
     const text = body.kind === 'html' ? body.html : (body.kind === 'text' ? body.text : JSON.stringify(body.data))
     const observed = options.browser && !target.startsWith('file:') ? await observeBrowserJson(url, options, lease) : []
 
@@ -74,7 +79,7 @@ export async function probeUrl (url: string, options: { browser: boolean } & Com
 export async function probePage (url: string, options: { browser: boolean } & CommonOptions, terminal: Terminal): Promise<number> {
   try {
     const result = await probeUrl(url, options)
-    terminal.out(result.pdf === undefined ? probeReport(result.url, result.status, result.findings, result.observed) : pdfReport(result.url, result.pdf))
+    terminal.out(reportOf(result))
 
     return 0
   } catch (error) {
@@ -104,4 +109,11 @@ async function observeBrowserJson (url: string, options: CommonOptions, lease: A
   } finally {
     await browser.close()
   }
+}
+
+function reportOf (result: ProbeResult): string {
+  if (result.pdf !== undefined) return pdfReport(result.url, result.pdf)
+  if (result.workbook !== undefined) return workbookReport(result.url, result.workbook)
+
+  return probeReport(result.url, result.status, result.findings, result.observed)
 }
