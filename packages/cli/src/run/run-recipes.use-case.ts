@@ -1,6 +1,7 @@
 import { RecipeBindingError, RecipeSet, RecipeValidationError, createCrawler, jsonLinesSink, memorySink, traceLine } from '@opencraw/core'
 import type { CrawlEvent } from '@opencraw/core'
 import { resolveAccess } from '../access'
+import { loadHooks } from '../hooks-module'
 import type { Command } from '../arguments'
 import type { Terminal } from '../terminal'
 import { loadForRun } from './load-for-run.use-case'
@@ -32,8 +33,10 @@ export async function runRecipes (command: Extract<Command, { name: 'run' }>, te
   }
 
   let access
+  let hooks
   try {
     access = await resolveAccess(command.options)
+    hooks = command.hooks === undefined ? undefined : await loadHooks(command.hooks)
   } catch (error) {
     terminal.err(error instanceof Error ? error.message : String(error))
 
@@ -43,6 +46,7 @@ export async function runRecipes (command: Extract<Command, { name: 'run' }>, te
   const crawler = createCrawler({
     sink,
     access,
+    hooks,
     resume:  command.resume,
     debug:   command.dryRun,
     browser: {

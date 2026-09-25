@@ -17,6 +17,7 @@ beforeAll(async () => {
   site = await startFixtureSite()
   const env: Record<string, string> = {}
   for (const [key, value] of Object.entries(process.env)) if (value !== undefined) env[key] = value
+  env.OPENCRAW_HOOKS = join(__dirname, '..', '..', 'core', 'e2e', 'shop-hooks.mjs')
   const transport = new StdioClientTransport({ command: 'node', args: [BIN], env })
   client = new Client({ name: 'e2e-client', version: '0.0.1' })
   await client.connect(transport)
@@ -64,13 +65,16 @@ describe('opencraw mcp server', () => {
     expect(body.inputs.map(file => file.id).sort((a, b) => String(a).localeCompare(String(b)))).toEqual(['shop-api', 'shop-web'])
   })
 
-  it('run: dryRun against the fixture shop returns one record with its report', async () => {
-    const result = await client.callTool({ name: 'run', arguments: { paths: [recipesDir], only: ['shop-web'], dryRun: true } })
+  it('run: dryRun against the fixture shop, the api recipe calling a hook from OPENCRAW_HOOKS', async () => {
+    const result = await client.callTool({ name: 'run', arguments: { paths: [recipesDir], dryRun: true } })
     expect(result.isError).toBeFalsy()
-    const body = textOf(result) as { report: { recipes: { recipeId: string, emitted: number }[] }, records?: unknown[] }
-    expect(body.report.recipes).toEqual([expect.objectContaining({ recipeId: 'shop-web', emitted: 1 })])
-    expect(body.records).toHaveLength(1)
-  }, 30000)
+    const body = textOf(result) as { report: { recipes: { recipeId: string, emitted: number, error?: string }[] }, records?: unknown[] }
+    expect(body.report.recipes).toEqual([
+      expect.objectContaining({ recipeId: 'shop-api', emitted: 1 }),
+      expect.objectContaining({ recipeId: 'shop-web' }),
+    ])
+    expect(body.report.recipes.every(recipe => recipe.error === undefined)).toBe(true)
+  }, 60000)
 
   it('run: takes the recipes inline as JSON Lines, for a host that cannot write files', async () => {
     const jsonLines = ['product.output.json', 'shop-web.input.json'].map(name => oneLine(join(recipesDir, name))).join('\n')

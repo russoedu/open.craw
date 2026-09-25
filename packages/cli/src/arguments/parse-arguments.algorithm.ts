@@ -16,6 +16,8 @@ Options for run
   --dry-run           One record per input, printed with the scope it was mapped from.
   --trace             Print the crawl trace to stderr.
   --headed            Show the browser.
+  --hooks <file>      A JavaScript module whose default export is { name: function }: the hooks
+                      the recipes call (or OPENCRAW_HOOKS). It runs as your code: trust it.
 
 Options for probe
   --browser           Also render the page in a browser and list the JSON it fetches.
@@ -37,6 +39,7 @@ const OPTIONS = {
   'dry-run':        { type: 'boolean' },
   'trace':          { type: 'boolean' },
   'headed':         { type: 'boolean' },
+  'hooks':          { type: 'string' },
   'browser':        { type: 'boolean' },
   'browser-path':   { type: 'string' },
   'insecure-tls':   { type: 'boolean' },
@@ -80,7 +83,7 @@ export function parseArguments (argv: readonly string[], env: Record<string, str
       if (values.resume === true && values.append !== true) throw new Error('--resume needs --append (and --out)')
       if ((values.append === true || values.resume === true) && values.out === undefined) throw new Error('--append and --resume need --out')
 
-      return { name: 'run', paths: rest, out: values.out, append: values.append === true, resume: values.resume === true, trace: values.trace === true, dryRun: values['dry-run'] === true, only: values.only ?? [], headed: values.headed === true, options }
+      return { name: 'run', paths: rest, out: values.out, append: values.append === true, resume: values.resume === true, trace: values.trace === true, dryRun: values['dry-run'] === true, only: values.only ?? [], headed: values.headed === true, hooks: values.hooks ?? (env.OPENCRAW_HOOKS === '' ? undefined : env.OPENCRAW_HOOKS), options }
     }
     case 'probe': {
       if (rest.length !== 1) throw new Error('probe needs exactly one URL')

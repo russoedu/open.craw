@@ -10,6 +10,7 @@ const run = promisify(execFile)
 const BIN = join(__dirname, '..', 'bin', 'opencraw.mjs')
 const FIXTURE_PORT = '4546'
 const recipesDir = join(__dirname, '..', '..', 'core', 'e2e', 'recipes')
+const hooksModule = join(__dirname, '..', '..', 'core', 'e2e', 'shop-hooks.mjs')
 
 let site: Server
 beforeAll(async () => {
@@ -41,12 +42,20 @@ describe('opencraw cli', () => {
     expect(stderr).toContain('shop-web:')
   }, 60000)
 
-  it('run: writes JSON Lines to --out', async () => {
+  it('run --hooks: both reference recipes, the api one calling a hook, write the same six records to --out', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'cli-e2e-'))
     const out = join(directory, 'out.jsonl')
-    await run('node', [BIN, 'run', recipesDir, '--out', out, '--only', 'shop-web'])
+    const { stderr } = await run('node', [BIN, 'run', recipesDir, '--out', out, '--hooks', hooksModule])
+    expect(stderr).toMatch(/shop-api: 6 emitted/)
+    expect(stderr).toMatch(/shop-web: 0 emitted, 0 rejected, 6 duplicates/)
     const content = await readFile(out, 'utf8')
-    const lines = content.trim().split('\n')
-    expect(lines).toHaveLength(6)
+    expect(content.trim().split('\n')).toHaveLength(6)
+  }, 60000)
+
+  it('run: without the hooks module, the api recipe stops on the hook it cannot find', async () => {
+    await expect(run('node', [BIN, 'run', recipesDir, '--only', 'shop-api'], { env: { ...process.env, OPENCRAW_HOOKS: '' } })).rejects.toMatchObject({
+      code:   1,
+      stderr: expect.stringContaining('positive'),
+    })
   }, 60000)
 })

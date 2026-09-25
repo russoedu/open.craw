@@ -1,7 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { RecipeBindingError, RecipeSet, RecipeValidationError, createCrawler, jsonLinesSink, memorySink } from '@opencraw/core'
 import type { CrawlReport } from '@opencraw/core'
-import { loadForRun, resolveAccess } from '@opencraw/cli'
+import { loadForRun, loadHooks, resolveAccess } from '@opencraw/cli'
 import { z } from 'zod'
 import { recipeSourceOf, recipeSourceShape } from '../recipe-source'
 import type { RecipeSourceArgs } from '../recipe-source'
@@ -66,9 +66,11 @@ export async function runTool (args: RunArgs): Promise<CallToolResult> {
   let crawler: ReturnType<typeof createCrawler>
   const sink = args.dryRun === true || args.out === undefined ? memorySink() : jsonLinesSink(args.out, { append: args.append })
   try {
+    const hooksFile = serverFile('OPENCRAW_HOOKS')
     crawler = createCrawler({
       sink,
-      access:  await resolveAccess({ insecureTls: false, access: serverAccessFile(), accessProfile: args.access }),
+      hooks:   hooksFile === undefined ? undefined : await loadHooks(hooksFile),
+      access:  await resolveAccess({ insecureTls: false, access: serverFile('OPENCRAW_ACCESS'), accessProfile: args.access }),
       resume:  args.resume,
       browser: {
         headless:          args.headed !== true,
@@ -95,9 +97,13 @@ export async function runTool (args: RunArgs): Promise<CallToolResult> {
   }
 }
 
-/** The access config file the server was started with; the tool picks a profile from it, never a file. */
-function serverAccessFile (): string | undefined {
-  const file = process.env.OPENCRAW_ACCESS
+/**
+ * A file the server was started with (`OPENCRAW_ACCESS`, `OPENCRAW_HOOKS`).
+ * Never a tool argument: a caller picks a profile, never a file, and never
+ * names a module for the server to run.
+ */
+function serverFile (name: 'OPENCRAW_ACCESS' | 'OPENCRAW_HOOKS'): string | undefined {
+  const file = process.env[name]
 
   return file === undefined || file === '' ? undefined : file
 }

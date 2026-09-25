@@ -28,6 +28,8 @@ export type Command =
     dryRun:  boolean
     /** Run only the input recipes with these ids. */
     only:    string[]
+    /** A JavaScript module exporting the hooks the recipes call; `OPENCRAW_HOOKS` when not given. */
+    hooks?:  string
     headed:  boolean
     options: CommonOptions
   } |

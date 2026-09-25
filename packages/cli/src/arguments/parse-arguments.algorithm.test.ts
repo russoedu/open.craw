@@ -15,6 +15,7 @@ describe('parseArguments', () => {
       dryRun:  true,
       only:    ['a', 'b'],
       headed:  false,
+      hooks:   undefined,
       options: { browserPath: undefined, insecureTls: true, userAgent: undefined, access: undefined, accessProfile: undefined },
     })
     expect(parseArguments(['probe', 'https://x', '--browser', '--browser-path', '/c', '--user-agent', 'ua'])).toEqual({
@@ -23,6 +24,8 @@ describe('parseArguments', () => {
     expect(parseArguments(['probe', 'https://x'], { OPENCRAW_CHROMIUM: '/env' })).toMatchObject({ options: { browserPath: '/env' } })
     expect(parseArguments(['run', 'r/', '--access', 'a.json', '--access-profile', 'uk'])).toMatchObject({ options: { access: 'a.json', accessProfile: 'uk' } })
     expect(parseArguments(['run', 'r/'], { OPENCRAW_ACCESS: 'env.json' })).toMatchObject({ options: { access: 'env.json' } })
+    expect(parseArguments(['run', 'r/', '--hooks', 'h.mjs'], { OPENCRAW_HOOKS: 'env.mjs' })).toMatchObject({ hooks: 'h.mjs' })
+    expect(parseArguments(['run', 'r/'], { OPENCRAW_HOOKS: 'env.mjs' })).toMatchObject({ hooks: 'env.mjs' })
   })
 
   it('rejects what makes no sense', () => {
