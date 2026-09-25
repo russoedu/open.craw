@@ -56,6 +56,12 @@ export interface ExtractStep extends StepBaseFields {
   from?:    string
 }
 export interface SetStep extends StepBaseFields { type: 'set', value: unknown }
+/**
+ * Appends to a list bound in an enclosing scope (a `set` to `[]` before the
+ * loop), so values gathered page by page or item by item outlive the child
+ * scope that found them. A list value is appended item by item.
+ */
+export interface CollectStep extends StepBaseFields { type: 'collect', into: string, value: unknown }
 /** Runs a body per item of a list (`over`) or per live element matching `selector` (web mode; the elements are re-resolved on every use). */
 export interface ForEachStep extends StepBaseFields { type: 'forEach', over?: string, selector?: string, as: string, steps: Step[], emit?: true | { output: string } }
 /** Runs `steps` when `test` renders truthy, else `else`; both in the current scope. */
@@ -66,7 +72,7 @@ export interface HookStep extends StepBaseFields { type: 'hook', name: string, a
 
 export type Step =
   | GotoStep | ClickStep | FillStep | PressStep | SelectStep | ScrollStep | WaitStep | EvaluateStep | ScreenshotStep |
-  RequestStep | ExtractStep | SetStep | ForEachStep | IfStep | PaginateStep | EmitStep | HookStep
+  RequestStep | ExtractStep | SetStep | CollectStep | ForEachStep | IfStep | PaginateStep | EmitStep | HookStep
 
 export type StepType = Step['type']
 
@@ -123,6 +129,7 @@ const extractStep = z.strictObject({
   from:     stepId.optional(),
 })
 const assignStep = z.strictObject({ ...base, type: z.literal('set'), value: z.unknown() })
+const collectStep = z.strictObject({ ...base, type: z.literal('collect'), into: stepId, value: z.unknown() })
 const emitStep = z.strictObject({ ...base, type: z.literal('emit'), output: z.string().optional() })
 const hookStep = z.strictObject({ ...base, type: z.literal('hook'), name: z.string().min(1), args: z.record(z.string(), z.unknown()).optional() })
 
@@ -143,5 +150,5 @@ const paginateStep = z.strictObject({
 
 export const stepSchema: z.ZodType<Step> = z.discriminatedUnion('type', [
   gotoStep, clickStep, fillStep, pressStep, selectStep, scrollStep, waitStep, evaluateStep, screenshotStep,
-  requestStep, extractStep, assignStep, emitStep, hookStep, forEachStep, ifStep, paginateStep,
+  requestStep, extractStep, assignStep, collectStep, emitStep, hookStep, forEachStep, ifStep, paginateStep,
 ])

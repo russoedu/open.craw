@@ -52,6 +52,7 @@ const FUNCTION_ENTRIES: [string, Fn][] = [
   ['replace', ([value, pattern, replacement]) => stringify(value).replaceAll(new RegExp(stringify(pattern), 'g'), () => stringify(replacement))],
   ['contains', ([haystack, needle]) => (Array.isArray(haystack) ? haystack.some(item => looseEqual(item, needle)) : stringify(haystack).includes(stringify(needle)))],
   ['split', ([value, separator]) => stringify(value).split(stringify(separator ?? ','))],
+  ['urlEncode', ([value]) => encodeURIComponent(stringify(value))],
 ]
 const FUNCTIONS = new Map<string, Fn>(FUNCTION_ENTRIES)
 

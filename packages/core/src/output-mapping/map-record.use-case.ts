@@ -89,13 +89,31 @@ async function resolveEach (rule: Extract<MappingRule, { each: string }>, scope:
     const built: Record<string, unknown> = {}
     const nestedRules = Object.entries(rule.fields)
     for (const [name, nested] of nestedRules) {
-      const value = await resolveRule(nested, itemScope, item, { ...context, scope: itemScope, lookup: path => getPath(itemScope, path) }, `${target}.${name}`)
+      const value = await resolveRule(nested, itemScope, item, { ...context, scope: itemScope, lookup: itemLookup(itemScope, context.lookup) }, `${target}.${name}`)
       if (value !== undefined) setPath(built, name, value)
     }
     items.push(built)
   }
 
   return items
+}
+
+/**
+ * What a transform inside `each.fields` sees: the item first, then the scope
+ * the `each` ran in, so a `lookup` table or a `template` path extracted once per
+ * record (before the loop) stays reachable from every item. `from` stays
+ * relative to the item.
+ *
+ * @param itemScope - The current item.
+ * @param outer - The enclosing lookup: the record's, or an outer item's.
+ * @returns The chained lookup.
+ */
+function itemLookup (itemScope: Record<string, unknown>, outer: TransformContext['lookup']): TransformContext['lookup'] {
+  return (path) => {
+    const own = getPath(itemScope, path)
+
+    return own === undefined ? outer(path) : own
+  }
 }
 
 function itemAsScope (item: unknown): Record<string, unknown> {

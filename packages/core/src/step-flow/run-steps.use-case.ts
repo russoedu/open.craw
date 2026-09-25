@@ -110,6 +110,12 @@ async function runOne (step: Step, scope: ExtractionScope, walk: StepWalk): Prom
 
       return 'continue'
     }
+    case 'collect': {
+      const value = typeof step.value === 'string' ? render(step.value, lookupIn(scope)) : step.value
+      if (value !== undefined) scope.append(step.into, Array.isArray(value) ? value : [value])
+
+      return 'continue'
+    }
     case 'hook': {
       const hook = walk.hooks.resolve(step.name)
       const result = await hook(undefined, renderArgs(step.args ?? {}, scope), { recipeId: walk.recipe.id, scope: scope.snapshot(), log: logThrough(walk) })

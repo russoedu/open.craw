@@ -54,6 +54,8 @@ function coerce (value: unknown, field: FieldSpec, path: string): unknown {
     }
     case 'object': { return object(value, field, path)
     }
+    case 'json': { return json(value, path)
+    }
   }
 }
 
@@ -94,6 +96,34 @@ function array (value: unknown, field: FieldSpec, path: string): unknown[] {
   if (spec === undefined) return items
 
   return items.map((item, index) => coerceValue(item, spec, `${path}[${index}]`))
+}
+
+/**
+ * Any JSON value, kept as is: an object with every key, however nested, a list,
+ * text, a number. Only what JSON cannot hold is refused, so the sink never
+ * sees a function or a `Date` it would silently turn into something else.
+ *
+ * @param value - The value.
+ * @param path - Where the field is, for messages.
+ * @returns The same value.
+ * @throws CoercionError for a value JSON cannot represent.
+ */
+function json (value: unknown, path: string): unknown {
+  const problem = nonJson(value, path)
+  if (problem !== undefined) throw new CoercionError(problem.path, `${problem.what} is not JSON`)
+
+  return value
+}
+
+function nonJson (value: unknown, path: string): { path: string, what: string } | undefined {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return undefined
+  if (typeof value === 'number') return Number.isFinite(value) ? undefined : { path, what: String(value) }
+  if (Array.isArray(value)) return value.map((item, index) => nonJson(item, `${path}[${index}]`)).find(found => found !== undefined)
+  if (typeof value === 'object' && [Object.prototype, null].includes(Object.getPrototypeOf(value) as object | null)) {
+    return Object.entries(value).map(([key, item]) => (item === undefined ? undefined : nonJson(item, `${path}.${key}`))).find(found => found !== undefined)
+  }
+
+  return { path, what: value === undefined ? 'undefined' : (typeof value === 'object' ? (value.constructor?.name ?? 'an object') : `a ${typeof value}`) }
 }
 
 function object (value: unknown, field: FieldSpec, path: string): Record<string, unknown> {

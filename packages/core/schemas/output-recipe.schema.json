@@ -64,7 +64,8 @@
             "url",
             "enum",
             "array",
-            "object"
+            "object",
+            "json"
           ]
         },
         "description": {

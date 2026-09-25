@@ -42,6 +42,26 @@ export class ExtractionScope {
     this.values.set(id, value)
   }
 
+  /**
+   * Appends to the list the id is bound to, in whichever scope binds it (this
+   * one or a parent), as a new list: a snapshot emitted earlier keeps what it saw.
+   *
+   * @param id - The id of a list bound in this scope or a parent.
+   * @param items - What to add, in order.
+   * @throws Error when no scope binds the id, or it holds something other than a list.
+   */
+  append (id: string, items: readonly unknown[]): void {
+    if (this.values.has(id)) {
+      const current = this.values.get(id)
+      if (!Array.isArray(current)) throw new Error(`"${id}" holds ${current === null ? 'null' : typeof current}, not a list: set it to [] before collecting into it`)
+      this.values.set(id, [...current, ...items])
+
+      return
+    }
+    if (this.parent === undefined) throw new Error(`"${id}" is not bound: set it to [] before collecting into it`)
+    this.parent.append(id, items)
+  }
+
   /** Whether the id is bound here or in a parent. */
   has (id: string): boolean {
     return this.values.has(id) || (this.parent?.has(id) ?? false)

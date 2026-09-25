@@ -103,4 +103,49 @@ describe('mapRecord', () => {
     const input: InputRecipe = { ...web, mapping: { ...web.mapping, title: { from: 'raw_title', transform: [{ op: 'sum' }] } } }
     await expect(mapRecord({ snapshot: webSnapshot, input, output, hooks, url: 'https://shop.example/p/1' })).rejects.toThrow(/^mapping failed: title: transform "sum"/)
   })
+
+  it('lets lookup and template inside each.fields reach ids extracted outside the loop', async () => {
+    const options: OutputRecipe = parseOutputRecipe({
+      kind:    'output',
+      id:      'model',
+      version: 1,
+      fields:  {
+        name:    { type: 'string' },
+        options: { type: 'array', items: { type: 'object', fields: { code: { type: 'string' }, content: { type: 'string' }, label: { type: 'string' }, own: { type: 'string' } } } },
+      },
+    })
+    const input: InputRecipe = parseInputRecipe({
+      kind:    'input',
+      id:      'configurator',
+      output:  'model',
+      mode:    'api',
+      start:   [{ url: 'http://x' }],
+      steps:   [{ type: 'emit' }],
+      mapping: {
+        name:    { from: 'model_name' },
+        options: {
+          each:   'option_rows',
+          fields: {
+            code:    { from: 'code' },
+            content: { from: 'code', transform: [{ op: 'lookup', in: 'componentsInfo', key: 'id', pick: 'text' }] },
+            label:   { from: 'code', transform: [{ op: 'template', value: '{{model_name}} {{code}}' }] },
+            own:     { from: 'code', transform: [{ op: 'lookup', in: 'table', key: 'id', pick: 'text' }] },
+          },
+        },
+      },
+    })
+    const snapshot = {
+      model_name:     'C-Class',
+      componentsInfo: [{ id: 'P31', text: 'Night package' }, { id: 'U62', text: 'Heated seats' }],
+      table:          [{ id: 'P31', text: 'outer' }],
+      option_rows:    [{ code: 'P31', table: [{ id: 'P31', text: 'the item\'s own' }] }, { code: 'U62' }, { code: 'X00' }],
+    }
+    const record = await mapRecord({ snapshot, input, output: options, hooks, url: 'http://x' })
+    expect(record.data.options).toEqual([
+      { code: 'P31', content: 'Night package', label: 'C-Class P31', own: 'the item\'s own' },
+      // U62 has no table of its own, so `own` looks in the record's table, which has no U62.
+      { code: 'U62', content: 'Heated seats', label: 'C-Class U62' },
+      { code: 'X00', label: 'C-Class X00' },
+    ])
+  })
 })

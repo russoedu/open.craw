@@ -60,4 +60,17 @@ describe('ExtractionScope', () => {
     expect(scope.lookup('item.nope.deeper')).toBeUndefined()
     expect(scope.lookup('nothing')).toBeUndefined()
   })
+
+  it('appends to a list bound in a parent scope, as a new list', () => {
+    const root = new ExtractionScope()
+    root.set('ids', [1])
+    const before = root.get('ids')
+    const page = root.child()
+    page.append('ids', [2, 3])
+    expect(root.get('ids')).toEqual([1, 2, 3])
+    expect(before).toEqual([1])
+    expect(() => page.append('missing', [1])).toThrow('"missing" is not bound')
+    root.set('text', 'x')
+    expect(() => page.append('text', [1])).toThrow('"text" holds string, not a list')
+  })
 })

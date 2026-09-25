@@ -1,4 +1,4 @@
-import { hasPlaceholder, render, renderText } from './template.algorithm'
+import { hasPlaceholder, render, renderDeep, renderText } from './template.algorithm'
 import { isTruthy, stringify } from './value-text.algorithm'
 
 const scope: Record<string, unknown> = { link: '/p/1', item: { href: '/p/2', tags: ['a', 'b'] }, page: { number: 2 }, empty: '' }
@@ -23,6 +23,13 @@ describe('render', () => {
     expect(render('plain', lookup)).toBe('plain')
     expect(hasPlaceholder('plain')).toBe(false)
     expect(hasPlaceholder('{{a}}')).toBe(true)
+  })
+
+  it('renders every string inside an object or array with renderDeep', () => {
+    const values: Record<string, unknown> = { a: 'A', n: 3 }
+    const deepLookup = (path: string): unknown => values[path]
+    expect(renderDeep({ x: '{{a}}', y: ['{{n}}', 'n={{n}}', 2, false, null], z: { deep: '{{a}}!' } }, deepLookup)).toEqual({ x: 'A', y: [3, 'n=3', 2, false, null], z: { deep: 'A!' } })
+    expect(renderDeep(undefined, deepLookup)).toBeUndefined()
   })
 })
 

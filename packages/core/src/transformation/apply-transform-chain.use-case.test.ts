@@ -89,4 +89,11 @@ describe('applyTransformChain', () => {
     expect(await run(null, { op: 'number' }, { op: 'default', value: 0 })).toBe(0)
     await expect(run('x', { op: 'sum' })).rejects.toThrow(/expects a list/)
   })
+
+  it('percent-encodes a URL component', async () => {
+    expect(await run('A#1 b&c+d/é', { op: 'urlEncode' })).toBe('A%231%20b%26c%2Bd%2F%C3%A9')
+    expect(await run(['#', 'x y'], { op: 'urlEncode' })).toEqual(['%23', 'x%20y'])
+    expect(await run(42, { op: 'urlEncode' })).toBe('42')
+    await expect(run({ a: 1 }, { op: 'urlEncode' })).rejects.toThrow(/urlEncode.*expects text/)
+  })
 })

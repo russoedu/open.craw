@@ -56,6 +56,24 @@ export function resolve (inner: string, lookup: Lookup): unknown {
 }
 
 /**
+ * Renders every string inside a JSON-shaped value (an object, an array, or a
+ * string) with {@link render}, so a lone placeholder keeps its type
+ * (`"{{vars.limit}}"` becomes the number) and anything else becomes text.
+ * Numbers, booleans and `null` pass through untouched.
+ *
+ * @param value - The value.
+ * @param lookup - Resolves a path.
+ * @returns A new value with every string rendered.
+ */
+export function renderDeep (value: unknown, lookup: Lookup): unknown {
+  if (typeof value === 'string') return render(value, lookup)
+  if (Array.isArray(value)) return value.map((item: unknown) => renderDeep(item, lookup))
+  if (typeof value === 'object' && value !== null) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, renderDeep(item, lookup)]))
+
+  return value
+}
+
+/**
  * Renders a template that must produce text.
  *
  * @param template - The string to render.

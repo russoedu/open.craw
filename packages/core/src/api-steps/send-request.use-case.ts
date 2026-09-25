@@ -3,7 +3,7 @@ import type { ExtractionScope } from '../extraction-scope'
 import { HttpError } from '../http-session'
 import type { HttpBody, HttpResponse, HttpSender } from '../http-session'
 import type { InputRecipe, RequestStep } from '../recipe-schema'
-import { render, renderText } from '../template'
+import { renderDeep, renderText } from '../template'
 import { detectBlock } from '../step-flow'
 import type { RunGate } from '../step-flow'
 
@@ -31,7 +31,7 @@ export async function sendRequest (step: RequestStep, scope: ExtractionScope, cl
       url,
       query:     step.query === undefined ? undefined : renderMap(step.query, lookup),
       headers:   step.headers === undefined ? undefined : renderMap(step.headers, lookup),
-      body:      typeof step.body === 'string' ? render(step.body, lookup) : step.body,
+      body:      renderDeep(step.body, lookup),
       as:        step.as,
       timeoutMs: recipe.limits?.timeoutMs,
     })

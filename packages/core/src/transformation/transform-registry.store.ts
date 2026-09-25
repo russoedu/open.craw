@@ -9,7 +9,7 @@ import { parseDate } from './date.algorithm'
 import { group, lookup } from './lookup.algorithm'
 import { parseBoolean, parseInteger, parseNumber } from './number.algorithm'
 import { lowercase, regex, replace, split, trim, uppercase } from './string.algorithm'
-import { absoluteUrl } from './url.algorithm'
+import { absoluteUrl, urlEncode } from './url.algorithm'
 
 /** What a transform may need besides its input. */
 export interface TransformContext {
@@ -62,6 +62,7 @@ export const BUILT_IN_TRANSFORMS: { [Op in TransformOp]: Registered<Op> } = {
   currency:    scalar((value, rule) => parseCurrency(value, rule.locale, rule.currency)),
   date:        scalar((value, rule) => parseDate(value, rule.format, rule.timezone)),
   absoluteUrl: scalar((value, rule, context) => absoluteUrl(value, rule.base ?? context.baseUrl)),
+  urlEncode:   scalar(value => urlEncode(value)),
   flatten:     list(value => flatten(value)),
   unique:      list(value => unique(value)),
   sum:         list(value => sum(value)),

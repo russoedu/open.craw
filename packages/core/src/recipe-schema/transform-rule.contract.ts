@@ -14,6 +14,8 @@ export type TransformRule =
   { op: 'currency', locale?: string, currency?: string } |
   { op: 'date', format?: string, timezone?: string } |
   { op: 'absoluteUrl', base?: string } |
+  /** Percent-encodes text for one URL component (`encodeURIComponent`). */
+  { op: 'urlEncode' } |
   { op: 'flatten' } | { op: 'unique' } | { op: 'sum' } | { op: 'count' } |
   { op: 'template', value: string } |
   { op: 'jsonpath', path: string } |
@@ -58,6 +60,7 @@ export const transformRuleSchema: z.ZodType<TransformRule> = z.discriminatedUnio
   z.strictObject({ op: z.literal('currency'), locale: z.string().optional(), currency: z.string().length(3).optional() }),
   z.strictObject({ op: z.literal('date'), format: z.string().optional(), timezone: z.string().optional() }),
   z.strictObject({ op: z.literal('absoluteUrl'), base: z.string().optional() }),
+  z.strictObject({ op: z.literal('urlEncode') }),
   z.strictObject({ op: z.literal('flatten') }),
   z.strictObject({ op: z.literal('unique') }),
   z.strictObject({ op: z.literal('sum') }),

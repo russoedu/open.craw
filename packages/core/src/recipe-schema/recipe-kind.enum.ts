@@ -6,7 +6,7 @@ export const SELECTOR_KINDS = ['css', 'xpath', 'jsonpath', 'regex'] as const
 /** `take` also accepts `attr:<name>`, which is validated by pattern rather than listed. */
 export const TAKE_KINDS = ['text', 'html', 'value', 'json'] as const
 export const BODY_KINDS = ['json', 'html', 'text'] as const
-export const FIELD_TYPES = ['string', 'number', 'integer', 'boolean', 'date', 'datetime', 'currency', 'url', 'enum', 'array', 'object'] as const
+export const FIELD_TYPES = ['string', 'number', 'integer', 'boolean', 'date', 'datetime', 'currency', 'url', 'enum', 'array', 'object', 'json'] as const
 export const MISSING_POLICIES = ['fail', 'skip-record', 'null', 'default'] as const
 export const RECIPE_MISSING_POLICIES = ['fail', 'skip-record', 'null'] as const
 export const ERROR_POLICIES = ['fail', 'skip', 'retry'] as const

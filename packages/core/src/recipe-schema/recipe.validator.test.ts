@@ -31,6 +31,11 @@ describe('parseOutputRecipe', () => {
     const bad = { kind: 'output', id: 'x', version: 1, fields: { at: { type: 'datetime', generated: 'now', required: true } } }
     expect(() => parseOutputRecipe(bad)).toThrow(/generated field/)
   })
+
+  it('takes a json field with no shape, and refuses one given a shape', () => {
+    expect(parseOutputRecipe({ kind: 'output', id: 'raw', version: 1, fields: { payload: { type: 'json', required: true } } }).fields.payload.type).toBe('json')
+    expect(() => parseOutputRecipe({ kind: 'output', id: 'raw', version: 1, fields: { payload: { type: 'json', fields: { a: { type: 'string' } } } } })).toThrow(/takes no "fields" or "items"/)
+  })
 })
 
 const recipe = (steps: unknown[]): unknown => ({ kind: 'input', id: 'r', output: 'o', mode: 'web', start: [{ url: 'http://x' }], steps, mapping: {} })

@@ -1,5 +1,5 @@
 export { getPath, setPath, segmentsOf } from './value-path.algorithm'
-export { render, renderText, resolve, hasPlaceholder } from './template.algorithm'
+export { render, renderDeep, renderText, resolve, hasPlaceholder } from './template.algorithm'
 export { isTruthy, stringify } from './value-text.algorithm'
 export { parseExpression, evaluateExpression, EXPRESSION_FUNCTIONS } from './expression.algorithm'
 export type { Expression } from './expression.algorithm'

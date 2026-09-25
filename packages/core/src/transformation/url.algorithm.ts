@@ -2,6 +2,21 @@ import { describe } from './string.algorithm'
 import { TransformError } from './transform.error'
 
 /**
+ * Percent-encodes a value for one URL component (a path segment, a query
+ * value), with `encodeURIComponent`'s rules: everything but letters, digits
+ * and `-_.!~*'()` is encoded, non-ASCII as UTF-8.
+ *
+ * @param value - Text, a number or a boolean.
+ * @returns The encoded text.
+ * @throws TransformError for anything else.
+ */
+export function urlEncode (value: unknown): string {
+  if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') throw new TransformError('urlEncode', `expects text, got ${describe(value)}`, value)
+
+  return encodeURIComponent(String(value))
+}
+
+/**
  * Resolves a possibly relative URL.
  *
  * @param value - The URL text.

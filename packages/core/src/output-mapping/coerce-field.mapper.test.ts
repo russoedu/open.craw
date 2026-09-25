@@ -20,6 +20,15 @@ describe('coerceValue', () => {
     expect(coerceValue({ a: '1', extra: true }, { type: 'object', fields: { a: { type: 'number' } } }, 'f')).toEqual({ a: 1 })
   })
 
+  it('keeps a json field verbatim, whatever its shape, and refuses what JSON cannot hold', () => {
+    const payload = { 'a': { b: [1, 'two', { c: null, d: true }] }, 'odd key': 1.5 }
+    expect(coerceValue(payload, { type: 'json' }, 'f')).toBe(payload)
+    expect(coerceValue([1, [2]], { type: 'json' }, 'f')).toEqual([1, [2]])
+    expect(coerceValue('text', { type: 'json' }, 'f')).toBe('text')
+    expect(() => coerceValue({ a: [1, NaN] }, { type: 'json' }, 'f')).toThrow('f.a[1]: NaN is not JSON')
+    expect(() => coerceValue({ when: new Date(0) }, { type: 'json' }, 'f')).toThrow('f.when: Date is not JSON')
+  })
+
   it('names the path in errors', () => {
     expect(() => coerceValue('nope', { type: 'url' }, 'images[1]')).toThrow(CoercionError)
     expect(() => coerceValue('nope', { type: 'url' }, 'images[1]')).toThrow(/^images\[1\]: /)

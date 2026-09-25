@@ -25,7 +25,7 @@ export interface FieldSpec {
   values?:      string[]
   /** Element spec for `array`. */
   items?:       FieldSpec
-  /** Member specs for `object`. */
+  /** Member specs for `object`. A `json` field takes none: it keeps whatever it is given. */
   fields?:      Record<string, FieldSpec>
   min?:         number
   max?:         number
@@ -78,6 +78,9 @@ export const fieldSpecSchema: z.ZodType<FieldSpec> = z.strictObject({
   const needed = REQUIRES[field.type]
   if (needed !== undefined && field[needed] === undefined) {
     context.issues.push({ code: 'custom', input: field, path: [needed], message: `a "${field.type}" field needs "${needed}"` })
+  }
+  if (field.type === 'json' && (field.fields !== undefined || field.items !== undefined)) {
+    context.issues.push({ code: 'custom', input: field, path: [field.fields === undefined ? 'items' : 'fields'], message: 'a "json" field keeps any value as is; it takes no "fields" or "items" (use "object" or "array" to declare a shape)' })
   }
   if (field.generated !== undefined && field.required === true) {
     context.issues.push({ code: 'custom', input: field, path: ['required'], message: 'a generated field is always present; drop "required"' })

@@ -2,7 +2,10 @@ import { readFile } from 'node:fs/promises'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { HookRegistry } from '../hooks'
+import { mapRecord } from '../output-mapping'
 import type { OutputRecord } from '../output-mapping'
+import { parseInputRecipe, parseOutputRecipe } from '../recipe-schema'
 import { DedupePolicy } from './dedupe.policy'
 import { jsonLinesSink } from './json-lines-sink.repository'
 import { memorySink } from './memory-sink.repository'
@@ -88,5 +91,23 @@ describe('DedupePolicy', () => {
     expect(off.isDuplicate(record('a'))).toBe(false)
     expect(new DedupePolicy().isDuplicate(record('a', null))).toBe(false)
     expect(new DedupePolicy().isDuplicate(record('a', null))).toBe(false)
+  })
+})
+
+describe('a json field', () => {
+  it('reaches the sink unchanged, keys nobody declared included', async () => {
+    const output = parseOutputRecipe({ kind: 'output', id: 'raw', version: 1, fields: { id: { type: 'string', key: true }, payload: { type: 'json', required: true } } })
+    const input = parseInputRecipe({ kind: 'input', id: 'api', output: 'raw', mode: 'api', start: [{ url: 'http://x' }], steps: [{ type: 'emit' }], mapping: { id: { from: 'response.id' }, payload: { from: 'response' } } })
+    const response = { 'id': 'C1', 'undeclared': { deep: [{ x: 1, y: [true, null, 'z'] }] }, 'with space': 2.5 }
+    const record = await mapRecord({ snapshot: { response }, input, output, hooks: new HookRegistry(), url: 'http://x' })
+    expect(record.data.payload).toEqual(response)
+    const directory = await mkdtemp(join(tmpdir(), 'json-field-'))
+    const path = join(directory, 'out.jsonl')
+    const sink = jsonLinesSink(path)
+    await sink.open(output)
+    await sink.write(record)
+    await sink.close()
+    const line = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>
+    expect(line.payload).toEqual(response)
   })
 })

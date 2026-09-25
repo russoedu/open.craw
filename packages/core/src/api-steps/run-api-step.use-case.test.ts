@@ -179,4 +179,51 @@ describe('ApiStepRunner', () => {
     await expect(crawl(one, missing)).rejects.toThrow('HTTP 404 for http://shop/api/products?page=1')
     await expect(crawl({ ...one, session: { blockedWhen: { text: 'verify you are human' } } }, custom)).rejects.toThrow('body matches')
   })
+
+  it('renders templates in every string of an object body, keeping a lone placeholder\'s type', async () => {
+    const sender = fakeSender()
+    const withBody: InputRecipe = {
+      ...recipe,
+      steps: [
+        { type: 'set', id: 'clientId', value: 'abc' },
+        { type: 'set', id: 'secret', value: 's3cr3t' },
+        { type: 'set', id: 'limit', value: '{{5 + 5}}' },
+        { type: 'request', id: 'first', url: '{{start.url}}', method: 'POST', as: 'json', body: { client_id: '{{clientId}}', grant: 'client_credentials', note: 'id={{clientId}}', limit: '{{limit}}', raw: 5, flag: true, none: null, nested: { x: '{{clientId}}-x', list: ['{{secret}}', 1] } } },
+        { type: 'emit' },
+      ],
+    }
+    await crawl(withBody, sender)
+    expect(sender.sent[0].body).toEqual({ client_id: 'abc', grant: 'client_credentials', note: 'id=abc', limit: 10, raw: 5, flag: true, none: null, nested: { x: 'abc-x', list: ['s3cr3t', 1] } })
+  })
+
+  it('collects ids across every page, then fans out once pagination has finished', async () => {
+    const sender = fakeSender()
+    const twoPhase: InputRecipe = {
+      ...recipe,
+      steps: [
+        { type: 'set', id: 'allIds', value: [] },
+        {
+          type:  'paginate',
+          next:  { jsonpath: '$.nextPage' },
+          steps: [
+            { type: 'request', id: 'list', url: '{{page.url}}', as: 'json' },
+            { type: 'extract', id: 'ids', from: 'list', selector: '$.items[*].id', kind: 'jsonpath', take: 'json', many: true },
+            { type: 'collect', into: 'allIds', value: '{{ids}}' },
+          ],
+        },
+        { type: 'set', id: 'total', value: '{{len(allIds)}}' },
+        { type: 'forEach', over: 'allIds', as: 'id', emit: true, steps: [] },
+      ],
+    }
+    const emitted = await crawl(twoPhase, sender)
+    expect(emitted.map(snapshot => snapshot.id)).toEqual([1, 2, 3])
+    expect(emitted.map(snapshot => snapshot.total)).toEqual([3, 3, 3])
+    // Both list pages were fetched before the first record was emitted.
+    expect(sender.sent.map(request => request.url)).toEqual(['http://shop/api/products?page=1', 'http://shop/api/products?page=2'])
+  })
+
+  it('refuses to collect into an id nothing bound', async () => {
+    const unbound: InputRecipe = { ...recipe, steps: [{ type: 'collect', into: 'nowhere', value: 'x' }] }
+    await expect(crawl(unbound, fakeSender())).rejects.toThrow('"nowhere" is not bound: set it to [] before collecting into it')
+  })
 })

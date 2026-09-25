@@ -87,6 +87,13 @@ describe('validateBinding', () => {
     }
     expect(messages(ok)).toEqual([])
   })
+
+  it('needs the list a collect step appends to to be bound before it', () => {
+    const collecting: InputRecipe = { ...api, steps: [{ type: 'collect', into: 'allIds', value: '{{x}}' }, ...api.steps] }
+    expect(messages(collecting)).toContain('steps.0.into: "allIds" is not a known id: set it to [] before the loop that collects into it')
+    const declared: InputRecipe = { ...api, steps: [{ type: 'set', id: 'allIds', value: [] }, { type: 'collect', into: 'allIds', value: '{{x}}' }, ...api.steps] }
+    expect(messages(declared)).toEqual([])
+  })
 })
 
 describe('fieldAt', () => {

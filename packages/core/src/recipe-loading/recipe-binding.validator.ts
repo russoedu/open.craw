@@ -80,6 +80,7 @@ function walkStep (step: Step, at: string, mode: 'web' | 'api', known: Set<strin
     known.add(step.id)
   }
   if (step.type === 'extract' && step.from !== undefined && !known.has(step.from)) report(`${at}.from`, `"${step.from}" is not a known id`)
+  if (step.type === 'collect' && !known.has(step.into)) report(`${at}.into`, `"${step.into}" is not a known id: set it to [] before the loop that collects into it`)
   const nested = (): WalkState => ({ ...state, ids: new Set(state.ids) })
   switch (step.type) {
     case 'forEach': {
