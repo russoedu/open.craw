@@ -1,0 +1,18 @@
+{
+  "$schema": "../../packages/core/schemas/output-recipe.schema.json",
+  "kind": "output",
+  "id": "dealer-discount",
+  "version": 1,
+  "description": "One model's discount for one month of a manufacturer's discount sheet: the percentage off list price, the versions it excludes and any extra incentive (trade-in, scrappage, stock or registration bonus).",
+  "onMissing": "null",
+  "fields": {
+    "month": { "type": "string", "required": true, "key": true, "pattern": "^\\d{4}-\\d{2}$" },
+    "brand": { "type": "string", "required": true, "key": true },
+    "channel": { "type": "enum", "values": ["online", "offline"], "key": true, "description": "When the sheet splits a brand's table by sales channel." },
+    "model": { "type": "string", "required": true, "key": true, "description": "The model line as the sheet writes it, codes and series included." },
+    "discountPercent": { "type": "number", "min": 0, "max": 100, "description": "Percent off the list price of the base vehicle and options. Null when the sheet gives only an extra incentive." },
+    "excludedVersions": { "type": "string", "description": "Versions the discount does not apply to, as written." },
+    "extraIncentive": { "type": "string", "description": "Any extra on top: trade-in, scrappage, stock or registration bonus, as written." },
+    "sheet": { "type": "url", "generated": "sourceUrl" }
+  }
+}

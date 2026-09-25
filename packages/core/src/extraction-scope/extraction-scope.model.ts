@@ -8,11 +8,13 @@
  * default) is scope state too, bound in the innermost scope that navigated.
  */
 
+import type { PdfDocument } from '../pdf-document'
 import { getPath } from '../template'
 
 /** A fetched or rendered document a later `extract` can read. */
 export type ScopeDocument =
-  | { kind: 'json', data: unknown } |
+  | PdfDocument |
+  { kind: 'json', data: unknown } |
   { kind: 'html', html: string } |
   { kind: 'text', text: string }
 

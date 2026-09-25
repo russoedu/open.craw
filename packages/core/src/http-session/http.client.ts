@@ -1,5 +1,9 @@
+import { readFile } from 'node:fs/promises'
+import { extname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { request } from 'playwright'
 import type { APIRequestContext, APIResponse } from 'playwright'
+import { readPdf } from '../pdf-document'
 import { HttpError } from './http-response.contract'
 import type { HttpBody, HttpRequest, HttpResponse, HttpSender } from './http-response.contract'
 
@@ -46,6 +50,7 @@ export class HttpClient implements HttpSender {
    * @throws HttpError for a 4xx or 5xx status.
    */
   async send (httpRequest: HttpRequest): Promise<HttpResponse> {
+    if (httpRequest.url.startsWith('file:')) return readLocalFile(httpRequest)
     const response = await this.context.fetch(httpRequest.url, {
       method:  httpRequest.method ?? (httpRequest.body === undefined ? 'GET' : 'POST'),
       params:  httpRequest.query,
@@ -72,12 +77,29 @@ export class HttpClient implements HttpSender {
 
 async function readBody (response: APIResponse, as: HttpRequest['as']): Promise<HttpBody> {
   const kind = as ?? kindFromContentType(response.headers()['content-type'] ?? '')
-  const text = await response.text()
+
+  return parseBody(kind, await response.body(), response.url())
+}
+
+/**
+ * A `file:` URL, read from disk: a PDF or JSON a recipe gets from a folder
+ * instead of a server. The kind is `as`, else the file extension.
+ */
+async function readLocalFile (httpRequest: HttpRequest): Promise<HttpResponse> {
+  const path = fileURLToPath(httpRequest.url)
+  const bytes = await readFile(path)
+
+  return { status: 200, url: httpRequest.url, headers: {}, body: await parseBody(httpRequest.as ?? kindFromExtension(extname(path)), bytes, httpRequest.url) }
+}
+
+async function parseBody (kind: HttpBody['kind'], bytes: Uint8Array, url: string): Promise<HttpBody> {
+  if (kind === 'pdf') return readPdf(bytes, url)
+  const text = new TextDecoder().decode(bytes)
   if (kind === 'json') {
     try {
       return { kind: 'json', data: JSON.parse(text) as unknown }
     } catch (error) {
-      throw new Error(`${response.url()}: body is not JSON (${(error as Error).message})`, { cause: error })
+      throw new Error(`${url}: body is not JSON (${(error as Error).message})`, { cause: error })
     }
   }
 
@@ -87,7 +109,14 @@ async function readBody (response: APIResponse, as: HttpRequest['as']): Promise<
 function kindFromContentType (contentType: string): HttpBody['kind'] {
   const type = contentType.toLowerCase()
   if (type.includes('json')) return 'json'
+  if (type.includes('pdf')) return 'pdf'
   if (type.includes('html') || type.includes('xml')) return 'html'
 
   return 'text'
+}
+
+function kindFromExtension (extension: string): HttpBody['kind'] {
+  const kinds: Record<string, HttpBody['kind']> = { '.json': 'json', '.pdf': 'pdf', '.html': 'html', '.htm': 'html', '.xml': 'html' }
+
+  return kinds[extension.toLowerCase()] ?? 'text'
 }

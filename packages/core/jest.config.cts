@@ -17,5 +17,7 @@ module.exports = {
     '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig],
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
+  // pdf.js is an ES module Jest cannot load itself: see jest-pdfjs.cjs.
+  moduleNameMapper: { '^pdfjs-dist/legacy/build/pdf\\.mjs$': '<rootDir>/jest-pdfjs.cjs' },
   coverageDirectory: 'test-output/jest/coverage',
 }

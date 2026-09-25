@@ -2,17 +2,19 @@ import type { SinkSummary } from '../record-sink'
 
 /** What one input recipe did. */
 export interface RecipeReport {
-  recipeId:   string
-  mode:       'web' | 'api'
-  emitted:    number
-  rejected:   number
-  duplicates: number
+  recipeId:     string
+  mode:         'web' | 'api'
+  emitted:      number
+  rejected:     number
+  duplicates:   number
   /** Records a resumed run found in the sink already. */
-  skipped:    number
-  pages:      number
-  durationMs: number
+  skipped:      number
+  /** Steps whose `onError: skip` policy swallowed a failure: a check that found nothing, a value a page lacked. */
+  stepsSkipped: number
+  pages:        number
+  durationMs:   number
   /** Set when the recipe stopped on a failure. */
-  error?:     string
+  error?:       string
 }
 
 /** What a whole run did. */

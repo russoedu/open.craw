@@ -8,7 +8,7 @@ interface Base { at: string, recipeId: string }
 
 export type CrawlEvent =
   | (Base & { type: 'recipe:start', mode: 'web' | 'api' }) |
-  (Base & { type: 'recipe:finish', emitted: number, rejected: number, duplicates: number, skipped: number, pages: number, durationMs: number, error?: string }) |
+  (Base & { type: 'recipe:finish', emitted: number, rejected: number, duplicates: number, skipped: number, stepsSkipped?: number, pages: number, durationMs: number, error?: string }) |
   /** `status` is the HTTP status of the navigation or request, when there was a response. */
   (Base & { type: 'page:visit', url: string, number: number, status?: number }) |
   /** How a recipe run reaches the network. Never carries credentials. */

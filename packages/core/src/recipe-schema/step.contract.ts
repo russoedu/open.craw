@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { BODY_KINDS, ERROR_POLICIES, HTTP_METHODS, SELECTOR_KINDS, TAKE_KINDS, WAIT_UNTIL } from './recipe-kind.enum'
-import type { BodyKind, HttpMethod, SelectorKind, WaitUntil } from './recipe-kind.enum'
+import { BODY_KINDS, ERROR_POLICIES, HTTP_METHODS, SELECTOR_KINDS, TABLE_ALIGNS, TAKE_KINDS, WAIT_UNTIL } from './recipe-kind.enum'
+import type { BodyKind, HttpMethod, SelectorKind, TableAlign, WaitUntil } from './recipe-kind.enum'
 
 /** What to do when a step fails. Resolved step -> recipe -> `fail`. */
 export type ErrorPolicy =
@@ -54,6 +54,12 @@ export interface ExtractStep extends StepBaseFields {
   many?:    boolean
   /** Id of a document or fragment to read instead of the current document. */
   from?:    string
+  /** `table` only: output key -> a pattern (case-insensitive) for that column's header cell. */
+  columns?: Record<string, string>
+  /** `table` only: a pattern (case-insensitive) for the row that ends a table. */
+  until?:   string
+  /** `table` only: how a row's values sit against a cell wrapped over several lines; default `auto`. */
+  align?:   TableAlign
 }
 export interface SetStep extends StepBaseFields { type: 'set', value: unknown }
 /**
@@ -119,6 +125,7 @@ const requestStep = z.strictObject({
   body:    z.unknown().optional(),
   as:      z.enum(BODY_KINDS).optional(),
 })
+const tableOnly = ['columns', 'until', 'align'] as const
 const extractStep = z.strictObject({
   ...base,
   type:     z.literal('extract'),
@@ -127,6 +134,14 @@ const extractStep = z.strictObject({
   take:     takeKindSchema.optional(),
   many:     z.boolean().optional(),
   from:     stepId.optional(),
+  columns:  stringMap.optional(),
+  until:    z.string().min(1).optional(),
+  align:    z.enum(TABLE_ALIGNS).optional(),
+}).check((context) => {
+  if (context.value.kind === 'table') return
+  for (const key of tableOnly) {
+    if (context.value[key] !== undefined) context.issues.push({ code: 'custom', input: context.value, path: [key], message: `"${key}" belongs to kind "table"` })
+  }
 })
 const assignStep = z.strictObject({ ...base, type: z.literal('set'), value: z.unknown() })
 const collectStep = z.strictObject({ ...base, type: z.literal('collect'), into: stepId, value: z.unknown() })

@@ -1,4 +1,5 @@
 import type { ProbeFindings } from './find-data.algorithm'
+import type { PdfFindings } from './pdf-findings.mapper'
 
 /**
  * Renders a probe's findings as text.
@@ -20,6 +21,22 @@ export function probeReport (url: string, status: number, findings: ProbeFinding
   ]
 
   return [`${url} (HTTP ${status})`, '', ...sections].filter(line => line !== '').join('\n')
+}
+
+/**
+ * Renders what a probe found in a PDF as text.
+ *
+ * @param url - The URL or file probed.
+ * @param pdf - What `describePdf` found.
+ * @returns The report.
+ */
+export function pdfReport (url: string, pdf: PdfFindings): string {
+  return [
+    `${url} (PDF, ${pdf.pages} page${pdf.pages === 1 ? '' : 's'})`,
+    '',
+    section('Likely table headers (a "table" extract selector for each)', pdf.headers.map(header => `  p${header.page}  ${header.selector}\n        ${header.text}`)),
+    section('First rows (cells separated by " | ")', pdf.rows.map(row => `  p${row.page}  ${row.text}`)),
+  ].filter(line => line !== '').join('\n')
 }
 
 function section (title: string, rows: string[]): string {

@@ -1,8 +1,11 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { EventBus } from '../crawl-events'
 import { ExtractionScope } from '../extraction-scope'
 import { HookRegistry } from '../hooks'
 import { HttpError } from '../http-session'
 import type { HttpRequest, HttpResponse, HttpSender } from '../http-session'
+import { readPdf } from '../pdf-document'
 import type { InputRecipe } from '../recipe-schema'
 import { runSteps } from '../step-flow'
 import { ApiStepRunner } from './run-api-step.use-case'
@@ -225,5 +228,31 @@ describe('ApiStepRunner', () => {
   it('refuses to collect into an id nothing bound', async () => {
     const unbound: InputRecipe = { ...recipe, steps: [{ type: 'collect', into: 'nowhere', value: 'x' }] }
     await expect(crawl(unbound, fakeSender())).rejects.toThrow('"nowhere" is not bound: set it to [] before collecting into it')
+  })
+
+  it('reads a PDF: tables by header, regex over its rows, jsonpath over its structure', async () => {
+    const bytes = readFileSync(join(__dirname, '..', 'pdf-document', 'fixtures', 'discounts.pdf'))
+    const pdf = await readPdf(new Uint8Array(bytes))
+    const sender: HttpSender = { send: async request => ({ status: 200, url: request.url, headers: {}, body: pdf }) }
+    const reading: InputRecipe = {
+      ...recipe,
+      start: [{ url: 'http://shop/discounts.pdf' }],
+      steps: [
+        { type: 'request', id: 'doc', url: '{{start.url}}', as: 'pdf' },
+        { type: 'extract', id: 'month', selector: String.raw`DISCOUNTS - (\w+ \d{4})`, kind: 'regex' },
+        { type: 'extract', id: 'first', from: 'doc', selector: '$.pages[1].rows[0].text', kind: 'jsonpath' },
+        { type: 'extract', id: 'tables', selector: '^models', kind: 'table', many: true, until: String.raw`^(note|\*)`, columns: { model: '^models', discount: String.raw`^(discount|\(promo)`, extra: '^extra' } },
+        { type: 'forEach', over: 'tables', as: 'table', steps: [{ type: 'set', id: 'rows', value: '{{table.rows}}' }, { type: 'forEach', over: 'rows', as: 'row', emit: true, steps: [] }] },
+      ],
+    }
+    const emitted = await crawl(reading, sender)
+    expect(emitted).toHaveLength(12)
+    expect(emitted[0]).toMatchObject({ month: 'SEPTEMBER 2026', first: 'MODELS GAMMA\tDiscount %*\tExtras*', table: { title: 'MODELS ALPHA' }, row: { model: 'CITY (model 101)', discount: '19,0%', extra: '+3% registration bonus' } })
+    expect(emitted.at(-1)).toMatchObject({ table: { page: 2 }, row: { model: 'G3 BEV', discount: '5,0%' } })
+  })
+
+  it('refuses a table extract on a document that is not a PDF', async () => {
+    const wrong: InputRecipe = { ...recipe, steps: [{ type: 'request', id: 'list', url: '{{start.url}}', as: 'json' }, { type: 'extract', id: 't', selector: 'x', kind: 'table' }] }
+    await expect(crawl(wrong, fakeSender())).rejects.toThrow(/table reads a PDF; the current document is json/)
   })
 })

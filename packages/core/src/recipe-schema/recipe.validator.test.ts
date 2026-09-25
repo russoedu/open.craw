@@ -3,6 +3,10 @@ import { join } from 'node:path'
 import { RecipeValidationError } from './recipe-validation.error'
 import { parseInputRecipe, parseOutputRecipe, recipeKindOf } from './recipe.validator'
 
+function pdfRecipe (step: Record<string, unknown>): unknown {
+  return { kind: 'input', id: 'x', output: 'y', mode: 'api', start: [{ url: 'http://a' }], steps: [{ type: 'request', url: 'http://a', as: 'pdf' }, step], mapping: {} }
+}
+
 function fixture (name: string): unknown {
   return JSON.parse(readFileSync(join(__dirname, 'fixtures', name), 'utf8'))
 }
@@ -66,6 +70,12 @@ describe('parseInputRecipe', () => {
       const paths = (error as RecipeValidationError).issues.map(issue => issue.path)
       expect(paths).toEqual(expect.arrayContaining(['steps.0.type', 'mapping.a.transform.0.op']))
     }
+  })
+
+  it('takes table options on a table extract only', () => {
+    expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: '^MODELS', kind: 'table', columns: { model: '^MODELS' }, until: '^NOTE', align: 'center' }))).not.toThrow()
+    expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: 'h1', kind: 'css', columns: { model: 'x' } }))).toThrow(/"columns" belongs to kind "table"/)
+    expect(() => parseInputRecipe(pdfRecipe({ type: 'extract', id: 't', selector: 'x', kind: 'table', align: 'middle' }))).toThrow(/align/)
   })
 
   it('rejects unknown keys (typos) anywhere', () => {

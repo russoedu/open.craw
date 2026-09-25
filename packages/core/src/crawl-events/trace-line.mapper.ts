@@ -13,7 +13,7 @@ export function traceLine (event: CrawlEvent): string | undefined {
   switch (event.type) {
     case 'recipe:start': { return `▶ ${event.recipeId} (${event.mode})`
     }
-    case 'recipe:finish': { return `■ ${event.recipeId}: ${event.emitted} emitted, ${event.rejected} rejected, ${event.duplicates} duplicates, ${event.skipped > 0 ? `${event.skipped} skipped, ` : ''}${event.pages} pages, ${event.durationMs} ms${event.error === undefined ? '' : `\n  ✖ stopped: ${event.error}`}`
+    case 'recipe:finish': { return `■ ${event.recipeId}: ${event.emitted} emitted, ${event.rejected} rejected, ${event.duplicates} duplicates, ${event.skipped > 0 ? `${event.skipped} skipped, ` : ''}${(event.stepsSkipped ?? 0) > 0 ? `${event.stepsSkipped} steps skipped, ` : ''}${event.pages} pages, ${event.durationMs} ms${event.error === undefined ? '' : `\n  ✖ stopped: ${event.error}`}`
     }
     case 'access:lease': { return `${indent(1)}⇄ access ${event.profile} (${event.kind}${event.server === undefined ? '' : ` ${event.server}`}${event.session === undefined ? '' : `, session ${event.session}`})`
     }

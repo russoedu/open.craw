@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
+import { join } from 'node:path'
 import type { BrowserSessionConfig } from '../src/index'
 
 /**
@@ -127,6 +129,12 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
     return
   }
   if (url.pathname === '/account') return html(LOGGED_IN)
+  if (url.pathname === '/discounts.pdf') {
+    outgoing.writeHead(200, { 'content-type': 'application/pdf' })
+    outgoing.end(readFileSync(join(__dirname, '..', 'src', 'pdf-document', 'fixtures', 'discounts.pdf')))
+
+    return
+  }
   if (url.pathname === '/api/products') {
     if (!(incoming.headers.cookie ?? '').includes('session=ok')) {
       outgoing.writeHead(401, { 'content-type': 'application/json' })

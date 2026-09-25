@@ -3,6 +3,7 @@ import type { ExtractionScope } from '../extraction-scope'
 import { HttpError } from '../http-session'
 import type { HttpBody, HttpResponse, HttpSender } from '../http-session'
 import type { InputRecipe, RequestStep } from '../recipe-schema'
+import { pdfText } from '../pdf-document'
 import { renderDeep, renderText } from '../template'
 import { detectBlock } from '../step-flow'
 import type { RunGate } from '../step-flow'
@@ -49,6 +50,7 @@ export async function sendRequest (step: RequestStep, scope: ExtractionScope, cl
 
 function bodyText (body: HttpBody): string {
   if (body.kind === 'json') return JSON.stringify(body.data)
+  if (body.kind === 'pdf') return pdfText(body)
 
   return body.kind === 'html' ? body.html : body.text
 }
@@ -73,9 +75,10 @@ function resolveUrl (target: string, base: string | undefined): string {
   }
 }
 
-/** What a step id holds for a document: parsed JSON, or the markup / text. */
+/** What a step id holds for a document: parsed JSON, the read PDF, or the markup / text. */
 export function documentValue (body: HttpBody): unknown {
   if (body.kind === 'json') return body.data
+  if (body.kind === 'pdf') return body
 
   return body.kind === 'html' ? body.html : body.text
 }

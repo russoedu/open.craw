@@ -16,6 +16,7 @@ export async function extractFromPage (step: ExtractStep, page: Page, scope: Ext
 
     return
   }
+  if (step.kind === 'table') throw new Error('table reads a PDF: fetch it with a request step in api mode, or extract "from" a PDF bound earlier')
   const rendered = renderSelector(step.selector, scope)
   const take = step.take ?? 'text'
   const raw = step.kind === 'regex'

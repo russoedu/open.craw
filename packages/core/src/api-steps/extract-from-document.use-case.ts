@@ -1,4 +1,6 @@
 import type { ExtractionScope, ScopeDocument } from '../extraction-scope'
+import { findTables, isPdfDocument, pdfText } from '../pdf-document'
+import type { TableQuery } from '../pdf-document'
 import type { ExtractStep } from '../recipe-schema'
 import { parseJsonText, selectHtml, selectJson, selectRegex, takeFromHtml, takeFromJson, tryParseJson } from '../selection'
 import { hasPlaceholder, renderText } from '../template'
@@ -7,7 +9,8 @@ import { NoMatchError } from '../step-flow'
 /**
  * Runs an `extract` step against a static document: the value bound under
  * `from`, else the scope's current document. `css` reads HTML, `jsonpath`
- * reads JSON; `xpath` needs a live page and is refused here.
+ * reads JSON (or a read PDF's rows), `table` reads a PDF's tables, `regex`
+ * reads any document as text; `xpath` needs a live page and is refused here.
  *
  * A `jsonpath` extract whose `from` is text parses that text as JSON, and a
  * list of texts (every `<script type="application/ld+json">` of a page) becomes
@@ -25,8 +28,14 @@ export function extractFromDocument (step: ExtractStep, scope: ExtractionScope):
   let values: unknown[]
   switch (step.kind) {
     case 'jsonpath': {
-      if (document.kind !== 'json') throw new Error(`jsonpath needs a JSON document; the current document is ${document.kind}`)
-      values = selectJson(document.data, selector).map(node => takeFromJson(node, take))
+      if (document.kind !== 'json' && document.kind !== 'pdf') throw new Error(`jsonpath needs a JSON document; the current document is ${document.kind}`)
+      values = selectJson(document.kind === 'pdf' ? document : document.data, selector).map(node => takeFromJson(node, take))
+
+      break
+    }
+    case 'table': {
+      if (document.kind !== 'pdf') throw new Error(`table reads a PDF; the current document is ${document.kind} (request it with "as": "pdf")`)
+      values = findTables(document, tableQuery(step, selector))
 
       break
     }
@@ -66,10 +75,30 @@ export function renderSelector (selector: string, scope: ExtractionScope): strin
   return hasPlaceholder(selector) ? renderText(selector, path => scope.lookup(path)) : selector
 }
 
-/** The text a regex extract reads: markup, text, or JSON re-serialised (a list of texts joined by newlines). */
+/**
+ * A table extract's query: the selector matches the header row, the other
+ * patterns come from the step; all case-insensitive, since PDFs capitalise
+ * headings freely.
+ */
+function tableQuery (step: ExtractStep, selector: string): TableQuery {
+  const columns = step.columns === undefined ? undefined : Object.fromEntries(Object.entries(step.columns).map(([key, pattern]) => [key, patternOf(pattern, `columns.${key}`)]))
+
+  return { header: patternOf(selector, 'selector'), until: step.until === undefined ? undefined : patternOf(step.until, 'until'), columns, align: step.align }
+}
+
+function patternOf (source: string, where: string): RegExp {
+  try {
+    return new RegExp(source, 'i')
+  } catch (error) {
+    throw new Error(`${where}: invalid pattern ${source} (${(error as Error).message})`, { cause: error })
+  }
+}
+
+/** The text a regex extract reads: markup, text, a PDF's rows, or JSON re-serialised (a list of texts joined by newlines). */
 function textOf (document: ScopeDocument): string {
   if (document.kind === 'html') return document.html
   if (document.kind === 'text') return document.text
+  if (document.kind === 'pdf') return pdfText(document)
   if (Array.isArray(document.data) && document.data.every(entry => typeof entry === 'string')) return document.data.join('\n')
 
   return typeof document.data === 'string' ? document.data : JSON.stringify(document.data)
@@ -84,6 +113,8 @@ function documentFor (step: ExtractStep, scope: ExtractionScope): ScopeDocument 
   }
   const source = scope.get(step.from)
   if (source === undefined) throw new Error(`"${step.from}" is not bound`)
+  if (isPdfDocument(source)) return source
+  if (step.kind === 'table') throw new Error(`"${step.from}" is not a PDF; request it with "as": "pdf"`)
   if (step.kind === 'regex') {
     if (typeof source === 'string') return { kind: 'text', text: source }
 

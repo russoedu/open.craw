@@ -1,0 +1,43 @@
+{
+  "$schema": "../../packages/core/schemas/input-recipe.schema.json",
+  "kind": "input",
+  "id": "stellantis-it",
+  "output": "dealer-discount",
+  "mode": "api",
+  "description": "Stellantis Italy's monthly discount sheet for members of Italian professional associations, as ENPAM republishes it: one PDF per month, one table per brand (Fiat, Abarth, Lancia, Alfa Romeo, Jeep, Fiat Professional, Peugeot, Citroen, DS, Opel). A month whose sheet lacks the brand tables (June 2026 was published with its van and promo-code pages only) skips the check step, which the report counts, and yields no records.",
+  "start": [
+    { "url": "https://www.enpam.it/wp-content/uploads/STELLANTIS-SCONTI-e-cod-promo_mese-01-2026.pdf", "vars": { "month": "2026-01" } },
+    { "url": "https://www.enpam.it/wp-content/uploads/STELLANTIS-SCONTI-e-cod-promo_mese-02-2026.pdf", "vars": { "month": "2026-02" } },
+    { "url": "https://www.enpam.it/wp-content/uploads/STELLANTIS-SCONTI-e-cod-promo_mese-04-2026.pdf", "vars": { "month": "2026-04" } },
+    { "url": "https://www.enpam.it/wp-content/uploads/STELLANTIS-SCONTI-e-cod-promo_mese-05-2026.pdf", "vars": { "month": "2026-05" } },
+    { "url": "https://www.enpam.it/wp-content/uploads/STELLANTIS-SCONTI-e-cod-promo_mese-06-2026.pdf", "vars": { "month": "2026-06" } },
+    { "url": "https://www.enpam.it/wp-content/uploads/STELLANTIS-SCONTI-e-cod-promo_mese-07-2026.pdf", "vars": { "month": "2026-07" } },
+    { "url": "https://www.enpam.it/wp-content/uploads/STELLANTIS-SCONTI-e-cod-promo_mese-08-2026.pdf", "vars": { "month": "2026-08" } },
+    { "url": "https://www.enpam.it/wp-content/uploads/STELLANTIS-SCONTI-e-cod-promo_mese-09-2026.pdf", "vars": { "month": "2026-09" } }
+  ],
+  "limits": { "delayMs": 1000, "timeoutMs": 60000 },
+  "steps": [
+    { "type": "request", "id": "sheet", "url": "{{start.url}}", "as": "pdf" },
+    { "type": "extract", "id": "fiat_table", "selector": "^MODELLI FIAT\\b", "kind": "table", "onError": { "policy": "skip" } },
+    { "type": "extract", "id": "tables", "selector": "^MODELLI", "kind": "table", "many": true,
+      "until": "^(NOTA BENE|N\\.B\\.|\\*Si applicano)",
+      "columns": { "model": "^MODELLI", "discount": "^(Sconto|\\(PROMO)", "excluded": "^Versioni", "extra": "^Azion" } },
+    { "type": "forEach", "over": "tables", "as": "table", "steps": [
+      { "type": "set", "id": "rows", "value": "{{table.rows}}" },
+      { "type": "forEach", "over": "rows", "as": "row", "emit": true, "steps": [] }
+    ]}
+  ],
+  "mapping": {
+    "month": { "from": "vars.month" },
+    "brand": { "from": "table.title", "transform": [{ "op": "regex", "pattern": "^MODELLI\\s+(.+?)(?:\\s+OFF-LINE.*|\\s*\\(.*)?$" }] },
+    "channel": { "from": "table.title", "transform": [
+      { "op": "regex", "pattern": "\\((?:SCONTI )?(ON-LINE|OFF LINE)\\)" },
+      { "op": "lowercase" },
+      { "op": "replace", "pattern": "[- ]", "replacement": "" }
+    ]},
+    "model": { "from": "row.model" },
+    "discountPercent": { "from": "row.discount", "transform": [{ "op": "regex", "pattern": "(\\d+(?:[,.]\\d+)?)\\s?%" }, { "op": "number" }] },
+    "excludedVersions": { "from": "row.excluded", "transform": [{ "op": "default", "value": null }] },
+    "extraIncentive": { "from": "row.extra", "transform": [{ "op": "default", "value": null }] }
+  }
+}
