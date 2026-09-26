@@ -1,3 +1,4 @@
+import { once } from 'node:events'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import type { Server } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -87,9 +88,9 @@ describe('persistent browser profiles (real chromium)', () => {
 
   it('refuses a profile another browser holds open', async () => {
     // The holder signals once its page is open in the profile, then keeps it for three more seconds.
-    let opened: () => void = () => undefined
-    const holderOpen = new Promise<void>((resolve) => { opened = resolve })
-    const first = createCrawler({ browser: browserConfig(), profilesDir, onEvent: (event) => { if (event.type === 'page:visit') opened() } })
+    const signal = new EventTarget()
+    const holderOpen = once(signal, 'open')
+    const first = createCrawler({ browser: browserConfig(), profilesDir, onEvent: (event) => { if (event.type === 'page:visit') signal.dispatchEvent(new Event('open')) } })
     const second = createCrawler({ browser: browserConfig(), profilesDir })
     const slow = { ...webRecipe('holder', { browserProfile: 'busy', bootstrap: login }), steps: [{ type: 'goto', url: '{{start.url}}' }, { type: 'wait', ms: 3000 }, { type: 'extract', id: 'name', selector: '"name":"([^"]+)"', kind: 'regex' }, { type: 'emit' }] }
     try {
