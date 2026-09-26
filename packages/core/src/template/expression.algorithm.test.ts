@@ -69,6 +69,12 @@ describe('expressions', () => {
     // blank text is an empty list, and blank pieces are dropped: a forEach over a blank var runs no iteration
     expect(run("split('', ',')")).toEqual([])
     expect(run("split(' a , ,b,', ',')")).toEqual(['a', 'b'])
+    // An object keyed by name, walked as a list; anything else gives nothing to walk
+    expect(run('entries(item.nested)')).toEqual([{ key: 'n', value: 4 }])
+    expect(run('keys(item.nested)')).toEqual(['n'])
+    expect(run('values(item.nested)')).toEqual([4])
+    expect(run('entries(tags)')).toEqual([{ key: '0', value: 'a' }, { key: '1', value: 'b' }])
+    expect(run("entries('text')")).toEqual([])
     expect(run('len(item)')).toBe(0)
   })
 

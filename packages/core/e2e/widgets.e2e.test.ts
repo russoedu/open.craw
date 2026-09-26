@@ -32,9 +32,11 @@ describe('select and download (real chromium)', () => {
       { type: 'select', selector: '#rto', values: ['{{ split(vars.rtos) }}'], force: true },
       { type: 'select', selector: '#fuel', values: ['Petrol', 'CNG'] },
       { type: 'select', selector: '#fuel', values: ['DIESEL'], multiple: true },
+      // A blank filter var renders to no values: the control is left as it is.
+      { type: 'select', selector: '#fuel', values: ['{{ split(vars.none) }}'], force: true },
       { type: 'extract', id: 'name', selector: '#picked', kind: 'css' },
       { type: 'emit' },
-    ], { name: { from: 'name' } }, { rtos: 'DL1, DL3 - OFFICE 3' })
+    ], { name: { from: 'name' } }, { rtos: 'DL1, DL3 - OFFICE 3', none: '' })
     expect(error).toBeUndefined()
     expect(records).toEqual([{ name: 'state=DL;rto=DL1,DL3;fuel=PETROL,DIESEL,CNG', total: null }])
   }, 60_000)
