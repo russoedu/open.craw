@@ -279,6 +279,27 @@ describe('runSteps', () => {
       expect(Object.values(perOuter)).toEqual([[10, 5], [10, 5]])
     })
 
+    it('gives each parallel web iteration a forked runner, disposes it after, and keeps live-element loops sequential', async () => {
+      const web: InputRecipe = { ...recipe, mode: 'web' }
+      const main = fakeRunner({})
+      const forks: { id: number, disposed: boolean }[] = []
+      main.fork = async () => {
+        const record = { id: forks.length, disposed: false }
+        forks.push(record)
+        const child = fakeRunner({})
+
+        return { ...child, dispose: async () => { record.disposed = true } }
+      }
+      main.elements = async () => [{ selector: 'a', index: 0, text: 'a', html: '', attrs: {} }, { selector: 'a', index: 1, text: 'b', html: '', attrs: {} }]
+      const { emitted } = await run([{ type: 'set', id: 'delays', value: [20, 10, 30] }, loop('delays')], main, { hooks: wait, gate: new RunGate(3, 0), recipe: web })
+      expect(emitted).toHaveLength(3)
+      expect(forks.map(entry => entry.disposed)).toEqual([true, true, true])
+      forks.length = 0
+      const live = await run([{ type: 'forEach', selector: 'a', as: 'link', emit: true, steps: [] }], main, { gate: new RunGate(3, 0), recipe: web })
+      expect(live.emitted).toHaveLength(2)
+      expect(forks).toEqual([])
+    })
+
     it('rethrows the first failure after the running iterations settled', async () => {
       const runner = fakeRunner({ 'http://x/1': [] })
       const steps: Step[] = [

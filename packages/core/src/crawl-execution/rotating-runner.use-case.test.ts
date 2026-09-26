@@ -38,6 +38,41 @@ async function blockedError (runner: RotatingRunner): Promise<BlockedError> {
 }
 
 describe('RotatingRunner', () => {
+  it('forks a tab per iteration from the current runner, and again after a rotation', async () => {
+    const forked: number[] = []
+    const closed: number[] = []
+    const open = async (attempt: number): Promise<LeasedRunner> => {
+      const leaf = async (): Promise<void> => { if (attempt === 1) throw new BlockedError('http://x/', 403, 'HTTP 403') }
+      const runner: StepRunner = {
+        runLeaf:  leaf,
+        nextPage: async () => null,
+        fork:     async () => {
+          forked.push(attempt)
+
+          return { runLeaf: leaf, nextPage: async () => null, dispose: async () => { closed.push(attempt) } }
+        },
+        dispose: async () => undefined,
+      }
+
+      return { runner, lease: { profile: 'p', kind: 'proxy', session: String(attempt) } }
+    }
+    const rotating = await RotatingRunner.open({ recipe, events: new EventBus(), maxRotations: 1, open })
+    const tab = await rotating.fork()
+    let error: unknown
+    try {
+      await tab.runLeaf({ type: 'goto', url: 'x' }, new ExtractionScope())
+    } catch (error_) {
+      error = error_
+    }
+    expect(error).toBeInstanceOf(BlockedError)
+    await expect(tab.rotate?.(error as BlockedError)).resolves.toBe(true)
+    await tab.runLeaf({ type: 'goto', url: 'x' }, new ExtractionScope())
+    await tab.dispose()
+    // one tab on the first runner, closed when the rotation made it stale; one on the second, closed at the end
+    expect(forked).toEqual([1, 2])
+    expect(closed).toEqual([1, 2])
+  })
+
   it('reports the block and rotates once for blocks raised by the same runner', async () => {
     const test = harness(2)
     const runner = await test.open()

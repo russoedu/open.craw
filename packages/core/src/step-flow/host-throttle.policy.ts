@@ -21,7 +21,8 @@ interface Bucket {
   rule:      HostRule
   inFlight:  number
   waiting:   (() => void)[]
-  lastStart: number
+  /** When the previous request really started: each start waits for it, so a late start pushes the next one back. */
+  lastStart: Promise<number>
   /** Until when the site asked to be left alone (`Retry-After`). */
   pausedTo:  number
 }
@@ -52,7 +53,7 @@ export class HostThrottle {
     if (bucket === undefined) {
       const rule = { ...pick(this.config), ...match?.[1] }
       if (!always && !hasLimit(rule)) return undefined
-      bucket = { rule, inFlight: 0, waiting: [], lastStart: -Infinity, pausedTo: 0 }
+      bucket = { rule, inFlight: 0, waiting: [], lastStart: Promise.resolve(-Infinity), pausedTo: 0 }
       this.buckets.set(key, bucket)
     }
 
@@ -77,10 +78,19 @@ export class HostThrottle {
     const concurrency = bucket.rule.concurrency ?? Infinity
     if (bucket.inFlight >= concurrency) await new Promise<void>((resolve) => { bucket.waiting.push(resolve) })
     bucket.inFlight += 1
-    const now = Date.now()
-    const at = Math.max(now, bucket.lastStart + (bucket.rule.delayMs ?? 0), bucket.pausedTo)
-    bucket.lastStart = at
-    if (at > now) await sleep(at - now)
+    const previous = bucket.lastStart
+    const turn = (async (): Promise<number> => {
+      const after = await previous
+      // A pause may arrive while waiting (a Retry-After), so check it again after each sleep.
+      for (;;) {
+        const now = Date.now()
+        const at = Math.max(now, after + (bucket.rule.delayMs ?? 0), bucket.pausedTo)
+        if (at <= now) return now
+        await sleep(at - now)
+      }
+    })()
+    bucket.lastStart = turn
+    await turn
     let released = false
 
     return () => {

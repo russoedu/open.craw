@@ -21,6 +21,7 @@ export const runInputShape = {
   insecureTls: z.boolean().optional().describe("Accept an intercepting proxy's certificate. Defaults to OPENCRAW_INSECURE_TLS=1 in the server's environment."),
   userAgent:   z.string().optional().describe('The user agent to send.'),
   access:      z.string().optional().describe('An access profile (a proxy) from the server\'s access config file, OPENCRAW_ACCESS, used by every recipe that names none. The error for an unknown name lists the profiles.'),
+  parallel:    z.int().min(1).max(16).optional().describe('How many input recipes run at once. Default 1. Iterations inside a recipe follow its limits.concurrency.'),
 }
 
 interface RunArgs extends RecipeSourceArgs {
@@ -34,6 +35,7 @@ interface RunArgs extends RecipeSourceArgs {
   insecureTls?: boolean,
   userAgent?:   string
   access?:      string
+  parallel?:    number
 }
 
 /** What the `run` tool returns. */
@@ -75,6 +77,7 @@ export async function runTool (args: RunArgs): Promise<CallToolResult> {
       captchaSolvers: plugins?.captchaSolvers,
       access:         await resolveAccess({ insecureTls: false, access: serverFile('OPENCRAW_ACCESS'), accessProfile: args.access }),
       profilesDir:    serverFile('OPENCRAW_PROFILES'),
+      parallel:       args.parallel,
       resume:         args.resume,
       browser:        {
         headless:          args.headed !== true,

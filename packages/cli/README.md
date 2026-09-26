@@ -43,6 +43,7 @@ input recipes) and reports what happened.
 | `--dry-run` | One record per input recipe, printed with the scope it was mapped from — for checking a recipe under construction without a full run. |
 | `--trace` | Print the crawl trace to stderr. |
 | `--headed` | Show the browser instead of running headless. |
+| `--parallel <n>` | Run this many input recipes at once (default 1). Iterations inside a recipe follow its `limits.concurrency`. See [§3.9 of the authoring guide](../../docs/recipes/authoring.md#39-concurrency). |
 | `--retries <n>` | Tries per request that fails in passing (a dropped connection, a timeout, a 429, a 5xx), for recipes whose `limits.retry` says nothing. Default 3; `1` turns retrying off. See [§7 of the authoring guide](../../docs/recipes/authoring.md#7-policies-what-happens-when-something-is-missing-or-fails). |
 | `--profiles <dir>` | Where the persistent browser profiles of `session.browserProfile` live (or `OPENCRAW_PROFILES`; default `.opencraw/profiles`). See [access.md](../../docs/recipes/access.md#persistent-browser-profiles). |
 | `--host-delay <ms>`, `--host-concurrency <n>` | Per-site politeness across every recipe: at least `ms` between two requests to one site, at most `n` in flight. They override the access config's `throttle` defaults. See [access.md](../../docs/recipes/access.md#throttling-per-site). |

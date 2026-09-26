@@ -2,7 +2,7 @@ import type { AccessLease } from '../access'
 import type { EventBus } from '../crawl-events'
 import type { ExtractionScope, LiveElement } from '../extraction-scope'
 import type { InputRecipe, PaginateNext, Step } from '../recipe-schema'
-import { BlockedError } from '../step-flow'
+import { BlockedError, disposeQuietly } from '../step-flow'
 import type { NextPageResult, StepRunner } from '../step-flow'
 
 /** A runner and the access lease it was opened with. */
@@ -88,6 +88,63 @@ export class RotatingRunner implements StepRunner {
     } catch (error) {
       this.note(error, generation)
       throw error
+    }
+  }
+
+  /**
+   * A runner for one parallel iteration, forked from whichever runner is
+   * current when it runs a step: after a rotation it forks again from the new
+   * one, since the old context is gone (or going). Blocks are noted and
+   * rotated like the main runner's.
+   *
+   * @returns The iteration's runner.
+   */
+  async fork (): Promise<StepRunner> {
+    // `own`: a tab this iteration opened and must close; an api runner is shared and never disposed here.
+    let forked: { generation: number, runner: StepRunner, own: boolean } | undefined
+    const disposeForked = async (): Promise<void> => {
+      if (forked?.own === true) await disposeQuietly(forked.runner)
+      forked = undefined
+    }
+    const current = async (): Promise<StepRunner> => {
+      if (forked?.generation === this.generation) return forked.runner
+      await disposeForked()
+      const inner = this.inner
+      forked = inner.fork === undefined ? { generation: this.generation, runner: inner, own: false } : { generation: this.generation, runner: await inner.fork(), own: true }
+
+      return forked.runner
+    }
+
+    return {
+      runLeaf: async (step, scope) => {
+        const generation = this.generation
+        try {
+          const runner = await current()
+          await runner.runLeaf(step, scope)
+        } catch (error) {
+          this.note(error, generation)
+          throw error
+        }
+      },
+      nextPage: async (next, scope) => {
+        const generation = this.generation
+        try {
+          const runner = await current()
+
+          return await runner.nextPage(next, scope)
+        } catch (error) {
+          this.note(error, generation)
+          throw error
+        }
+      },
+      elements: async (selector, scope) => {
+        const runner = await current()
+        if (runner.elements === undefined) throw new Error('forEach over selector iterates live elements and needs a browser; this recipe runs in api mode')
+
+        return runner.elements(selector, scope)
+      },
+      rotate:  error => this.rotate(error),
+      dispose: disposeForked,
     }
   }
 

@@ -60,7 +60,7 @@ export function createCrawler (options: CrawlOptions = {}): Crawler {
       retry:           options.retry,
 
       ignoreHTTPSErrors: options.browser?.ignoreHTTPSErrors,
-    }, options.onRecipeError ?? 'continue'),
+    }, options.onRecipeError ?? 'continue', options.parallel ?? 1),
     async close () {
       const launched = browser
       browser = undefined

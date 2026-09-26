@@ -199,8 +199,15 @@ function flakyRoute (incoming: IncomingMessage, outgoing: ServerResponse, url: U
   outgoing.end(`<!doctype html><html lang="en"><body><p id="ok">ok after ${hits}</p></body></html>`)
 }
 
+/** How many `/slow/` pages the site is serving at once, and the most it served at once since the last reset. */
+export const slowLoad = { now: 0, peak: 0 }
+
+/** When each request reached the site, for tests that check how requests are spaced. */
+export const arrivals: { path: string, at: number }[] = []
+
 function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
   const url = new URL(incoming.url ?? '/', FIXTURE_BASE)
+  arrivals.push({ path: `${url.pathname}${url.search}`, at: Date.now() })
   const html = (body: string, status = 200): void => {
     outgoing.writeHead(status, { 'content-type': 'text/html; charset=utf-8' })
     outgoing.end(body)
@@ -218,6 +225,20 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
   }
   if (url.pathname.startsWith('/captcha/') && captchaRoute(incoming, outgoing, url, html)) return
   if (url.pathname === '/flaky') return flakyRoute(incoming, outgoing, url)
+  if (url.pathname === '/slow') {
+    // A listing of six pages that each take 300 ms: sequential costs ~1.8 s, three at a time ~0.6 s.
+    return html(`<!doctype html><html lang="en"><body>${Array.from({ length: 6 }, (_, index) => `<a class="item" href="/slow/${index + 1}">${index + 1}</a>`).join('')}</body></html>`)
+  }
+  if (url.pathname.startsWith('/slow/')) {
+    slowLoad.now += 1
+    slowLoad.peak = Math.max(slowLoad.peak, slowLoad.now)
+    setTimeout(() => {
+      slowLoad.now -= 1
+      html(`<!doctype html><html lang="en"><body><h1>Item ${url.pathname.slice('/slow/'.length)}</h1></body></html>`)
+    }, 300)
+
+    return
+  }
   if (url.pathname === '/configurator') return html(CONFIGURATOR)
   if (url.pathname === '/login' && incoming.method === 'GET') return html(LOGIN_FORM)
   if (url.pathname === '/login' && incoming.method === 'POST') {

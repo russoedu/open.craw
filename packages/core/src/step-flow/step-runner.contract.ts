@@ -2,6 +2,20 @@ import type { ExtractionScope, LiveElement } from '../extraction-scope'
 import type { PaginateNext, Step } from '../recipe-schema'
 import type { BlockedError } from './blocked.error'
 
+/**
+ * Disposes a runner, ignoring a failure: a tab whose browser already went
+ * away (a rotation, a crash) has nothing left to close.
+ *
+ * @param runner - The runner.
+ */
+export async function disposeQuietly (runner: StepRunner): Promise<void> {
+  try {
+    await runner.dispose()
+  } catch {
+    // already gone
+  }
+}
+
 /** What `paginate` learns from the runner after a page body ran. */
 export type NextPageResult =
   /** The next page is at this URL (the runner already navigated in web mode). */
@@ -29,5 +43,11 @@ export interface StepRunner {
    * `false` means it cannot, and the block fails the step like any error.
    */
   rotate?:   (error: BlockedError) => Promise<boolean>
+  /**
+   * A runner of its own for one parallel `forEach` iteration: a new tab in the
+   * same browser context (same cookies, its own page), disposed when the
+   * iteration ends. Web mode; an api runner is shared as it is.
+   */
+  fork?:     () => Promise<StepRunner>
   dispose:   () => Promise<void>
 }

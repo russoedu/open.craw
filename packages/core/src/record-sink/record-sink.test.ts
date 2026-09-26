@@ -73,24 +73,26 @@ describe('jsonLinesSink', () => {
 describe('DedupePolicy', () => {
   it('drops repeated keys across recipes under run scope, first wins', () => {
     const policy = new DedupePolicy('run')
-    policy.startRecipe()
-    expect(policy.isDuplicate(record('a'))).toBe(false)
-    policy.startRecipe()
-    expect(policy.isDuplicate(record('a'))).toBe(true)
-    expect(policy.isDuplicate(record('b'))).toBe(false)
+    expect(policy.forRecipe().isDuplicate(record('a'))).toBe(false)
+    const second = policy.forRecipe()
+    expect(second.isDuplicate(record('a'))).toBe(true)
+    expect(second.isDuplicate(record('b'))).toBe(false)
   })
 
   it('forgets keys per recipe under recipe scope and never dedupes under off or without a key', () => {
+    // Two recipes at once under `recipe` scope never see each other's keys.
     const perRecipe = new DedupePolicy('recipe')
-    perRecipe.startRecipe()
-    expect(perRecipe.isDuplicate(record('a'))).toBe(false)
-    perRecipe.startRecipe()
-    expect(perRecipe.isDuplicate(record('a'))).toBe(false)
-    const off = new DedupePolicy('off')
+    const first = perRecipe.forRecipe()
+    const parallel = perRecipe.forRecipe()
+    expect(first.isDuplicate(record('a'))).toBe(false)
+    expect(parallel.isDuplicate(record('a'))).toBe(false)
+    expect(first.isDuplicate(record('a'))).toBe(true)
+    const off = new DedupePolicy('off').forRecipe()
     expect(off.isDuplicate(record('a'))).toBe(false)
     expect(off.isDuplicate(record('a'))).toBe(false)
-    expect(new DedupePolicy().isDuplicate(record('a', null))).toBe(false)
-    expect(new DedupePolicy().isDuplicate(record('a', null))).toBe(false)
+    const keyless = new DedupePolicy().forRecipe()
+    expect(keyless.isDuplicate(record('a', null))).toBe(false)
+    expect(keyless.isDuplicate(record('a', null))).toBe(false)
   })
 })
 

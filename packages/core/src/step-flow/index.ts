@@ -1,6 +1,7 @@
 export { runSteps } from './run-steps.use-case'
 export type { StepWalkOptions, EmitOutcome } from './run-steps.use-case'
 export type { StepRunner, NextPageResult } from './step-runner.contract'
+export { disposeQuietly } from './step-runner.contract'
 export { StepFailure, NoMatchError } from './step-failure.error'
 export { resolveErrorPolicy, backoffFor, sleep } from './retry.policy'
 export { RunGate } from './run-gate.policy'

@@ -17,6 +17,7 @@ describe('parseArguments', () => {
       headed:   false,
       profiles: undefined,
       retries:  undefined,
+      parallel: undefined,
       throttle: { delayMs: undefined, concurrency: undefined },
       options:  { browserPath: undefined, insecureTls: true, userAgent: undefined, access: undefined, accessProfile: undefined, plugins: undefined },
     })
@@ -34,6 +35,7 @@ describe('parseArguments', () => {
     expect(parseArguments(['run', 'r/', '--host-delay', '500', '--host-concurrency', '2'])).toMatchObject({ throttle: { delayMs: 500, concurrency: 2 } })
     expect(parseArguments(['run', 'r/'], { OPENCRAW_PROFILES: '/p' })).toMatchObject({ profiles: '/p' })
     expect(parseArguments(['run', 'r/', '--retries', '1'])).toMatchObject({ retries: 1 })
+    expect(parseArguments(['run', 'r/', '--parallel', '4'])).toMatchObject({ parallel: 4 })
     expect(parseArguments(['run', 'r/', '--profiles', 'here'], { OPENCRAW_PROFILES: '/p' })).toMatchObject({ profiles: 'here' })
   })
 

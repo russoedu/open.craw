@@ -31,6 +31,8 @@ export type Command =
     /** Run only the input recipes with these ids. */
     only:      string[]
     headed:    boolean
+    /** How many input recipes run at once. */
+    parallel?: number
     /** Tries per request for recipes whose `limits.retry` says nothing (1 turns retrying off). */
     retries?:  number
     /** Where `session.browserProfile` profiles live; `OPENCRAW_PROFILES` when not given. */

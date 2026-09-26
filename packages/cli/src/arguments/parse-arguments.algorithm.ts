@@ -16,6 +16,8 @@ Options for run
   --dry-run           One record per input, printed with the scope it was mapped from.
   --trace             Print the crawl trace to stderr.
   --headed            Show the browser.
+  --parallel <n>      Run this many input recipes at once (default 1). Iterations inside a recipe
+                      follow its limits.concurrency.
   --retries <n>       Tries per request that fails in passing (connection, timeout, 429, 5xx), for
                       recipes whose limits.retry says nothing. Default 3; 1 turns retrying off.
   --profiles <dir>    Where recipes' session.browserProfile profiles live (or OPENCRAW_PROFILES;
@@ -51,6 +53,7 @@ const OPTIONS = {
   'headed':           { type: 'boolean' },
   'profiles':         { type: 'string' },
   'retries':          { type: 'string' },
+  'parallel':         { type: 'string' },
   'host-delay':       { type: 'string' },
   'host-concurrency': { type: 'string' },
   'hooks':            { type: 'string' },
@@ -99,7 +102,7 @@ export function parseArguments (argv: readonly string[], env: Record<string, str
       if (values.resume === true && values.append !== true) throw new Error('--resume needs --append (and --out)')
       if ((values.append === true || values.resume === true) && values.out === undefined) throw new Error('--append and --resume need --out')
 
-      return { name: 'run', paths: rest, out: values.out, append: values.append === true, resume: values.resume === true, trace: values.trace === true, dryRun: values['dry-run'] === true, only: values.only ?? [], headed: values.headed === true, profiles: values.profiles ?? nonEmpty(env.OPENCRAW_PROFILES), retries: integer(values.retries, '--retries', 1), throttle: { delayMs: integer(values['host-delay'], '--host-delay', 0), concurrency: integer(values['host-concurrency'], '--host-concurrency', 1) }, options }
+      return { name: 'run', paths: rest, out: values.out, append: values.append === true, resume: values.resume === true, trace: values.trace === true, dryRun: values['dry-run'] === true, only: values.only ?? [], headed: values.headed === true, profiles: values.profiles ?? nonEmpty(env.OPENCRAW_PROFILES), retries: integer(values.retries, '--retries', 1), parallel: integer(values.parallel, '--parallel', 1), throttle: { delayMs: integer(values['host-delay'], '--host-delay', 0), concurrency: integer(values['host-concurrency'], '--host-concurrency', 1) }, options }
     }
     case 'probe': {
       if (rest.length !== 1) throw new Error('probe needs exactly one URL')

@@ -133,7 +133,7 @@ export interface CrawlLimits {
   /** Minimum interval between two request starts across the recipe, whatever runs in parallel. */
   delayMs?:     number
   timeoutMs?:   number
-  /** How many `forEach` iterations may run at once (api mode; a web recipe drives one page). Default 1. */
+  /** How many `forEach` iterations over a list may run at once: requests in api mode, tabs in web mode. Default 1. */
   concurrency?: number
   /** How requests that fail in passing are sent again; the crawler's `retry`, else three tries, when omitted. */
   retry?:       RetryRule

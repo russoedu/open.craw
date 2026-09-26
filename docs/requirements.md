@@ -42,7 +42,7 @@ JavaScript module whose default export is the name -> function map.
 | `start` | One or more `{ url, vars? }`; each start point runs the whole step list. |
 | `vars` | Recipe-level variables, read in templates as `{{vars.name}}`. |
 | `session` | Headers, cookies, user agent, viewport, a saved `storageStatePath`, a `bootstrap`, `access` (`{ profile?, country?, sticky? }`), `blockedWhen`, `onBlock`, `captcha` and `browserProfile` (section 2.1). |
-| `limits` | `maxRecords` (exact, whatever is in flight), `delayMs` (minimum interval between request starts across the recipe), `timeoutMs`, `concurrency` (`forEach` iterations in flight, api mode; default `1`). |
+| `limits` | `maxRecords` (exact, whatever is in flight), `delayMs` (minimum interval between request starts across the recipe), `timeoutMs`, `concurrency` (`forEach` iterations over a list in flight: requests in api mode, tabs in web mode; default `1`), `retry` (see Retries). |
 | `onError` | Default step policy: `fail`, `skip`, or `retry { attempts, backoffMs }`. |
 | `steps` | The acquisition recipe (section 2.2). |
 | `mapping` | Output field path -> mapping rule (section 4). |
@@ -79,6 +79,13 @@ run ends. See `docs/recipes/access.md`.
 the requests in flight per site, shared by every recipe a crawler runs. `domains` rules cover a domain and its
 subdomains, longest match first, and group them into one site. Every navigation, request, bootstrap page and
 `next.selector` click takes the site's turn; a recipe's own `limits` apply on top.
+
+**Parallel execution.** `limits.concurrency` runs `forEach` iterations over a list at once: requests on one
+HTTP session in api mode, tabs of the recipe's browser context in web mode (`StepRunner.fork`; a tab follows a
+rotation by forking again from the new runner). Loops over live elements stay sequential.
+`CrawlOptions.parallel` (CLI `--parallel`, MCP `parallel`) runs that many input recipes of a set at once, each
+with its own context or session; reports keep the set's order; `onRecipeError: 'stop'` stops those not yet
+started. `dedupe: 'recipe'` keeps a key set per recipe run; `run` shares one.
 
 **Retries.** A request that fails in passing is sent again before the step's error policy sees it:
 `limits.retry: { attempts?, backoffMs?, maxDelayMs?, statuses? }`, over `CrawlOptions.retry` (CLI `--retries`),
@@ -223,7 +230,8 @@ every use, so a page that re-renders after each interaction (a configurator) sti
   concurrency; iterations in flight finish without emitting.
 - **Concurrency** is one gate per recipe run: `concurrency` permits shared by every `forEach` in it (the
   outermost concurrent loop takes them; a loop inside one of its iterations runs sequentially) plus one
-  throttle (`delayMs` between request starts). Web mode is always sequential: one page.
+  throttle (`delayMs` between request starts). In web mode each parallel iteration runs in its own tab; loops
+  over live elements stay sequential.
 - **Resume**: with `CrawlOptions.resume` the engine asks the sink `has(key)` for each mapped record and
   skips the ones it has (`record:skipped`, counted as `skipped`). `jsonLinesSink(path, { append: true })`
   writes `_key` per line and reads the keys back on open.

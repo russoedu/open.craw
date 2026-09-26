@@ -3,14 +3,18 @@ import type { ForEachStep } from '../recipe-schema'
 import { renderText } from '../template'
 import type { RunGate } from './run-gate.policy'
 import type { EmitOutcome, StepWalk, StepWalkOptions } from './run-steps.use-case'
+import { disposeQuietly } from './step-runner.contract'
+import type { StepRunner } from './step-runner.contract'
 
 /**
  * Runs a body once per item of a list (`over`), or once per live element
  * matching `selector`, each in a fresh child scope with the item bound under
  * `as`; emits a record per iteration when asked.
  *
- * With a concurrent gate, iterations run as permits allow and records come
- * out in completion order; without one, in list order.
+ * With a concurrent gate, iterations of a list run as permits allow and
+ * records come out in completion order; without one, in list order. In web
+ * mode each parallel iteration runs in a tab of its own (`runner.fork`); a
+ * loop over live elements stays sequential, since its elements live on one page.
  *
  * @param step - The forEach step.
  * @param scope - The scope the list lives in.
@@ -20,7 +24,7 @@ import type { EmitOutcome, StepWalk, StepWalkOptions } from './run-steps.use-cas
 export async function runForEach (step: ForEachStep, scope: ExtractionScope, walk: StepWalk): Promise<EmitOutcome> {
   const items = await itemsOf(step, scope, walk)
   const gate = walk.gate
-  if (gate?.concurrent === true) return runPooled(step, scope, walk, items, gate)
+  if (gate?.concurrent === true && step.selector === undefined && (walk.recipe.mode === 'api' || walk.runner.fork !== undefined)) return runPooled(step, scope, walk, items, gate)
   for (const item of items) {
     if (await runIteration(step, scope, walk, item) === 'stop') return 'stop'
   }
@@ -46,13 +50,16 @@ async function runPooled (step: ForEachStep, scope: ExtractionScope, walk: StepW
   let stopped = false
   let failure: { error: unknown } | undefined
   const tasks: Promise<void>[] = []
-  const overrides = { gate: gate.nested() }
+  const nested = gate.nested()
   const iterate = async (item: unknown, release: () => void): Promise<void> => {
+    let runner: StepRunner | undefined
     try {
-      if (await runIteration(step, scope, walk, item, overrides) === 'stop') stopped = true
+      runner = walk.runner.fork === undefined ? walk.runner : await walk.runner.fork()
+      if (await runIteration(step, scope, walk, item, { gate: nested, runner }) === 'stop') stopped = true
     } catch (error) {
       failure ??= { error }
     } finally {
+      if (runner !== undefined && runner !== walk.runner) await disposeQuietly(runner)
       release()
     }
   }

@@ -1,7 +1,6 @@
 import type { Server } from 'node:http'
 import { createCrawler, loadRecipes } from '../src/index'
-import type { CrawlEvent } from '../src/index'
-import { FIXTURE_BASE, startFixtureSite, stopFixtureSite } from './fixture-site'
+import { arrivals, FIXTURE_BASE, startFixtureSite, stopFixtureSite } from './fixture-site'
 
 let site: Server
 beforeAll(async () => { site = await startFixtureSite() })
@@ -29,20 +28,20 @@ function catalog (id: string, page: number): Record<string, unknown> {
 
 describe('per-site throttle (crawler-wide)', () => {
   it('spaces every request to the site across recipes and parallel iterations', async () => {
-    const visits: number[] = []
-    const onEvent = (event: CrawlEvent): void => { if (event.type === 'page:visit') visits.push(Date.parse(event.at)) }
-    const crawler = createCrawler({ throttle: { domains: { '127.0.0.1': { delayMs: 120 } } }, onEvent })
+    arrivals.length = 0
+    const crawler = createCrawler({ throttle: { domains: { '127.0.0.1': { delayMs: 120 } } } })
     try {
       const report = await crawler.run(await loadRecipes([output, catalog('first', 1), catalog('second', 2)]))
       expect(report.recipes.map(recipe => [recipe.recipeId, recipe.emitted, recipe.error])).toEqual([['first', 2, undefined], ['second', 2, undefined]])
     } finally {
       await crawler.close()
     }
-    expect(visits).toHaveLength(6)
-    const sorted = [...visits].sort((first, second) => first - second)
-    const gaps = sorted.slice(1).map((at, index) => at - sorted[index])
-    // A visit is reported when its response arrives: starts are 120 ms apart, arrivals too give or take the fixture's jitter.
-    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(60)
-    expect(sorted.at(-1)! - sorted[0]).toBeGreaterThanOrEqual(5 * 120 - 30)
+    // Two catalog pages and four products, as the site saw them arrive.
+    const times = arrivals.filter(({ path }) => path.startsWith('/catalog') || path.startsWith('/product/')).map(({ at }) => at)
+    expect(times).toHaveLength(6)
+    const gaps = times.slice(1).map((at, index) => at - times[index])
+    // Unthrottled, these land within a few ms of each other. The site shares the test's event loop, so its
+    // clock can run a little late under load: allow 40 ms of that.
+    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(80)
   }, 30000)
 })

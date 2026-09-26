@@ -73,8 +73,8 @@ export async function runInputRecipe (recipe: InputRecipe, output: OutputRecipe,
   const report: RecipeReport = { recipeId: input.id, mode: input.mode, emitted: 0, rejected: 0, duplicates: 0, skipped: 0, stepsSkipped: 0, pages: 0, durationMs: 0 }
   const captchas = { detected: 0, solved: 0, failed: 0 }
   const limits = input.limits ?? {}
-  // A web recipe drives one page, so only api mode runs iterations in parallel.
-  const gate = new RunGate(input.mode === 'web' ? 1 : (limits.concurrency ?? 1), limits.delayMs ?? 0, deps.hosts)
+  // Parallel iterations: requests in api mode, tabs of the recipe's context in web mode.
+  const gate = new RunGate(limits.concurrency ?? 1, limits.delayMs ?? 0, deps.hosts)
   let stopped = false
   let chain: Promise<unknown> = Promise.resolve()
   const unsubscribe = deps.events.subscribe((event) => {
@@ -85,7 +85,7 @@ export async function runInputRecipe (recipe: InputRecipe, output: OutputRecipe,
     if (event.type === 'captcha:failed' && event.recipeId === input.id) captchas.failed += 1
   })
   deps.events.emit({ type: 'recipe:start', recipeId: input.id, mode: input.mode })
-  deps.dedupe.startRecipe()
+  const dedupe = deps.dedupe.forRecipe()
   let runner: StepRunner | undefined
   try {
     const onBlock = input.session?.onBlock
@@ -152,7 +152,7 @@ export async function runInputRecipe (recipe: InputRecipe, output: OutputRecipe,
       if (deps.resume === true && record.key !== null && await deps.sink.has?.(record.key) === true) {
         report.skipped += 1
         deps.events.emit({ type: 'record:skipped', recipeId: input.id, url, key: record.key })
-      } else if (deps.dedupe.isDuplicate(record)) {
+      } else if (dedupe.isDuplicate(record)) {
         report.duplicates += 1
         deps.events.emit({ type: 'record:duplicate', recipeId: input.id, url, key: record.key ?? '' })
       } else {

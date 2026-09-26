@@ -18,6 +18,12 @@ export interface CrawlOptions {
   onEvent?:         CrawlListener
   /** Default `run`: a key seen once is dropped for the rest of the run. */
   dedupe?:          DedupeScope
+  /**
+   * How many input recipes of a set run at once; default 1, one after
+   * another. Each has its own browser context or HTTP session; the browser,
+   * the sink and the per-site `throttle` are shared.
+   */
+  parallel?:        number
   /** Whether a failed input recipe stops the run; default `continue`. */
   onRecipeError?:   'continue' | 'stop'
   /** Base directory for relative `storageStatePath` and `saveTo` values. */

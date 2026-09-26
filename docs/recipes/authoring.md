@@ -415,11 +415,17 @@ The trace shows the branch taken as `⑂ steps.N  then`.
 
 ### 3.9 Concurrency
 
-`limits.concurrency: 3` lets a `forEach` run three iterations at once: a listing whose body fetches every
-item's page fans out, three requests in flight, and records come out in completion order rather than list
-order. Rules:
+Two dials, one inside a recipe and one across recipes.
 
-- **api mode only**. A web recipe drives one browser page, so it stays sequential whatever the limit says.
+**Inside a recipe**, `limits.concurrency: 3` lets a `forEach` over a list run three iterations at once: a
+listing whose body fetches every item's page fans out, and records come out in completion order rather than
+list order.
+
+- **api mode:** three requests in flight on one HTTP session.
+- **web mode:** three **tabs** of the recipe's browser context, one per iteration: they share cookies (the
+  login), each has its own page, and each closes when its iteration ends. A tab opens blank, so the body must
+  start with a `goto` (`{{item.url}}`). A `forEach` over `selector` stays sequential: its live elements
+  belong to one page.
 - The limit is **per recipe run**, not per loop: nested loops share it. The outermost concurrent loop takes
   the permits; a loop inside one of its iterations runs its body sequentially, so nesting never multiplies
   the number of requests in flight.
@@ -430,6 +436,16 @@ order. Rules:
   on top of these per-recipe limits.
 - A failing step under the `fail` policy stops new iterations; the ones in flight settle, then the recipe
   fails as usual.
+- A block under `onBlock.rotate` rotates once for the whole recipe; every tab reopens on the new lease.
+
+**Across recipes**, `createCrawler({ parallel: 3 })` (CLI `--parallel 3`, MCP `run` with `parallel: 3`) runs
+three input recipes of a set at once, each in its own browser context or HTTP session. They share the browser,
+the sink and the per-site throttle. Reports keep the set's order. Under `onRecipeError: 'stop'`, a failure stops
+the recipes not started yet. De-duplication under `dedupe: 'recipe'` stays per recipe; under `run`, the recipe
+that emits a key first keeps it.
+
+Parallel is only faster if the site lets it be. Pair it with the per-site `throttle`
+([access.md](access.md#throttling-per-site)), which bounds what all of this adds up to on one site.
 
 ---
 
