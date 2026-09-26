@@ -1,6 +1,6 @@
 export { readPdf, PdfReadError } from './read-pdf.client'
 export { pdfText, isPdfDocument } from './pdf-document.model'
 export type { PdfDocument, PdfPage, PdfRow, PdfCell, PositionedText } from './pdf-document.model'
-export { assembleRows } from './row-assembly.algorithm'
+export { assembleRows, rowsOfCells } from './row-assembly.algorithm'
 export { findTables } from './pdf-table.algorithm'
 export type { PdfTable, TableQuery, TableAlign } from './pdf-table.algorithm'

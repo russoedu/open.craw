@@ -13,6 +13,8 @@ export interface RecipeReport {
   stepsSkipped: number
   pages:        number
   durationMs:   number
+  /** Captcha challenges met, solved, and solve attempts that failed; present when any was met. */
+  captchas?:    { detected: number, solved: number, failed: number }
   /** Set when the recipe stopped on a failure. */
   error?:       string
 }

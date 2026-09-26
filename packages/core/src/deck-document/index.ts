@@ -1,0 +1,5 @@
+export { deckText, isDeckDocument } from './deck-document.model'
+export type { DeckDocument, DeckSlide, DeckShape, DeckChart } from './deck-document.model'
+export { readPptxDeck } from './read-pptx.client'
+export { findDeckTables } from './deck-table.algorithm'
+export type { DeckTable, DeckTableQuery } from './deck-table.algorithm'

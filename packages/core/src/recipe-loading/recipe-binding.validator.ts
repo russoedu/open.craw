@@ -20,7 +20,9 @@ const API_ONLY = new Set<string>(API_ONLY_STEPS)
  * - web-only steps appear only in web recipes or inside a bootstrap, api-only
  *   steps only in api recipes, and `next.selector` only in web mode;
  * - exactly one emitting construct exists on any path (the two branches of an
- *   `if` are separate paths).
+ *   `if` are separate paths);
+ * - a `captcha` step, and `onBlock.solve`, have a solver: their own or
+ *   `session.captcha.solver`.
  *
  * @param input - A parsed input recipe.
  * @param output - The parsed output recipe it names.
@@ -34,10 +36,13 @@ export function validateBinding (input: InputRecipe, output: OutputRecipe): Bind
   const varNames = [input.vars ?? {}, ...input.start.map(point => point.vars ?? {})].flatMap(record => Object.keys(record))
   for (const name of varNames) known.add(name)
 
-  walkSteps(input.steps, 'steps', input.mode, known, report, { emitting: false, ids: new Set() })
+  const solver = input.session?.captcha !== undefined
+  walkSteps(input.steps, 'steps', input.mode, known, report, { emitting: false, ids: new Set(), solver })
   if (input.session?.bootstrap !== undefined) {
-    walkSteps(input.session.bootstrap.steps, 'session.bootstrap.steps', 'web', new Set(RESERVED), report, { emitting: false, ids: new Set(), bootstrap: true })
+    walkSteps(input.session.bootstrap.steps, 'session.bootstrap.steps', 'web', new Set(RESERVED), report, { emitting: false, ids: new Set(), bootstrap: true, solver })
   }
+  if (!solver && input.session?.onBlock?.solve === true) report('session.onBlock.solve', 'solving a block needs a solver: add session.captcha')
+  if (input.mode === 'api' && input.session?.onBlock?.solve === true) report('session.onBlock.solve', 'captchas are solved on a live page; this recipe runs in api mode (solve them in session.bootstrap)')
 
   for (const [target, rule] of Object.entries(input.mapping)) {
     const field = fieldAt(output.fields, target)
@@ -64,6 +69,8 @@ interface WalkState {
   emitting:   boolean
   ids:        Set<string>
   bootstrap?: boolean
+  /** Whether `session.captcha` names a solver. */
+  solver:     boolean
 }
 
 function walkSteps (steps: readonly Step[], path: string, mode: 'web' | 'api', known: Set<string>, report: (path: string, message: string) => void, state: WalkState): void {
@@ -80,7 +87,11 @@ function walkStep (step: Step, at: string, mode: 'web' | 'api', known: Set<strin
     known.add(step.id)
   }
   if (step.type === 'extract' && step.from !== undefined && !known.has(step.from)) report(`${at}.from`, `"${step.from}" is not a known id`)
-  if (mode === 'web' && state.bootstrap !== true && step.type === 'extract' && step.kind === 'table' && step.from === undefined) report(at, 'a "table" extract reads a PDF, which a web page is not: fetch the PDF with a request step in an api recipe, or extract "from" a PDF bound earlier')
+  if (mode === 'web' && state.bootstrap !== true && step.type === 'extract' && step.kind === 'table' && step.from === undefined) {
+    const foreign = (['sheet', 'slide', 'shapes', 'align', 'includeHidden'] as const).filter(option => step[option] !== undefined)
+    if (foreign.length > 0) report(at, `a "table" extract on a web page reads its HTML tables; ${foreign.map(option => `"${option}"`).join(', ')} belong to PDFs, workbooks or decks (fetch one with a request step in an api recipe)`)
+  }
+  if (step.type === 'captcha' && step.solver === undefined && !state.solver) report(at, 'a captcha step needs a solver: name one ("solver") or add session.captcha')
   if (step.type === 'collect' && !known.has(step.into)) report(`${at}.into`, `"${step.into}" is not a known id: set it to [] before the loop that collects into it`)
   const nested = (): WalkState => ({ ...state, ids: new Set(state.ids) })
   switch (step.type) {

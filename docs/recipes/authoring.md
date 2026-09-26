@@ -170,7 +170,8 @@ steps in its bootstrap** to obtain a session (§2.2).
 | `bootstrap` | `{ steps, keep, saveTo? }`. Runs `steps` in a browser **before** the crawl, then captures what `keep` lists (`cookies`, `localStorage`). A `web` recipe starts its page from that state; an `api` recipe sends those cookies with every request. Bootstrap steps are web steps only and never emit. |
 | `access` | `{ profile?, country?, sticky? }`: what the site needs from the network. `profile` names a profile of the runner's access config (its default when omitted), `country` is a two-letter code for profiles that target by country, `sticky: false` lets the provider change IP per request. Never credentials: those live in the access config. See [access.md](./access.md). |
 | `blockedWhen` | `{ status?, header?, text? }`: what counts as the site refusing the crawl, checked on every navigation and request. Default: 403, 429, or an AWS WAF challenge header. A block fails the step with the URL and reason instead of a later selector miss. |
-| `onBlock` | `{ rotate: true, attempts? }`: on a block, take a new access lease (a new IP), reopen the session (re-running the bootstrap) and retry the step, up to `attempts` times per run (default 2). |
+| `onBlock` | `{ rotate?, solve?, attempts? }`. `rotate: true`: on a block, take a new access lease (a new IP), reopen the session (re-running the bootstrap) and retry the step, up to `attempts` times per run (default 2). `solve: true` (web mode, needs `captcha`): a block page showing a captcha is solved on the spot; rotation, if on, applies only when solving fails. |
+| `captcha` | `{ solver, detect?, verify?, attempts?, timeoutMs?, maxSolves? }`, web mode and bootstraps: after every navigation, click and key press, a visible challenge is solved by the named solver before the next step runs. §6.1. |
 
 A login looks like this and works for both modes:
 
@@ -209,6 +210,7 @@ Every step has `type`, and may have:
 | `wait` | one of `selector`, `ms`, `state: "networkidle"` | `selector` waits for visibility. Put a `wait` after `goto` on script-heavy pages before extracting. |
 | `evaluate` | `script` | JavaScript evaluated in the page; the result is bound under `id`. **Trusted recipes only.** |
 | `screenshot` | `path` (template) | Full page. A debugging aid. |
+| `captcha` | `solver?`, `selector?`, `verify?`, `attempts?`, `timeoutMs?` | Solves the challenge on the page, if there is one (none is fine), reCAPTCHA v3 included. Missing fields come from `session.captcha`. §6.1. |
 
 Clicks and key presses can navigate; the engine re-reads the page URL after every web step.
 
@@ -219,7 +221,11 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 
 | Step | Fields | Notes |
 |---|---|---|
-| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `html`, `text`, `pdf`) | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF). A `file:` URL reads a local file, its kind from `as` or the extension. 4xx/5xx fail the step. |
+| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `jsonl`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`, `yaml`, `markdown`), `encoding?`, `delimiter?`, `scalars?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck, `application/yaml` YAML, `application/x-ndjson` JSON Lines, `text/markdown` Markdown). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`, `.yaml`, `.yml`, `.jsonl`, `.ndjson`, `.md`). 4xx/5xx fail the step. |
+
+Text bodies are decoded from, in order: a byte-order mark, `encoding` (any WHATWG label: `windows-1252`,
+`iso-8859-15`, `shift_jis`), the charset the server declares, UTF-8, and Windows-1252 for text that is not
+UTF-8 (the usual European export). `delimiter` (one character) overrides a CSV's detected delimiter (§4.7).
 
 `body` is templated **all the way down**: a string body is one template, and in an object or list body
 every string inside it is one, at any depth. A string that is exactly one placeholder keeps the value's type
@@ -437,9 +443,24 @@ order. Rules:
 | an id holding a **list of texts** | with `jsonpath`: every entry that parses as JSON becomes one element of an array and the path runs over the array | same |
 | an id holding **data** (an object, a list of objects) | with `jsonpath` | same |
 | an id holding a **read PDF** (a `request` with `as: "pdf"`) | with `table`, `regex` or `jsonpath` (§4.6) | same |
+| an id holding a **read workbook** (a spreadsheet or a CSV) | with `table`, `regex` or `jsonpath` (§4.7) | same |
+| an id holding a **read deck** (a presentation) | with `table`, `regex` or `jsonpath` (§4.8) | same |
 
-JSON-LD wrapped in `/* <![CDATA[ */ ... /* ]]> */` or `<!-- -->` guards is unwrapped before parsing. The
-common pattern, both sites in the examples use it:
+**JSON Lines** (NDJSON: one JSON value per line, as bulk exports and Shopify bulk operations give) read with
+`as: "jsonl"`, or by the `application/x-ndjson` / `application/jsonl` content types or the `.jsonl` / `.ndjson`
+extensions, into an **array** of the lines' values: `$[*]` walks them. A line that does not parse fails the step
+with its number. JSON Lines served as `application/json` fail with a hint to use `as: "jsonl"`.
+
+**Wrapped JSON** is unwrapped, both in a response read as JSON and in text a `jsonpath` extract parses (`from`):
+
+- comment guards around JSON-LD: `/* <![CDATA[ */ … /* ]]> */`, `<!-- … -->`;
+- anti-hijacking prefixes: `)]}'` (with or without a comma), `while(1);`, `for(;;);`;
+- JSONP: `callback({…});`, so an endpoint served as `text/javascript` reads with `as: "json"`;
+- an assignment in an inline script: `window.__INITIAL_STATE__ = {…};` (with `var`, `let` or `const`, too).
+
+Valid JSON is always read as it is: a wrapper is only removed when the text does not parse, and what is inside
+must be strict JSON. Nothing is evaluated, so a JavaScript literal (`{ a: undefined }`, unquoted keys) still
+fails: read it with `regex`, or a hook. The common JSON-LD pattern, both sites in the examples use it:
 
 ```json
 { "type": "extract", "id": "ld", "selector": "script[type=\"application/ld+json\"]", "kind": "css", "take": "text", "many": true },
@@ -554,6 +575,182 @@ How it reads a table, which is what makes real-world sheets work:
 Find the selectors with `opencraw probe <url or file.pdf>`: for a PDF it lists the rows and every row that
 looks like a table header, with a ready `selector`. The Stellantis example
 (`examples/stellantis-it-discounts/`) reads eight monthly discount sheets this way.
+
+`fillDown` (below, §4.7) works on PDF tables too.
+
+### 4.7 Spreadsheets and CSV
+
+Both read into a **workbook**: sheets of cells that the same three extract kinds read.
+
+**Spreadsheets.** `request` with `as: "xlsx"` (or a response served with a spreadsheet content type, or a
+local `file:…xlsx` / `…xlsm`) reads every worksheet with
+[`@opencraw/office-reader`](../../packages/office-reader). Numbers and booleans keep their type, so
+`13955.625` is a number that no locale guess can misread. Dates become ISO text (`2026-06-01`,
+`2026-06-01T09:30:00`), errors their text (`#DIV/0!`), and empty cells `''`. Formulas give their cached
+value; nothing is evaluated, and display formats are not applied (a percentage stays `0.125`). Hidden sheets
+and rows are read, and `table` skips them unless `includeHidden`. Merged ranges are recorded, and `table`
+fills them. A legacy `.xls`, a password-protected file or an `.ods` fails the step, with what to do.
+
+**CSV.** `request` with `as: "csv"` (or a response served as `text/csv`, `application/csv` or
+`text/tab-separated-values`, or a local `file:…csv` / `…tsv`) reads the file into a **workbook**: a CSV is a
+workbook with one sheet, named after the file (`…/prezzo_alle_8.csv` → `prezzo_alle_8`). Every cell stays
+text; `number` with a `locale` and `date` with a `format` convert them in the mapping.
+
+- **Encoding** as in §3.2: a Windows-1252 export with no charset reads right without `encoding`.
+- **Delimiter** is detected among `,` `;` tab `|`: the one that splits the first lines into the most
+  consistent number of fields, so a title line above the header does not mislead it, and `;` with decimal
+  commas (`Panda;15.950,00`) is read as `;`. Set `delimiter` on the `request` when detection gets it wrong.
+- **Quotes**: a quoted field may hold the delimiter, line breaks and `""`; a quote inside an unquoted field is
+  kept as is (`1.0 Hybrid "Cross"`). Rows are kept ragged, nothing is trimmed.
+
+The same three extract kinds read it:
+
+| `kind` | Reads | Use for |
+|---|---|---|
+| `table` | tables, found by their header row | the list itself, below any title lines |
+| `regex` | the text: cells separated by a tab, rows by a newline, sheets by a blank line | a date in a title line: `Estrazione del (\S+)` |
+| `jsonpath` | the structure: `{ kind: "workbook", sheets: [{ name, rows: [["cell", …], …] }], csv: { encoding, delimiter } }` | a file with no header row: `$.sheets[0].rows[*]`; `merges`, `hidden` and `hiddenRows` too, for a spreadsheet |
+
+A grid needs no geometry, so a workbook table is simpler than a PDF one: column *i* of a row belongs to header
+cell *i*. The `selector` matches the header row (its non-empty cells joined by spaces, whitespace collapsed),
+and each table is `{ sheet, title, header, rows }`. Before reading, every merged range's value is copied
+into the cells it covers: a brand merged down its models reads on every row, and a group header merged
+across its sub-columns names each of them.
+
+```json
+{ "type": "request", "url": "{{start.url}}" },
+{ "type": "extract", "id": "table", "selector": "^Marca Modello", "kind": "table", "until": "^Totale",
+  "fillDown": ["brand", "model"],
+  "columns": { "brand": "^Marca$", "model": "^Modello$", "version": "^Versione$", "price": "^Prezzo" } },
+{ "type": "set", "id": "rows", "value": "{{table.rows}}" },
+{ "type": "forEach", "over": "rows", "as": "row", "emit": true, "steps": [] }
+```
+
+| Field | Meaning |
+|---|---|
+| `selector` | Matches the header row. Title lines above it and empty rows below it are skipped. |
+| `until` | Matches the row that ends a table. A table also ends at the next header and at the sheet's end. `"^$"` ends it at the first empty row: several tables on one sheet, separated by blank rows. |
+| `columns` | Output key → header pattern. Without it the header texts are the keys; a column with data but no header text is keyed by its letter (`A`, `B`…), and a repeated header gets a counter (`Price 2`). |
+| `fillDown` | Output keys whose empty cells take the value of the row above: exports that write a brand or a model once over its versions. |
+| `headerRows` | How many rows the header spans (default 1): a column's key joins its header texts (`Total` over `August` → `Total August`). |
+| `sheet` | A pattern for the names of the sheets to read (default: all). |
+| `includeHidden` | Read hidden sheets and rows too. |
+
+A spreadsheet table under a two-row merged header (the German KBA registration statistics):
+
+```json
+{ "type": "extract", "id": "table", "kind": "table", "sheet": "^FZ 10\\.1$", "selector": "^Marke Modellreihe",
+  "headerRows": 2, "until": "^NEUZULASSUNGEN INSGESAMT",
+  "columns": { "brand": "^Marke$", "model": "^Modellreihe$", "month": "^Insgesamt August", "bev": "^mit Elektroantrieb \\(BEV\\) August" } }
+```
+
+`Insgesamt` is merged over *August 2026 · Jan.–August 2026 · Anteil in %*, so the three columns read as
+`Insgesamt August 2026` and so on, and the brand merged down its models' rows fills every row.
+
+`opencraw probe <url or file>` lists a workbook's sheets, the first rows, and every row that looks like a
+header, with a ready `selector` (and a `headerRows` hint when the header has merged cells). For a CSV it
+also reports the encoding and the delimiter it used.
+
+### 4.8 Presentations
+
+`request` with `as: "pptx"` (or a response served with a presentation content type, or a local
+`file:…pptx`) reads the deck with [`@opencraw/office-reader`](../../packages/office-reader) into slides:
+
+```
+{ kind: "deck", width, height, slides: [{ number, title, hidden,
+    shapes: [{ x, y, width, height, text, placeholder }],   // points from the top-left corner, reading order
+    tables: [{ name, rows, merges }],                        // native tables, as sheets
+    charts: [{ type, title, series: [{ name, categories, values }] }],
+    notes }] }
+```
+
+A title placeholder that PowerPoint places through the slide's layout gets the layout's position, and boxes
+inside a group are placed through its scaling. Slide numbers, dates and footers are left out. A legacy `.ppt`,
+a password-protected file or an `.odp` fails the step, with what to do.
+
+| `kind` | Reads | Use for |
+|---|---|---|
+| `table` | native tables, or with `shapes: true` text boxes laid out as a table | price and incentive tables |
+| `regex` | per visible slide: its text boxes, its tables' rows (cells separated by a tab), then `Notes: …`; slides separated by a blank line | a validity date in the notes: `Notes: .*fino al (\d+ \w+)` |
+| `jsonpath` | the structure above | chart data: `$.slides[?(@.title=='Vendite')].charts[*].series[*]` |
+
+A **native table** reads like a spreadsheet table (§4.7). Merged cells are filled, `headerRows` joins a header
+spread over several rows, and `slide` (a pattern on slide titles) picks the slides:
+
+```json
+{ "type": "extract", "id": "table", "kind": "table", "slide": "^Incentivi", "selector": "^Modello Prezzo", "headerRows": 2,
+  "columns": { "model": "^Modello$", "list": "^Prezzo Listino$", "discount": "^Sconto$" } }
+```
+
+**Text boxes laid out as a table** read with `shapes: true`, through the PDF table reader (§4.6): each box is a
+cell, boxes whose heights overlap form a row, and columns come from where the body's boxes start (`align`
+applies). A very tall box can pull two rows together.
+
+```json
+{ "type": "extract", "id": "table", "kind": "table", "shapes": true, "slide": "^Griglia", "selector": "^Modello Prezzo",
+  "columns": { "model": "^Modello", "price": "^Prezzo" } }
+```
+
+Each table is `{ slide, slideTitle, title, header, rows }`, and hidden slides are skipped unless
+`includeHidden`. `opencraw probe <url or file.pptx>` lists the slides, each native table's header with a ready
+`selector`, the charts' series, and the slides whose short text boxes look like a table.
+
+### 4.9 YAML
+
+`request` with `as: "yaml"` (or a response served as `application/yaml`, `text/yaml` or their `x-` forms, or a
+local `file:…yaml` / `…yml`) parses the YAML into **JSON data**: `jsonpath`, `forEach` and `json` fields work
+exactly as on a JSON response. Several documents (`---`) become an array of them.
+
+- **YAML 1.2, always.** Under YAML 1.1, `country: NO` is `false`, `y` is `true` and `0123` is octal `83`. The
+  parser is pinned to 1.2 even when the file declares `%YAML 1.1`, so `NO` stays `"NO"`.
+- **`scalars: "text"`** on the `request` keeps every scalar as written. Even 1.2 reads `zip: 0123` as `123` and
+  `version: 1.10` as `1.1`; with `"text"`, they stay `"0123"` and `"1.10"`, and transforms convert what needs
+  converting.
+- **Merge keys** (`<<: *defaults`) are applied, **anchors** expand with a cap (a "billion laughs" file fails),
+  and **duplicate keys** fail the step with their line.
+- **Custom tags** (`!!js/function`, `!custom`) never build values: the tagged value is read as a plain one, and
+  the trace shows a warning.
+
+### 4.10 Markdown
+
+`request` with `as: "markdown"` (or a response served as `text/markdown`, or a local `file:…md`) renders
+GitHub-flavoured Markdown (tables, task lists, strikethrough, autolinks) to an **HTML document**, so every
+`css` selector works on it. GitHub raw and most CDNs serve Markdown as `text/plain`: set `as`. Two additions
+make it easier to aim at:
+
+- **Sections.** Each heading and everything up to the next heading of the same or a higher level is wrapped
+  in `<section data-heading="…" data-level="…">`, sections nesting: the table under *Prezzi* is
+  `section[data-heading='Prezzi' i] table`. Headings get GitHub's slug ids (`<h2 id="prezzi">`).
+- **Front matter.** A leading `---` YAML block is parsed (YAML 1.2, as §4.9) and put in the head as
+  `<script type="application/json" data-front-matter>`: read it the way JSON-LD is read.
+
+```json
+{ "type": "request", "url": "{{start.url}}", "as": "markdown" },
+{ "type": "extract", "id": "front", "selector": "script[data-front-matter]", "kind": "css", "take": "text" },
+{ "type": "extract", "id": "updated", "from": "front", "selector": "$.updated", "kind": "jsonpath" },
+{ "type": "extract", "id": "table", "selector": "^Modello Versione", "kind": "table", "columns": { "model": "^Modello$", "price": "^Prezzo$" } }
+```
+
+In a GFM table a `|` inside a code span still splits the cell: the Markdown must write it `\|`. Raw HTML in the
+Markdown is kept and selectable, and never runs (it is parsed, not loaded in a browser). To run a `regex` over
+the Markdown source instead, request it with `as: "text"`.
+
+### 4.11 HTML tables
+
+`table` also reads an HTML document's `<table>`s: a fetched page, rendered Markdown, or, in web mode, the live
+page. Every table becomes a grid: `thead`, `tbody` and `tfoot` rows in order, `th` and `td` alike, cell text
+with whitespace collapsed, and `colspan` / `rowspan` as merged ranges. From there it is the grid table of §4.7:
+the `selector` matches the header row, merged cells are filled, `headerRows` joins a header over two rows,
+`fillDown` and `columns` work the same. A table inside a table is read on its own.
+
+```json
+{ "type": "extract", "id": "table", "kind": "table", "selector": "^Model Version", "headerRows": 2,
+  "columns": { "model": "^Model$", "version": "^Version$", "urban": "^Consumption Urban$" } }
+```
+
+A model merged down its versions (`rowspan`) reads on every row, and *Consumption* over *Urban · Mixed*
+(`colspan`) names both columns. It replaces a `css` extract per `tr` and a `take` per `td`. `probe` lists
+every table's header row with a ready `selector`.
 
 ## 5. Mapping
 
@@ -678,9 +875,78 @@ export default {
 opencraw run recipes/ --hooks hooks.mjs      # or OPENCRAW_HOOKS=hooks.mjs
 ```
 
-The MCP server reads `OPENCRAW_HOOKS` from its own environment, never from a tool call: an agent can run
+The same file becomes a **plugins module** when it names its exports: `hooks` (the map), `accessPlugins`
+([access.md](access.md#plugins)) and `captchaSolvers` (§6.1). `--plugins` / `OPENCRAW_PLUGINS` are the same
+option under their own name.
+
+```js
+// plugins.mjs
+export const hooks = { positive: input => Number(input) > 0 }
+export const accessPlugins = [myProxyList]
+export const captchaSolvers = [capsolver({ apiKey: process.env.CAPSOLVER_KEY })]
+```
+
+The MCP server reads `OPENCRAW_PLUGINS` / `OPENCRAW_HOOKS` from its own environment, never from a tool call: an agent can run
 recipes that call your hooks but cannot make the server load a module of its choosing. The module runs as
 your code, with your privileges, like anything you `import`: load only files you trust.
+
+### 6.1 Captcha solvers
+
+A captcha solver gets past one challenge on the live page. The engine does the rest: finding challenges,
+checking the page afterwards, retrying, rotating, and capping what a run spends.
+
+```ts
+import type { CaptchaSolver } from '@opencraw/core'
+
+const solver: CaptchaSolver = {
+  name:  'my-solver',
+  solve: async (challenge, { page, lease, attempt, signal, log }) => {
+    // challenge: { kind, url, siteKey?, action?, selector? }
+    const token = await myService.solve(challenge.kind, challenge.siteKey, challenge.url, { signal })
+    await page.locator('[name="g-recaptcha-response"]').evaluate((field, value) => { field.value = value }, token)
+    await page.locator('form').first().evaluate(form => form.submit())
+    return { status: 'solved' }            // or { status: 'failed', reason: 'balance is zero' }
+  },
+}
+const crawler = createCrawler({ captchaSolvers: [solver] })
+```
+
+A recipe names it in `session.captcha` (checked after every navigation, click and key press) or in a
+`captcha` step (one known point, such as a login form):
+
+```json
+"session": { "captcha": { "solver": "my-solver", "verify": { "selector": "#results" }, "maxSolves": 5 },
+             "onBlock": { "solve": true, "rotate": true } }
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `solver` | | A registered solver's name. An unknown name fails the recipe before its first page. |
+| `detect.selector` | the common widgets | Where challenges are: visible `.g-recaptcha`, `.h-captcha`, `.cf-turnstile`, or their iframes. |
+| `verify` | `{ gone: true }` | How a solve is confirmed: the challenge is `gone` and/or an element (`selector`) appears. The solver's `solved` is only a claim. |
+| `attempts` | 3 | Solves tried per challenge. |
+| `timeoutMs` | 120000 | Time one solve may take; then `signal` aborts and the attempt fails. |
+| `maxSolves` | 10 | Solves the whole run may spend, rotations and bootstrap included. `0` detects without paying. |
+
+What happens:
+
+1. **Detect.** The first visible match gives `kind` (`recaptcha-v2`, `hcaptcha`, `turnstile`, `image`,
+   `unknown`; `recaptcha-v3` in a `captcha` step only), the `siteKey` (`data-sitekey`, or the iframe's `k` /
+   `sitekey`) and a `selector` for the widget.
+2. **Solve.** Each attempt spends one solve of `maxSolves`. The solver applies its answer on the page
+   (injects a token and submits, types a text). A throw or a timeout is a failed attempt.
+3. **Verify.** Up to 10 s for the page to confirm. A failed attempt re-detects (a widget re-renders after a
+   wrong answer), or reloads when the widget is gone without confirming.
+4. **Give up.** After `attempts`, or when `maxSolves` is spent, the step fails with a `CaptchaError`. It is a
+   block, so `onBlock.rotate` retries the step on a new IP (often an easier challenge, or none), then the step's
+   `onError` applies.
+
+Solvers get the access `lease`: token services solve faster, and more often correctly, through the same proxy
+as the browser. Api recipes cannot solve (there is no page): with `session.captcha`, a fetched page showing a
+widget fails as a block that says so. Solve it in `session.bootstrap` and keep the cookies.
+
+Solving captchas can break a site's terms of service. [captcha.md](captcha.md) has a working solver for
+CapSolver, the costs, and when not to.
 
 ---
 
@@ -765,7 +1031,8 @@ a resumed run costs the requests but not the duplicates. Any sink can support th
 ### 8.1 Events and the trace
 
 Everything the engine does is an event: `recipe:start` / `recipe:finish`, `page:visit` (with the HTTP status),
-`access:lease` / `access:blocked` / `access:rotate`, `step:start` /
+`access:lease` / `access:blocked` / `access:rotate`, `captcha:detected` / `captcha:solve` / `captcha:solved` /
+`captcha:failed` / `captcha:budget`, `step:start` /
 `step:finish` / `step:retry` / `step:skip` (with the step type, its id and its path such as
 `steps.8.steps.2`), `step:branch`, `record:emit` / `record:reject` / `record:duplicate` / `record:skipped`,
 `warning`, `error`. `traceLine`

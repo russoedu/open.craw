@@ -3,9 +3,16 @@ import { extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { request } from 'playwright'
 import type { APIRequestContext, APIResponse } from 'playwright'
+import { readPptxDeck } from '../deck-document'
+import { readMarkdown } from '../markdown-document'
 import { readPdf } from '../pdf-document'
+import type { BodyKind } from '../recipe-schema'
+import { csvWorkbook, readXlsxWorkbook, sheetNameOf } from '../workbook-document'
+import { parseJsonLike, parseJsonLines } from '../selection'
+import { readYaml } from '../yaml-document'
 import { HttpError } from './http-response.contract'
 import type { HttpBody, HttpRequest, HttpResponse, HttpSender } from './http-response.contract'
+import { charsetOf, decodeText } from './text-decoding.algorithm'
 
 /** Playwright's storage state: cookies plus per-origin local storage. */
 export type StorageState = Awaited<ReturnType<APIRequestContext['storageState']>>
@@ -58,8 +65,8 @@ export class HttpClient implements HttpSender {
       data:    httpRequest.body as string | Record<string, unknown> | undefined,
       timeout: httpRequest.timeoutMs ?? this.timeoutMs,
     })
-    const body = await readBody(response, httpRequest.as)
-    const result: HttpResponse = { status: response.status(), url: response.url(), headers: response.headers(), body }
+    const { body, warnings, format } = await readBody(response, httpRequest)
+    const result: HttpResponse = { status: response.status(), url: response.url(), headers: response.headers(), body, format, ...(warnings.length > 0 && { warnings }) }
     if (response.status() >= 400) throw new HttpError(response.status(), response.url(), body, response.headers())
 
     return result
@@ -75,39 +82,85 @@ export class HttpClient implements HttpSender {
   }
 }
 
-async function readBody (response: APIResponse, as: HttpRequest['as']): Promise<HttpBody> {
-  const kind = as ?? kindFromContentType(response.headers()['content-type'] ?? '')
+/** A body as read, with what reading it noticed. */
+interface ReadBody {
+  body:     HttpBody
+  warnings: string[]
+  format:   BodyKind
+}
 
-  return parseBody(kind, await response.body(), response.url())
+async function readBody (response: APIResponse, httpRequest: HttpRequest): Promise<ReadBody> {
+  const contentType = response.headers()['content-type'] ?? ''
+  const format = httpRequest.as ?? formatFromContentType(contentType)
+
+  return parseBody(format, await response.body(), response.url(), { ...httpRequest, charset: charsetOf(contentType) })
 }
 
 /**
- * A `file:` URL, read from disk: a PDF or JSON a recipe gets from a folder
- * instead of a server. The kind is `as`, else the file extension.
+ * A `file:` URL, read from disk: a PDF, spreadsheet, presentation, CSV, YAML
+ * or JSON a recipe gets from a folder instead of a server. The format is `as`,
+ * else the file extension.
  */
 async function readLocalFile (httpRequest: HttpRequest): Promise<HttpResponse> {
   const path = fileURLToPath(httpRequest.url)
   const bytes = await readFile(path)
+  const { body, warnings, format } = await parseBody(httpRequest.as ?? formatFromExtension(extname(path)), bytes, httpRequest.url, httpRequest)
 
-  return { status: 200, url: httpRequest.url, headers: {}, body: await parseBody(httpRequest.as ?? kindFromExtension(extname(path)), bytes, httpRequest.url) }
+  return { status: 200, url: httpRequest.url, headers: {}, body, format, ...(warnings.length > 0 && { warnings }) }
 }
 
-async function parseBody (kind: HttpBody['kind'], bytes: Uint8Array, url: string): Promise<HttpBody> {
-  if (kind === 'pdf') return readPdf(bytes, url)
-  const text = new TextDecoder().decode(bytes)
-  if (kind === 'json') {
-    try {
-      return { kind: 'json', data: JSON.parse(text) as unknown }
-    } catch (error) {
-      throw new Error(`${url}: body is not JSON (${(error as Error).message})`, { cause: error })
-    }
+async function parseBody (format: BodyKind, bytes: Uint8Array, url: string, reading: { encoding?: string, delimiter?: string, scalars?: 'typed' | 'text', charset?: string }): Promise<ReadBody> {
+  if (format === 'yaml') {
+    const { text } = decodeText(bytes, reading)
+    const { data, warnings } = await readYaml(text, url, reading.scalars)
+
+    return { body: { kind: 'json', data }, warnings, format }
+  }
+  if (format === 'markdown') {
+    const { text } = decodeText(bytes, reading)
+    const { html, warnings } = await readMarkdown(text, url)
+
+    return { body: { kind: 'html', html }, warnings, format }
   }
 
-  return kind === 'html' ? { kind: 'html', html: text } : { kind: 'text', text }
+  return { body: await parseFormat(format, bytes, url, reading), warnings: [], format }
 }
 
-function kindFromContentType (contentType: string): HttpBody['kind'] {
-  const type = contentType.toLowerCase()
+async function parseFormat (format: BodyKind, bytes: Uint8Array, url: string, reading: { encoding?: string, delimiter?: string, charset?: string }): Promise<HttpBody> {
+  if (format === 'pdf') return readPdf(bytes, url)
+  if (format === 'xlsx') return readXlsxWorkbook(bytes, url)
+  if (format === 'pptx') return readPptxDeck(bytes, url)
+  const { text, encoding } = decodeText(bytes, reading)
+  if (format === 'csv') return csvWorkbook(text, { name: sheetNameOf(url), encoding, delimiter: reading.delimiter })
+  if (format === 'jsonl') return { kind: 'json', data: parseJsonLines(text, url) }
+  if (format === 'json') {
+    const parsed = parseJsonLike(text)
+    if ('error' in parsed) throw new Error(`${url}: body is not JSON (${parsed.error.message})${looksLikeJsonLines(text) ? '; it looks like JSON Lines: read it with "as": "jsonl"' : ''}`, { cause: parsed.error })
+
+    return { kind: 'json', data: parsed.value }
+  }
+
+  return format === 'html' ? { kind: 'html', html: text } : { kind: 'text', text }
+}
+
+/** Several lines, the first of them JSON on its own. */
+function looksLikeJsonLines (text: string): boolean {
+  const lines = text.split(/\r?\n/).filter(line => line.trim() !== '')
+  if (lines.length < 2) return false
+  const first = parseJsonLike(lines[0])
+
+  return 'value' in first
+}
+
+function formatFromContentType (contentType: string): BodyKind {
+  const type = contentType.toLowerCase().split(';', 1)[0].trim()
+  if (CSV_TYPES.has(type)) return 'csv'
+  if (JSON_LINES_TYPES.has(type)) return 'jsonl'
+  // A legacy .xls or .ppt goes to the Office reader too, which says what to do with it.
+  if (type.includes('spreadsheetml') || type.startsWith('application/vnd.ms-excel')) return 'xlsx'
+  if (type.includes('presentationml') || type.startsWith('application/vnd.ms-powerpoint')) return 'pptx'
+  if (YAML_TYPES.has(type)) return 'yaml'
+  if (type === 'text/markdown' || type === 'text/x-markdown') return 'markdown'
   if (type.includes('json')) return 'json'
   if (type.includes('pdf')) return 'pdf'
   if (type.includes('html') || type.includes('xml')) return 'html'
@@ -115,8 +168,12 @@ function kindFromContentType (contentType: string): HttpBody['kind'] {
   return 'text'
 }
 
-function kindFromExtension (extension: string): HttpBody['kind'] {
-  const kinds: Record<string, HttpBody['kind']> = { '.json': 'json', '.pdf': 'pdf', '.html': 'html', '.htm': 'html', '.xml': 'html' }
+const JSON_LINES_TYPES = new Set(['application/x-ndjson', 'application/ndjson', 'application/jsonl', 'application/x-jsonlines', 'application/jsonlines'])
+const YAML_TYPES = new Set(['application/yaml', 'application/x-yaml', 'text/yaml', 'text/x-yaml'])
+const CSV_TYPES = new Set(['text/csv', 'application/csv', 'text/x-csv', 'application/x-csv', 'text/comma-separated-values', 'text/tab-separated-values'])
 
-  return kinds[extension.toLowerCase()] ?? 'text'
+function formatFromExtension (extension: string): BodyKind {
+  const formats: Record<string, BodyKind> = { '.json': 'json', '.jsonl': 'jsonl', '.ndjson': 'jsonl', '.pdf': 'pdf', '.csv': 'csv', '.tsv': 'csv', '.xlsx': 'xlsx', '.xlsm': 'xlsx', '.xls': 'xlsx', '.pptx': 'pptx', '.pptm': 'pptx', '.ppsx': 'pptx', '.ppt': 'pptx', '.yaml': 'yaml', '.yml': 'yaml', '.md': 'markdown', '.markdown': 'markdown', '.html': 'html', '.htm': 'html', '.xml': 'html' }
+
+  return formats[extension.toLowerCase()] ?? 'text'
 }

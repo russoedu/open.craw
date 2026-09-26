@@ -16,11 +16,13 @@ npx playwright install chromium   # web recipes and browser bootstraps only
 | `loadRecipes(source)` | Reads, validates and binds recipes from one source holding all of them, the output recipe found by its `kind`. The source is any of the forms below. Throws `RecipeValidationError` / `RecipeBindingError` with every problem and its JSON path. |
 | `loadRecipeSet({ output, inputs })` | The same, with the output recipe given apart; each part is any of the forms below. |
 | `readRecipeSource(source)` | Decodes recipes without validating them, each with where it came from, for tooling. |
-| `createCrawler(options)` | Builds an engine: `hooks`, `sink` (`memorySink()` default, `jsonLinesSink(path, { append? })`), `onEvent`, `browser` settings, `dedupe` (`run` / `recipe` / `off`), `onRecipeError` (`continue` / `stop`), `resume` (skip keys the sink already has), `access` + `accessPlugins` (proxy profiles, see [access.md](../../docs/recipes/access.md)). |
+| `createCrawler(options)` | Builds an engine: `hooks`, `sink` (`memorySink()` default, `jsonLinesSink(path, { append? })`), `onEvent`, `browser` settings, `dedupe` (`run` / `recipe` / `off`), `onRecipeError` (`continue` / `stop`), `resume` (skip keys the sink already has), `access` + `accessPlugins` (proxy profiles, see [access.md](../../docs/recipes/access.md)), `captchaSolvers` (see [captcha.md](../../docs/recipes/captcha.md)). |
 | `loadAccessConfig(path)`, `AccessBroker`, `ACCESS_PRESETS` | Access configs: load and validate one, lease a profile outside a crawl (the cli's `probe` does), list the provider presets. |
 | `crawler.run(set)` | Runs every input recipe in sequence; returns a `CrawlReport`. |
 | `crawler.close()` | Closes the browser, if one was launched. |
 | `readPdf(bytes)`, `findTables(pdf, query)`, `pdfText(pdf)` | The PDF reader and table extractor `request as: "pdf"` and `extract kind: "table"` use, for tooling. |
+| `csvWorkbook(text, options)`, `parseCsv(text, delimiter)`, `detectDelimiter(text)`, `findGridTables(workbook, query)`, `workbookText(workbook)` | The CSV reader and the workbook table extractor `request as: "csv"` / `"xlsx"` and `extract kind: "table"` use, for tooling. Spreadsheets are read by [`@opencraw/office-reader`](../office-reader). |
+| `findDeckTables(deck, query)`, `deckText(deck)` | The deck table extractor and text `request as: "pptx"` uses, for tooling; presentations are read by [`@opencraw/office-reader`](../office-reader). |
 | `HttpClient`, `BrowserClient` | The same clients the engine's runners use, for tooling built on top of `@opencraw/core` (`@opencraw/cli`'s `probe` command uses both). |
 | `parseInputRecipe`, `parseOutputRecipe`, `inputRecipeJsonSchema`, `outputRecipeJsonSchema`, `accessConfigJsonSchema` | The contracts, for tooling. |
 
@@ -60,7 +62,7 @@ step-flow         forEach / paginate / emit / policies        api-steps         
 web-steps         goto / click / extract runner               transformation    the built-in ops
 output-mapping    ids -> validated records                     record-sink       memory, JSON Lines, dedupe
 recipe-loading    files -> a bound RecipeSet                   crawl-execution   sessions, runs, reports
-access            proxy profiles, presets, leases, plugins
+access            proxy profiles, presets, leases, plugins     captcha           detection, the solve loop, the budget
 ```
 
 `e2e/` holds the fixture shop and the browser suite (`nx run core:e2e`); `tools/` emits `schemas/`.

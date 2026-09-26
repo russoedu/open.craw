@@ -5,12 +5,12 @@ export { stepSchema, errorPolicySchema, paginateNextSchema } from './step.contra
 export type {
   Step, StepType, StepBaseFields, TargetFields, ErrorPolicy, PaginateNext, TakeKind,
   GotoStep, ClickStep, FillStep, PressStep, SelectStep, ScrollStep, WaitStep, EvaluateStep, ScreenshotStep,
-  RequestStep, ExtractStep, SetStep, CollectStep, ForEachStep, IfStep, PaginateStep, EmitStep, HookStep,
+  RequestStep, ExtractStep, SetStep, CollectStep, ForEachStep, IfStep, PaginateStep, EmitStep, HookStep, CaptchaStep, CaptchaCheck,
 } from './step.contract'
 export { transformRuleSchema, mappingRuleSchema } from './transform-rule.contract'
 export type { TransformRule, TransformOp, MappingRule, FromRule, EachRule } from './transform-rule.contract'
 export { inputRecipeSchema, sessionSpecSchema, startPointSchema } from './input-recipe.contract'
-export type { InputRecipe, SessionSpec, SessionBootstrap, SessionAccess, BlockRule, BlockRotation, StartPoint, CrawlLimits, RecipeCookie } from './input-recipe.contract'
+export type { InputRecipe, SessionSpec, SessionBootstrap, SessionAccess, BlockRule, BlockRotation, CaptchaSettings, StartPoint, CrawlLimits, RecipeCookie } from './input-recipe.contract'
 export { parseInputRecipe, parseOutputRecipe, recipeKindOf } from './recipe.validator'
 export { RecipeValidationError } from './recipe-validation.error'
 export type { RecipeIssue } from './recipe-validation.error'

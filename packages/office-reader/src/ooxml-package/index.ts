@@ -1,0 +1,6 @@
+export { OoxmlPackage } from './ooxml-package.client'
+export type { PackageLimits } from './ooxml-package.client'
+export { walkXml, namespacedAttribute, isOn } from './xml-walk.algorithm'
+export type { XmlHandlers } from './xml-walk.algorithm'
+export { relationshipsOf, relationshipOfType } from './relationships.mapper'
+export type { Relationship } from './relationships.mapper'

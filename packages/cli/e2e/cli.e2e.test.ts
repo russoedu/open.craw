@@ -1,10 +1,11 @@
 import type { Server } from 'node:http'
 import { execFile } from 'node:child_process'
-import { mkdtemp, readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { startFixtureSite, stopFixtureSite } from '../../core/e2e/fixture-site'
+import { startForwardProxy, stopForwardProxy } from '../../core/e2e/forward-proxy'
 
 const run = promisify(execFile)
 const BIN = join(__dirname, '..', 'bin', 'opencraw.mjs')
@@ -56,6 +57,39 @@ describe('opencraw cli', () => {
     await expect(run('node', [BIN, 'run', recipesDir, '--only', 'shop-api'], { env: { ...process.env, OPENCRAW_HOOKS: '' } })).rejects.toMatchObject({
       code:   1,
       stderr: expect.stringContaining('positive'),
+    })
+  }, 60000)
+
+  it('run --plugins: an access profile of kind "plugin" leases its proxy from the plugins module', async () => {
+    const proxy = await startForwardProxy('secret', 4647)
+    try {
+      const directory = await mkdtemp(join(tmpdir(), 'cli-e2e-'))
+      const plugins = join(directory, 'plugins.mjs')
+      await writeFile(plugins, [
+        `export { default as hooks } from ${JSON.stringify(hooksModule)}`,
+        'export const accessPlugins = [{',
+        "  name: 'fixture-proxy',",
+        "  lease: request => ({ proxy: { server: 'http://127.0.0.1:4647', username: `plugin-${request.options.zone}-${request.attempt}`, password: 'secret' } }),",
+        '}]',
+      ].join('\n'))
+      const access = join(directory, 'access.json')
+      await writeFile(access, JSON.stringify({ profiles: { rotating: { kind: 'plugin', name: 'fixture-proxy', options: { zone: 'it' } } } }))
+      const { stderr } = await run('node', [BIN, 'run', recipesDir, '--only', 'shop-api', '--plugins', plugins, '--access', access, '--access-profile', 'rotating'])
+      expect(stderr).toMatch(/shop-api: 6 emitted/)
+      expect(proxy.hits.length).toBeGreaterThan(0)
+      expect(new Set(proxy.hits.map(hit => hit.username))).toEqual(new Set(['plugin-it-1']))
+    } finally {
+      await stopForwardProxy(proxy)
+    }
+  }, 60000)
+
+  it('run: an access profile naming a plugin the module does not provide stops before crawling', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'cli-e2e-'))
+    const access = join(directory, 'access.json')
+    await writeFile(access, JSON.stringify({ profiles: { rotating: { kind: 'plugin', name: 'missing' } } }))
+    await expect(run('node', [BIN, 'run', recipesDir, '--only', 'shop-api', '--hooks', hooksModule, '--access', access])).rejects.toMatchObject({
+      code:   1,
+      stderr: expect.stringContaining('plugin "missing", which is not registered'),
     })
   }, 60000)
 })

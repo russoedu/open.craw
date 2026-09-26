@@ -1,2 +1,2 @@
-export { loadHooks } from './load-hooks.repository'
-export type { ModuleImporter } from './load-hooks.repository'
+export { loadHooks, loadPlugins } from './load-hooks.repository'
+export type { ModuleImporter, PluginModule } from './load-hooks.repository'

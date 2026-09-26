@@ -21,6 +21,16 @@ export function traceLine (event: CrawlEvent): string | undefined {
     }
     case 'access:rotate': { return `${indent(1)}↻ new access lease (attempt ${event.attempt})`
     }
+    case 'captcha:detected': { return `${indent(1)}⚿ captcha ${event.kind} on ${event.url}`
+    }
+    case 'captcha:solve': { return undefined
+    }
+    case 'captcha:solved': { return `${indent(1)}✓ captcha solved by ${event.solver} (attempt ${event.attempt}, ${event.durationMs} ms)`
+    }
+    case 'captcha:failed': { return `${indent(1)}✗ captcha attempt ${event.attempt} failed: ${event.reason}`
+    }
+    case 'captcha:budget': { return `${indent(1)}⛔ captcha left unsolved: the run's ${event.max} solves are spent`
+    }
     case 'page:visit': { return `${indent(1)}⇢ page ${event.number}  ${event.url}${event.status === undefined || (event.status >= 200 && event.status < 300) ? '' : `  [${event.status}]`}`
     }
     case 'step:start': { return undefined

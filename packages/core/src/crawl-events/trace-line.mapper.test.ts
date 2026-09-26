@@ -22,6 +22,14 @@ describe('traceLine', () => {
     expect(traceLine({ type: 'page:visit', at, recipeId: 'r', url: 'https://x/', number: 1, status: 403 })).toBe('  ⇢ page 1  https://x/  [403]')
   })
 
+  it('shows captchas met, solved, failed and left for lack of budget', () => {
+    expect(traceLine({ type: 'captcha:detected', at, recipeId: 'r', url: 'https://x/', kind: 'turnstile' })).toBe('  ⚿ captcha turnstile on https://x/')
+    expect(traceLine({ type: 'captcha:solve', at, recipeId: 'r', url: 'https://x/', kind: 'turnstile', solver: 's', attempt: 1 })).toBeUndefined()
+    expect(traceLine({ type: 'captcha:failed', at, recipeId: 'r', url: 'https://x/', kind: 'turnstile', solver: 's', attempt: 1, reason: 'timeout' })).toBe('  ✗ captcha attempt 1 failed: timeout')
+    expect(traceLine({ type: 'captcha:solved', at, recipeId: 'r', url: 'https://x/', kind: 'turnstile', solver: 's', attempt: 2, durationMs: 900 })).toBe('  ✓ captcha solved by s (attempt 2, 900 ms)')
+    expect(traceLine({ type: 'captcha:budget', at, recipeId: 'r', url: 'https://x/', kind: 'turnstile', max: 10 })).toBe("  ⛔ captcha left unsolved: the run's 10 solves are spent")
+  })
+
   it('shows which branch an if took', () => {
     expect(traceLine({ type: 'step:branch', at, recipeId: 'r', path: 'steps.1', branch: 'then' })).toBe('  ⑂ steps.1  then')
   })

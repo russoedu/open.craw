@@ -1,5 +1,6 @@
 import type { AccessConfig, AccessPlugin } from '../access'
 import type { BrowserSessionConfig } from '../browser-session'
+import type { CaptchaSolver } from '../captcha'
 import type { CrawlListener } from '../crawl-events'
 import type { HookMap } from '../hooks'
 import type { DedupeScope, RecordSink } from '../record-sink'
@@ -34,4 +35,6 @@ export interface CrawlOptions {
   access?:          AccessConfig
   /** Plugins `{ kind: 'plugin', name }` profiles refer to. */
   accessPlugins?:   AccessPlugin[]
+  /** Solvers recipes name in `session.captcha.solver` and `captcha` steps. */
+  captchaSolvers?:  CaptchaSolver[]
 }

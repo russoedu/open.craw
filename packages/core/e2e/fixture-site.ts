@@ -13,6 +13,30 @@ import type { BrowserSessionConfig } from '../src/index'
 export const FIXTURE_PORT = Number(process.env.OPENCRAW_FIXTURE_PORT ?? '4545')
 export const FIXTURE_BASE = `http://127.0.0.1:${FIXTURE_PORT}`
 
+/** A CMS export in YAML: anchors, merge keys, a 1.1-style `NO` that 1.2 keeps as text. */
+/** A spec page whose table merges a model's cells down its versions and a group header across its columns. */
+const SPECS_PAGE = `<!doctype html><html lang="en"><head><title>Specs</title></head><body><h1>Specs</h1>
+<table class="specs"><thead><tr><th rowspan="2">Model</th><th rowspan="2">Version</th><th colspan="2">Consumption</th></tr><tr><th>Urban</th><th>Mixed</th></tr></thead>
+<tbody><tr><td rowspan="2">Pandina</td><td>1.0 Hybrid</td><td>5,2</td><td>4,9</td></tr><tr><td>1.0 Hybrid Cross</td><td>5,4</td><td>5,1</td></tr>
+<tr><td>600e</td><td>La Prima</td><td>0</td><td>0</td></tr></tbody></table></body></html>`
+
+const CATALOGUE_YAML = `defaults: &defaults
+  brand: Fiat
+  currency: EUR
+  market: NO
+models:
+  - <<: *defaults
+    name: Pandina
+    price: 15950
+  - <<: *defaults
+    name: 600e
+    price: 36950
+  - <<: *defaults
+    brand: Jeep
+    name: Avenger
+    price: 24950
+`
+
 const PAGES = 3
 const PER_PAGE = 2
 
@@ -94,6 +118,59 @@ const CONFIGURATOR = `<!doctype html><html lang="en"><head><title>Configurator</
 const LOGIN_FORM = '<!doctype html><html lang="en"><head><title>Login</title></head><body><form method="post" action="/login"><input id="user" name="user"><input id="pass" name="pass" type="password"><button type="submit">Go</button></form></body></html>'
 const LOGGED_IN = '<!doctype html><html lang="en"><head><title>Account</title></head><body><p id="logged-in">Welcome</p></body></html>'
 
+/** The token the fake captcha accepts; anything else shows the challenge again. */
+export const CAPTCHA_TOKEN = 'token-ok'
+export const CAPTCHA_SITE_KEY = 'test-site-key'
+
+/** A page that leads to the gate by a link, so the challenge appears after a click. */
+const CAPTCHA_START = '<!doctype html><html lang="en"><head><title>Search</title></head><body><a id="go" href="/captcha/gate">Search</a></body></html>'
+
+/**
+ * A reCAPTCHA-shaped challenge: a visible `.g-recaptcha` with a site key and
+ * the hidden `g-recaptcha-response` field a solver fills, in a form that posts
+ * the token back.
+ */
+function challengeHtml (back: string): string {
+  return `<!doctype html><html lang="en"><head><title>Check</title></head><body><h1>Are you human?</h1>
+<form id="challenge" method="post" action="/captcha/verify"><div class="g-recaptcha" data-sitekey="${CAPTCHA_SITE_KEY}" style="width:300px;height:78px;border:1px solid #999">I'm not a robot</div>
+<textarea id="g-recaptcha-response" name="g-recaptcha-response" style="display:none"></textarea><input type="hidden" name="back" value="${back}"></form></body></html>`
+}
+
+const CAPTCHA_RESULTS = '<!doctype html><html lang="en"><head><title>Results</title></head><body><ul id="results"><li class="item">Pandina</li><li class="item">600e</li></ul></body></html>'
+
+/** The captcha scenarios: a gate after a click, and a WAF that answers 403 with the challenge. Passing sets a cookie. */
+function captchaRoute (incoming: IncomingMessage, outgoing: ServerResponse, url: URL, html: (body: string, status?: number) => void): boolean {
+  const passed = (incoming.headers.cookie ?? '').includes('captcha=passed')
+  switch (url.pathname) {
+    case '/captcha/start': { html(CAPTCHA_START)
+
+      return true
+    }
+    case '/captcha/gate': { html(passed ? CAPTCHA_RESULTS : challengeHtml(url.pathname))
+
+      return true
+    }
+    case '/captcha/waf': { html(passed ? CAPTCHA_RESULTS : challengeHtml(url.pathname), passed ? 200 : 403)
+
+      return true
+    }
+    case '/captcha/verify': {
+      let body = ''
+      incoming.on('data', (chunk: Buffer) => { body += chunk.toString() })
+      incoming.on('end', () => {
+        const form = new URLSearchParams(body)
+        const back = form.get('back') ?? '/captcha/gate'
+        outgoing.writeHead(302, { location: back, ...(form.get('g-recaptcha-response') === CAPTCHA_TOKEN && { 'set-cookie': 'captcha=passed; Path=/' }) })
+        outgoing.end()
+      })
+
+      return true
+    }
+    default: { return false
+    }
+  }
+}
+
 function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
   const url = new URL(incoming.url ?? '/', FIXTURE_BASE)
   const html = (body: string, status = 200): void => {
@@ -111,6 +188,7 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
 
     return html(productHtml(product(id)))
   }
+  if (url.pathname.startsWith('/captcha/') && captchaRoute(incoming, outgoing, url, html)) return
   if (url.pathname === '/configurator') return html(CONFIGURATOR)
   if (url.pathname === '/login' && incoming.method === 'GET') return html(LOGIN_FORM)
   if (url.pathname === '/login' && incoming.method === 'POST') {
@@ -129,6 +207,53 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
     return
   }
   if (url.pathname === '/account') return html(LOGGED_IN)
+  if (url.pathname === '/listino.csv') {
+    // Windows-1252 with no charset declared, as many exports are served.
+    outgoing.writeHead(200, { 'content-type': 'text/csv' })
+    outgoing.end(readFileSync(join(__dirname, '..', 'src', 'workbook-document', 'fixtures', 'listino.csv')))
+
+    return
+  }
+  if (url.pathname === '/incentivi.xlsx') {
+    outgoing.writeHead(200, { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    outgoing.end(readFileSync(join(__dirname, '..', '..', 'office-reader', 'src', 'spreadsheet', 'fixtures', 'incentivi.xlsx')))
+
+    return
+  }
+  if (url.pathname === '/incentivi.pptx') {
+    outgoing.writeHead(200, { 'content-type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation' })
+    outgoing.end(readFileSync(join(__dirname, '..', '..', 'office-reader', 'src', 'presentation', 'fixtures', 'incentivi.pptx')))
+
+    return
+  }
+  if (url.pathname === '/catalogue.yaml') {
+    outgoing.writeHead(200, { 'content-type': 'application/yaml' })
+    outgoing.end(CATALOGUE_YAML)
+
+    return
+  }
+  if (url.pathname === '/products.jsonl') {
+    // A bulk export: one product per line, as NDJSON.
+    outgoing.writeHead(200, { 'content-type': 'application/x-ndjson' })
+    outgoing.end('{"sku":"P-1","name":"Pandina","price":15950}\n{"sku":"P-2","name":"600e","price":36950}\n')
+
+    return
+  }
+  if (url.pathname === '/legacy.js') {
+    // An old endpoint that still answers JSONP.
+    outgoing.writeHead(200, { 'content-type': 'text/javascript' })
+    outgoing.end('jQuery3510_1712({"items":[{"sku":"J-1","name":"Avenger","price":24950}]});')
+
+    return
+  }
+  if (url.pathname === '/listino.md') {
+    // Served as GitHub raw serves it: text/plain.
+    outgoing.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' })
+    outgoing.end(readFileSync(join(__dirname, '..', 'src', 'markdown-document', 'fixtures', 'listino.md')))
+
+    return
+  }
+  if (url.pathname === '/specs') return html(SPECS_PAGE)
   if (url.pathname === '/discounts.pdf') {
     outgoing.writeHead(200, { 'content-type': 'application/pdf' })
     outgoing.end(readFileSync(join(__dirname, '..', 'src', 'pdf-document', 'fixtures', 'discounts.pdf')))

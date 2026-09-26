@@ -11,6 +11,9 @@
     },
     {
       "path": "./packages/mcp"
+    },
+    {
+      "path": "./packages/office-reader"
     }
   ],
   "compilerOptions": {}

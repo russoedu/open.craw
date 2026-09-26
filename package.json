@@ -22,7 +22,10 @@
     "cli:build": "nx run cli:build",
     "cli:e2e": "nx run cli:e2e",
     "mcp:qa": "nx run mcp:lint && nx run mcp:test",
-    "mcp:build": "nx run mcp:build"
+    "mcp:build": "nx run mcp:build",
+    "office-reader:qa": "nx run office-reader:lint && nx run office-reader:test",
+    "office-reader:build": "nx run office-reader:build",
+    "office-reader:e2e": "nx run office-reader:e2e"
   },
   "private": true,
   "devDependencies": {
@@ -53,8 +56,7 @@
     "ts-jest": "^29.4.7",
     "ts-node": "10.9.1",
     "tslib": "^2.3.0",
-    "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "verdaccio": "^6.3.2"
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
   "workspaces": [
     "packages/*"
@@ -93,14 +95,6 @@
         "options": {
           "command": "eslint . --cache --ignore-pattern \"apps/**\" --ignore-pattern \"libs/**\" --ignore-pattern \"packages/**\" --ignore-pattern \"python-packages/**\" --ignore-pattern package-lock.json",
           "cwd": "."
-        }
-      },
-      "local-registry": {
-        "executor": "@nx/js:verdaccio",
-        "options": {
-          "port": 4873,
-          "config": ".verdaccio/config.yml",
-          "storage": "tmp/local-registry/storage"
         }
       }
     }

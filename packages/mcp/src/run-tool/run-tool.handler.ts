@@ -1,7 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { RecipeBindingError, RecipeSet, RecipeValidationError, createCrawler, jsonLinesSink, memorySink } from '@opencraw/core'
 import type { CrawlReport } from '@opencraw/core'
-import { loadForRun, loadHooks, resolveAccess } from '@opencraw/cli'
+import { loadForRun, loadPlugins, resolveAccess } from '@opencraw/cli'
 import { z } from 'zod'
 import { recipeSourceOf, recipeSourceShape } from '../recipe-source'
 import type { RecipeSourceArgs } from '../recipe-source'
@@ -66,13 +66,16 @@ export async function runTool (args: RunArgs): Promise<CallToolResult> {
   let crawler: ReturnType<typeof createCrawler>
   const sink = args.dryRun === true || args.out === undefined ? memorySink() : jsonLinesSink(args.out, { append: args.append })
   try {
-    const hooksFile = serverFile('OPENCRAW_HOOKS')
+    const pluginsFile = serverFile('OPENCRAW_PLUGINS') ?? serverFile('OPENCRAW_HOOKS')
+    const plugins = pluginsFile === undefined ? undefined : await loadPlugins(pluginsFile)
     crawler = createCrawler({
       sink,
-      hooks:   hooksFile === undefined ? undefined : await loadHooks(hooksFile),
-      access:  await resolveAccess({ insecureTls: false, access: serverFile('OPENCRAW_ACCESS'), accessProfile: args.access }),
-      resume:  args.resume,
-      browser: {
+      hooks:          plugins?.hooks,
+      accessPlugins:  plugins?.accessPlugins,
+      captchaSolvers: plugins?.captchaSolvers,
+      access:         await resolveAccess({ insecureTls: false, access: serverFile('OPENCRAW_ACCESS'), accessProfile: args.access }),
+      resume:         args.resume,
+      browser:        {
         headless:          args.headed !== true,
         executablePath:    args.browserPath ?? process.env.OPENCRAW_CHROMIUM,
         ignoreHTTPSErrors: args.insecureTls === true || process.env.OPENCRAW_INSECURE_TLS === '1',
@@ -98,11 +101,11 @@ export async function runTool (args: RunArgs): Promise<CallToolResult> {
 }
 
 /**
- * A file the server was started with (`OPENCRAW_ACCESS`, `OPENCRAW_HOOKS`).
+ * A file the server was started with (`OPENCRAW_ACCESS`, `OPENCRAW_PLUGINS` or `OPENCRAW_HOOKS`).
  * Never a tool argument: a caller picks a profile, never a file, and never
  * names a module for the server to run.
  */
-function serverFile (name: 'OPENCRAW_ACCESS' | 'OPENCRAW_HOOKS'): string | undefined {
+function serverFile (name: 'OPENCRAW_ACCESS' | 'OPENCRAW_PLUGINS' | 'OPENCRAW_HOOKS'): string | undefined {
   const file = process.env[name]
 
   return file === undefined || file === '' ? undefined : file

@@ -41,7 +41,7 @@ JavaScript module whose default export is the name -> function map.
 | `mode` | `web` (Playwright browser page) or `api` (Playwright request context, no browser). |
 | `start` | One or more `{ url, vars? }`; each start point runs the whole step list. |
 | `vars` | Recipe-level variables, read in templates as `{{vars.name}}`. |
-| `session` | Headers, cookies, user agent, viewport, a saved `storageStatePath`, a `bootstrap`, `access` (`{ profile?, country?, sticky? }`), `blockedWhen` and `onBlock` (section 2.1). |
+| `session` | Headers, cookies, user agent, viewport, a saved `storageStatePath`, a `bootstrap`, `access` (`{ profile?, country?, sticky? }`), `blockedWhen`, `onBlock` and `captcha` (section 2.1). |
 | `limits` | `maxRecords` (exact, whatever is in flight), `delayMs` (minimum interval between request starts across the recipe), `timeoutMs`, `concurrency` (`forEach` iterations in flight, api mode; default `1`). |
 | `onError` | Default step policy: `fail`, `skip`, or `retry { attempts, backoffMs }`. |
 | `steps` | The acquisition recipe (section 2.2). |
@@ -74,6 +74,19 @@ attempts. It rotates at most `attempts` times (default 2), and a block seen by s
 one lease rotates once. Otherwise the block fails the step like any error. Replaced runners are disposed when the
 run ends. See `docs/recipes/access.md`.
 
+**Captchas.** `session.captcha: { solver, detect?, verify?, attempts?, timeoutMs?, maxSolves? }` (web mode and
+bootstraps) names a solver the runner registered (`CrawlOptions.captchaSolvers`, or a plugins module's
+`captchaSolvers`); an unknown name fails the recipe before its first page. After every navigation, click and key
+press, a visible challenge (reCAPTCHA v2, hCaptcha, Turnstile by default, or `detect.selector`) is handed to the
+solver with its kind, site key and selector, the live page, the access lease and an abort signal. The engine then
+waits up to 10 s for the page to confirm (`verify`: the challenge is gone, default, and/or a selector is visible),
+retries up to `attempts` (default 3), and gives up with a `CaptchaError`, a `BlockedError`, so `onBlock.rotate`
+applies. Every attempt spends one of the run's `maxSolves` (default 10, shared by rotations and the bootstrap).
+`onBlock.solve: true` solves the challenge a block page shows before the block counts. A `captcha` step solves at
+one point, reCAPTCHA v3 included. Api recipes with `session.captcha` fail on a page that shows a widget. Events:
+`captcha:detected`, `captcha:solve`, `captcha:solved`, `captcha:failed`, `captcha:budget`; the recipe report
+counts them under `captchas`. See `docs/recipes/captcha.md`.
+
 ### 2.2 Steps
 
 Every step has `type`, an optional `id` (the name of the value it produces), an optional `onError` and an
@@ -90,8 +103,9 @@ optional `when` template that must render truthy for the step to run.
 | `wait` | web | – | one of `selector`, `ms`, `state: 'networkidle'` |
 | `evaluate` | web | value | `script`, JavaScript run in the page. Trusted recipes only. |
 | `screenshot` | web | – | `path` |
-| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'html' \| 'text' \| 'pdf'` |
-| `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex' \| 'table'`, `take`, `many?`, `from?`; `table` also `columns?`, `until?`, `align?` |
+| `captcha` | web | – | `solver?`, `selector?`, `verify?`, `attempts?`, `timeoutMs?`; defaults from `session.captcha` |
+| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'jsonl' \| 'html' \| 'text' \| 'pdf' \| 'csv' \| 'xlsx' \| 'pptx' \| 'yaml' \| 'markdown'`, `encoding?`, `delimiter?` (CSV), `scalars?` (YAML) |
+| `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex' \| 'table'`, `take`, `many?`, `from?`; `table` also `columns?`, `until?`, `align?` (PDF), `fillDown?`, `sheet?`, `headerRows?`, `includeHidden?` (workbook), `slide?`, `shapes?` (deck) |
 | `set` | both | value | `value` (template or literal) |
 | `collect` | both | – | `into` (a list id bound in an enclosing scope), `value` (template or literal); appends, so values outlive the `forEach` iteration or `paginate` page that found them |
 | `forEach` | both | – | `over` (a list id) or `selector` (web: live elements), `as` (variable), `steps`, `emit?: true \| { output }` |
@@ -104,6 +118,48 @@ A PDF (`as: 'pdf'`) is read into pages of rows of positioned cells (pdf.js, text
 `table` finds tables by their header row and returns `{ page, title, header, rows }`, rows keyed by column:
 columns come from where the body's cells start, and lines of a wrapped cell are regrouped into their row.
 `regex` reads a PDF as text (one line per row, cells tab-separated), `jsonpath` reads its structure.
+
+A CSV (`as: 'csv'`, `text/csv`, `.csv`/`.tsv`) is read into a workbook of one sheet of text cells: decoded from
+its BOM, `encoding`, the declared charset, UTF-8, else Windows-1252; delimiter detected among `,` `;` tab `|`
+by the most consistent field count (or `delimiter`); tolerant RFC 4180 quoting. `table` on a workbook matches
+the header row, maps column *i* to header *i*, skips empty rows, ends at `until`, the next header or the sheet
+end, and returns `{ sheet, title, header, rows }`; merged ranges are filled, `headerRows` joins a header over
+several rows, `fillDown` fills blank cells from the row above (PDF tables too). Text bodies of every kind are
+decoded the same way.
+
+A spreadsheet (`as: 'xlsx'`, a spreadsheet content type, `.xlsx`/`.xlsm`) is read by `@opencraw/office-reader`
+into the same workbook shape: numbers and booleans typed, dates ISO text, errors their text, formulas their
+cached value, with hidden sheets and rows and merged ranges. `.xls`, encrypted files and `.ods` fail with what
+to do. `@opencraw/office-reader` is a standalone package: `readXlsx(source, { sheets, values, limits })` from
+a path, bytes, a Blob or a stream, in Node or a browser; zip entries capped by declared size, XML entities never
+expanded.
+
+A presentation (`as: 'pptx'`, a presentation content type, `.pptx`) is read by `@opencraw/office-reader`'s
+`readPptx` into a deck: slides in presentation order, each with its text boxes (points, reading order,
+placeholders positioned through layout and master, group transforms applied; slide numbers, dates, footers
+left out), native tables as sheets with merges, charts from their caches, notes, hidden flag. `table` reads
+native tables through the workbook algorithm, or text boxes (`shapes: true`) through the PDF algorithm, one
+box per cell; `slide` picks slides by title, and returns `{ slide, slideTitle, title, header, rows }`. `regex`
+reads the slides' text, `jsonpath` the deck. `.ppt`, encrypted files and `.odp` fail with what to do.
+
+YAML (`as: 'yaml'`, `application/yaml` and kin, `.yaml`/`.yml`) is parsed with the `yaml` package into JSON data
+(several documents: an array): version pinned to 1.2 core whatever the document declares, merge keys applied,
+duplicate keys an error, aliases capped at 100, custom tags read as plain values with a `warning` event;
+`scalars: 'text'` (failsafe schema) keeps every scalar as written.
+
+JSON Lines (`as: 'jsonl'`, `application/x-ndjson` and kin, `.jsonl`/`.ndjson`) read into an array of the lines'
+values; a line that does not parse fails with its number. JSON — a response read as JSON or text a `jsonpath`
+extract parses — is read as it is, and only when that fails, unwrapped from comment guards, an anti-hijacking
+prefix (`)]}'`, `while(1);`, `for(;;);`), a JSONP call or a script assignment; the rest must be strict JSON.
+`probe` on JSON, JSON Lines or YAML shows the structure (four levels, a sample per leaf) and every array of
+objects with its path and shared keys.
+
+Markdown (`as: 'markdown'`, `text/markdown`, `.md`) is rendered with `marked` (GFM) into an HTML document:
+each heading and its content wrapped in `<section data-heading data-level>` (nesting by level), headings
+slugged, a leading YAML front matter parsed (YAML 1.2) into `<script type="application/json"
+data-front-matter>` in the head, raw HTML kept (parsed, never run). `table` reads an HTML document's
+`<table>`s (fetched, rendered Markdown, or the live page in web mode) as grids — rows in order, `th`/`td`
+alike, `colspan`/`rowspan` as merged ranges, nested tables on their own — through the grid table reader.
 
 `take` is `text` (default), `html`, `value`, `json` or `attr:<name>`. `xpath` works on live pages only; on
 fetched HTML use `css`; on JSON use `jsonpath`. A `jsonpath` extract whose `from` is text parses it as JSON; a list of

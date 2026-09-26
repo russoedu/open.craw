@@ -27,9 +27,11 @@ can write files passes their `paths`; one that can't (a chat-only host) passes t
 `probe`/`run` call's `browserPath`/`insecureTls`, so a sandbox without Playwright's own bundled browser
 does not need every tool call to repeat them.
 
-`OPENCRAW_HOOKS` points at a JavaScript module whose default export is `{ name: function }`: the hooks the
-recipes call (`hook` steps and transforms). Only the server's environment names it, never a tool call, so an
-agent can run recipes that use your hooks but can't make the server load a module of its choosing.
+`OPENCRAW_PLUGINS` (or `OPENCRAW_HOOKS`) points at a plugins module: named exports `hooks` (the recipes'
+`hook` steps and transforms), `accessPlugins` (for `{ kind: "plugin" }` access profiles) and `captchaSolvers`;
+a module whose default export is `{ name: function }` is read as hooks alone. Only the server's environment
+names it, never a tool call, so an agent can run recipes that use your plugins but can't make the server load
+a module of its choosing.
 
 `OPENCRAW_ACCESS` points at an access config ([access.md](../../docs/recipes/access.md)): proxy profiles, with
 credentials as `{{env.NAME}}` read from the server's environment. The `probe` and `run` tools then take an
@@ -53,7 +55,13 @@ endpoints only a script fetches after load.
 
 Returns `{ url, status, findings: { jsonLd, inlineJson, jsonUrls, scriptHosts, apiLinks }, observed }`. For a
 PDF (served as `application/pdf`, or a local path) it adds `pdf: { pages, rows, headers }`: the first rows and
-every likely table header with the `selector` a `table` extract needs.
+every likely table header with the `selector` a `table` extract needs. For a spreadsheet or a CSV (served as a
+spreadsheet type or `text/csv`, or a local `.xlsx`, `.csv` or `.tsv` path) it adds
+`workbook: { csv?: { encoding, delimiter }, sheets, rows, headers }`. For a presentation it adds
+`deck: { width, height, slides, headers, charts, grids }`, and for JSON, JSON Lines or YAML
+`json: { format, type, tree, lists }`: the structure, and every list of records with its path. An HTML page
+adds `html: { tables, outline?, frontMatter? }`: its tables' header rows, and for Markdown its sections and
+front matter keys.
 
 ### `validate`
 

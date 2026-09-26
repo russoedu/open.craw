@@ -3,9 +3,11 @@ import type { ExtractionScope } from '../extraction-scope'
 import { HttpError } from '../http-session'
 import type { HttpBody, HttpResponse, HttpSender } from '../http-session'
 import type { InputRecipe, RequestStep } from '../recipe-schema'
+import { deckText } from '../deck-document'
 import { pdfText } from '../pdf-document'
+import { workbookText } from '../workbook-document'
 import { renderDeep, renderText } from '../template'
-import { detectBlock } from '../step-flow'
+import { BlockedError, detectBlock } from '../step-flow'
 import type { RunGate } from '../step-flow'
 
 /**
@@ -19,7 +21,7 @@ import type { RunGate } from '../step-flow'
  * @param recipe - The recipe: its limits, block rule and id.
  * @param gate - Spaces request starts by `delayMs`.
  * @param events - Where to report the visit.
- * @throws BlockedError when the response is a block; HttpError for any other 4xx/5xx.
+ * @throws BlockedError when the response is a block, or a captcha page under `session.captcha`; HttpError for any other 4xx/5xx.
  */
 export async function sendRequest (step: RequestStep, scope: ExtractionScope, client: HttpSender, recipe: InputRecipe, gate: RunGate, events: EventBus): Promise<void> {
   const lookup = (path: string): unknown => scope.lookup(path)
@@ -34,6 +36,9 @@ export async function sendRequest (step: RequestStep, scope: ExtractionScope, cl
       headers:   step.headers === undefined ? undefined : renderMap(step.headers, lookup),
       body:      renderDeep(step.body, lookup),
       as:        step.as,
+      encoding:  step.encoding,
+      delimiter: step.delimiter,
+      scalars:   step.scalars,
       timeoutMs: recipe.limits?.timeoutMs,
     })
   } catch (error) {
@@ -42,15 +47,25 @@ export async function sendRequest (step: RequestStep, scope: ExtractionScope, cl
     throw await detectBlock({ url: error.url, status: error.status, headers: error.headers, text: async () => bodyText(error.body) }, recipe.session?.blockedWhen) ?? error
   }
   events.emit({ type: 'page:visit', recipeId: recipe.id, url: response.url, number: scope.pageState?.number ?? 1, status: response.status })
+  const warnings = response.warnings ?? []
+  for (const warning of warnings) events.emit({ type: 'warning', recipeId: recipe.id, message: `${response.url}: ${warning}`, meta: { url: response.url } })
   const blocked = await detectBlock({ url: response.url, status: response.status, headers: response.headers, text: async () => bodyText(response.body) }, recipe.session?.blockedWhen)
   if (blocked !== undefined) throw blocked
+  if (recipe.session?.captcha !== undefined && response.body.kind === 'html' && CAPTCHA_MARKUP.test(response.body.html)) {
+    throw new BlockedError(response.url, response.status, 'the page shows a captcha, which is solved on a live page: run this recipe in web mode, or get past it in session.bootstrap')
+  }
   scope.setPage({ url: response.url, document: response.body })
   if (step.id !== undefined) scope.set(step.id, documentValue(response.body))
 }
 
+/** The class names of the widgets `session.captcha` solves. Checked only when a recipe declares it. */
+const CAPTCHA_MARKUP = /\b(?:g-recaptcha|h-captcha|cf-turnstile)\b/
+
 function bodyText (body: HttpBody): string {
   if (body.kind === 'json') return JSON.stringify(body.data)
   if (body.kind === 'pdf') return pdfText(body)
+  if (body.kind === 'workbook') return workbookText(body)
+  if (body.kind === 'deck') return deckText(body)
 
   return body.kind === 'html' ? body.html : body.text
 }
@@ -75,10 +90,10 @@ function resolveUrl (target: string, base: string | undefined): string {
   }
 }
 
-/** What a step id holds for a document: parsed JSON, the read PDF, or the markup / text. */
+/** What a step id holds for a document: parsed JSON, the read PDF, workbook or deck, or the markup / text. */
 export function documentValue (body: HttpBody): unknown {
   if (body.kind === 'json') return body.data
-  if (body.kind === 'pdf') return body
+  if (body.kind === 'html') return body.html
 
-  return body.kind === 'html' ? body.html : body.text
+  return body.kind === 'text' ? body.text : body
 }

@@ -43,7 +43,7 @@ input recipes) and reports what happened.
 | `--dry-run` | One record per input recipe, printed with the scope it was mapped from — for checking a recipe under construction without a full run. |
 | `--trace` | Print the crawl trace to stderr. |
 | `--headed` | Show the browser instead of running headless. |
-| `--hooks <file>` | A JavaScript module whose default export is `{ name: function }`: the hooks the recipes call (or `OPENCRAW_HOOKS`). It runs as your code; load only files you trust. See [§6 of the authoring guide](../../docs/recipes/authoring.md#6-hooks). |
+| `--plugins <file>` (or `--hooks`) | A plugins module: named exports `hooks` (the recipes' hook steps and transforms), `accessPlugins` (for `{ kind: "plugin" }` access profiles) and `captchaSolvers`. A module whose default export is `{ name: function }` is read as hooks alone. `OPENCRAW_PLUGINS` / `OPENCRAW_HOOKS` when not given; `probe` reads it too. It runs as your code; load only files you trust. See [§6 of the authoring guide](../../docs/recipes/authoring.md#6-hooks). |
 
 ```sh
 opencraw run recipes/ --out out/products.jsonl --trace
@@ -62,12 +62,20 @@ opencraw probe https://example.com/product/1
 opencraw probe https://example.com/configurator --browser
 ```
 
-A PDF (a URL served as `application/pdf`, or a local `.pdf` path) is read instead: `probe` lists its first
-rows and every row that looks like a table header, with the `selector` a `table` extract needs.
+A PDF, a spreadsheet, a CSV or a presentation (a URL served with its content type, or a local `.pdf`,
+`.xlsx`, `.csv`, `.tsv` or `.pptx` path) is read instead: `probe` lists its pages, sheets or slides, its first
+rows, and every row that looks like a table header, with the `selector` a `table` extract needs. For a CSV it
+also names the encoding and the delimiter it detected; for a presentation, its charts and the slides whose
+text boxes look like a table. JSON, JSON Lines and YAML show their structure instead, and every list of
+records with the `jsonpath` that walks it. An HTML page also lists its tables' header rows, and Markdown
+(a `.md` URL is read as Markdown even when served as `text/plain`) its sections and front matter keys.
 
 ```sh
 opencraw probe https://example.com/price-list.pdf
 opencraw probe ./sheets/september.pdf
+opencraw probe ./exports/listino.csv
+opencraw probe ./exports/incentivi.xlsx
+opencraw probe ./decks/incentivi.pptx
 ```
 
 Use it before writing an input recipe, to find the shape a site's data actually takes (§9 of

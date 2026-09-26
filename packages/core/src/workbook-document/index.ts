@@ -1,0 +1,8 @@
+export { workbookText, isWorkbookDocument } from './workbook-document.model'
+export type { WorkbookDocument, Sheet, CsvFormat, WorkbookCell } from './workbook-document.model'
+export { parseCsv, detectDelimiter, CSV_DELIMITERS } from './csv-parser.algorithm'
+export { csvWorkbook, sheetNameOf } from './csv-workbook.mapper'
+export { readXlsxWorkbook } from './read-xlsx.client'
+export { findGridTables, fillDown } from './grid-table.algorithm'
+export { htmlTableSheets } from './html-tables.mapper'
+export type { GridTable, GridTableQuery } from './grid-table.algorithm'
