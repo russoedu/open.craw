@@ -16,6 +16,8 @@ export type OfficeReadErrorCode =
   'not-xlsx' |
   /** A zip package that is not a presentation. */
   'not-pptx' |
+  /** A zip package that is not a Word document. */
+  'not-docx' |
   /** A part the package needs is missing or malformed. */
   'malformed'
 

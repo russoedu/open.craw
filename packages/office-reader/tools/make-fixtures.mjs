@@ -17,6 +17,13 @@
 // notes, a slide number to leave out, a hidden slide, and slides whose order
 // in the presentation differs from their file names.
 //
+// incentivi.docx reproduces what price circulars do: a title, headings (one
+// through an Italian style id), bulleted and numbered lists, a price table
+// whose header merges across and down, a hyperlink and an internal link,
+// tracked changes, a text box (with the fallback copy Word writes next to
+// it), a field code, a tab and a line break, a header, a footer, a footnote
+// and a title in the document properties.
+//
 //   node packages/office-reader/tools/make-fixtures.mjs
 import { writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -26,6 +33,7 @@ import { strToU8, zipSync } from 'fflate'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', 'src')
 const spreadsheet = join(root, 'spreadsheet', 'fixtures')
 const presentation = join(root, 'presentation', 'fixtures')
+const document = join(root, 'document', 'fixtures')
 const pkg = join(root, 'ooxml-package', 'fixtures')
 
 const NS = 'https://schemas.openxmlformats.org/spreadsheetml/2006/main'
@@ -188,4 +196,61 @@ writeFileSync(join(presentation, 'incentivi.pptx'), zip({
   'ppt/slideLayouts/slideLayout1.xml':            layout,
   'ppt/slideLayouts/_rels/slideLayout1.xml.rels': rels([['rId1', 'slideMaster', '../slideMasters/slideMaster1.xml']]),
   'ppt/slideMasters/slideMaster1.xml':            master,
+}))
+
+// Word. Prefixes as Word writes them; the reader matches local names.
+const W = 'w'
+const WNS = `xmlns:w="${REL.replace('officeDocument/2006/relationships', 'wordprocessingml/2006/main')}" xmlns:r="${REL}" xmlns:mc="${REL.replace('officeDocument/2006/relationships', 'markup-compatibility/2006')}" xmlns:wps="${REL.replace('officeDocument/2006/relationships', 'wordprocessingShape')}"`
+const run = text => `<${W}:r><${W}:t xml:space="preserve">${text}</${W}:t></${W}:r>`
+const para = (content, properties = '') => `<w:p>${properties === '' ? '' : `<w:pPr>${properties}</w:pPr>`}${content}</w:p>`
+const styled = (style, text, extra = '') => para(run(text), `<w:pStyle w:val="${style}"/>${extra}`)
+const numbered = (numId, level, text) => para(run(text), `<w:numPr><w:ilvl w:val="${level}"/><w:numId w:val="${numId}"/></w:numPr>`)
+const cell = (text, properties = '') => `<w:tc>${properties === '' ? '' : `<w:tcPr>${properties}</w:tcPr>`}${para(text === '' ? '' : run(text))}</w:tc>`
+const docTable = '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/></w:tblPr><w:tblGrid><w:gridCol/><w:gridCol/><w:gridCol/><w:gridCol/></w:tblGrid>' +
+  `<w:tr>${cell('Modello', '<w:vMerge w:val="restart"/>')}${cell('Prezzo', '<w:gridSpan w:val="2"/>')}${cell('Sconto', '<w:vMerge w:val="restart"/>')}</w:tr>` +
+  `<w:tr>${cell('', '<w:vMerge/>')}${cell('Listino')}${cell('Netto')}${cell('', '<w:vMerge/>')}</w:tr>` +
+  `<w:tr>${cell('Pandina')}${cell('15.950')}${cell('13.955')}${cell('12,5%')}</w:tr>` +
+  `<w:tr>${cell('600e')}${cell('36.950')}${cell('32.950')}${cell('10%')}</w:tr></w:tbl>`
+const textBox = '<w:r><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing><wps:txbx><w:txbxContent>' + para(run('Offerta limitata')) + '</w:txbxContent></wps:txbx></w:drawing></mc:Choice>' +
+  '<mc:Fallback><w:pict><w:txbxContent>' + para(run('Offerta limitata')) + '</w:txbxContent></w:pict></mc:Fallback></mc:AlternateContent></w:r>'
+const body = styled('Title', 'Circolare incentivi giugno 2026') +
+  styled('Heading1', 'Condizioni') +
+  para(run('Valido dal 1 al 30 giugno 2026.') + '<w:r><w:footnoteReference w:id="1"/></w:r>') +
+  styled('ListBullet', 'Solo rottamazione') + styled('ListBullet', 'Non cumulabile') +
+  numbered(2, 0, 'Prenota') + numbered(2, 1, 'Entro il 15') +
+  styled('Titolo2', 'Prezzi') + docTable +
+  para(run('Listino completo: ') + '<w:hyperlink r:id="rId9">' + run('listino giugno') + '</w:hyperlink>' + run(', vedi ') + '<w:hyperlink w:anchor="prezzi">' + run('Prezzi') + '</w:hyperlink>') +
+  para('<w:ins w:id="1" w:author="a">' + run('Prezzi ') + '</w:ins><w:del w:id="2" w:author="a"><w:r><w:delText>Costi </w:delText></w:r></w:del>' + run('IVA inclusa') + '<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>') +
+  para(run('Marca') + '<w:r><w:tab/></w:r>' + run('Modello') + '<w:r><w:br/></w:r>' + run('Fiat') + textBox, '<w:tabs><w:tab w:val="left" w:pos="2000"/></w:tabs>') +
+  para('') + '<w:sectPr><w:headerReference w:type="default" r:id="rId7"/><w:footerReference w:type="default" r:id="rId8"/></w:sectPr>'
+const docStyles = xml(`<w:styles ${WNS}>` +
+  '<w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/></w:style>' +
+  '<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/></w:style>' +
+  '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:pPr><w:outlineLvl w:val="0"/></w:pPr></w:style>' +
+  '<w:style w:type="paragraph" w:styleId="Titolo2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/></w:style>' +
+  '<w:style w:type="paragraph" w:styleId="ListBullet"><w:name w:val="List Bullet"/><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr></w:pPr></w:style>' +
+  '<w:style w:type="table" w:styleId="TableGrid"><w:name w:val="Table Grid"/></w:style></w:styles>')
+const docNumbering = xml(`<w:numbering ${WNS}>` +
+  '<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum>' +
+  '<w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl><w:lvl w:ilvl="1"><w:numFmt w:val="lowerLetter"/></w:lvl></w:abstractNum>' +
+  '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num></w:numbering>')
+const footnotes = xml(`<w:footnotes ${WNS}><w:footnote w:type="separator" w:id="-1">${para('<w:r><w:separator/></w:r>')}</w:footnote>` +
+  `<w:footnote w:id="1">${para(run('Prezzi chiavi in mano, IPT esclusa.'))}</w:footnote></w:footnotes>`)
+const documentRels = xml(`<Relationships xmlns="${PKG_REL}">` +
+  [['rId1', 'styles', 'styles.xml'], ['rId2', 'numbering', 'numbering.xml'], ['rId3', 'footnotes', 'footnotes.xml'], ['rId7', 'header', 'header1.xml'], ['rId8', 'footer', 'footer1.xml']].map(([id, type, target]) => `<Relationship Id="${id}" Type="${REL}/${type}" Target="${target}"/>`).join('') +
+  `<Relationship Id="rId9" Type="${REL}/hyperlink" Target="https://example.com/listino-giugno.pdf" TargetMode="External"/></Relationships>`)
+
+const header = para(run('Stellantis Italia – riservato'))
+const footer = para(run('Pagina '))
+
+writeFileSync(join(document, 'incentivi.docx'), zip({
+  '_rels/.rels':                  xml(`<Relationships xmlns="${PKG_REL}"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="${PKG_REL}/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`),
+  'docProps/core.xml':            xml('<cp:coreProperties xmlns:cp="urn:cp" xmlns:dc="urn:dc"><dc:title>Circolare giugno</dc:title></cp:coreProperties>'),
+  'word/document.xml':            xml(`<w:document ${WNS}><w:body>${body}</w:body></w:document>`),
+  'word/_rels/document.xml.rels': documentRels,
+  'word/styles.xml':              docStyles,
+  'word/numbering.xml':           docNumbering,
+  'word/footnotes.xml':           footnotes,
+  'word/header1.xml':             xml(`<w:hdr ${WNS}>${header}</w:hdr>`),
+  'word/footer1.xml':             xml(`<w:ftr ${WNS}>${footer}</w:ftr>`),
 }))

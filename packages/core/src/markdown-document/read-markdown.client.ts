@@ -52,8 +52,16 @@ export async function readMarkdown (text: string, source: string): Promise<Markd
   return { html: `<!doctype html><html><head>${head}</head><body>${sections}</body></html>`, frontMatter: front?.data, warnings: front?.warnings ?? [] }
 }
 
-/** Wraps each heading and what follows it, up to the next heading of the same or a higher level, in a section. */
-function sectioned (html: string): string {
+/**
+ * Wraps each heading and what follows it, up to the next heading of the same
+ * or a higher level, in `<section data-heading="…" data-level="…">`, sections
+ * nesting; headings get slug ids. Rendered Markdown and Word documents both go
+ * through it, so one selector finds "the table under *Prezzi*" in either.
+ *
+ * @param html - Top-level HTML: headings among paragraphs, lists, tables.
+ * @returns The same content, sectioned.
+ */
+export function sectioned (html: string): string {
   const $ = load(html, null, false)
   const open: number[] = []
   const used = new Map<string, number>()

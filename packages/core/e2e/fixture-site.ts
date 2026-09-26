@@ -305,6 +305,12 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
 
     return
   }
+  if (url.pathname === '/circolare.docx') {
+    outgoing.writeHead(200, { 'content-type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+    outgoing.end(readFileSync(join(__dirname, '..', '..', 'office-reader', 'src', 'document', 'fixtures', 'incentivi.docx')))
+
+    return
+  }
   if (url.pathname === '/catalogue.yaml') {
     outgoing.writeHead(200, { 'content-type': 'application/yaml' })
     outgoing.end(CATALOGUE_YAML)

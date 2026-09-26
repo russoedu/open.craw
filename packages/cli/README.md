@@ -74,7 +74,8 @@ text boxes look like a table. JSON, JSON Lines and YAML show their structure ins
 records with the `jsonpath` that walks it. An HTML page also lists its tables' header rows, and Markdown
 (a `.md` URL is read as Markdown even when served as `text/plain`) its sections and front matter keys. XML
 (a feed, a sitemap, an export) shows its namespaces with the `namespaces` line an `xpath` extract needs, the
-elements that repeat (its records), and its structure; a sitemap says how many pages it lists.
+elements that repeat (its records), and its structure; a sitemap says how many pages it lists. A Word document
+(`.docx`) lists its sections and tables, like Markdown.
 
 ```sh
 opencraw probe https://example.com/price-list.pdf

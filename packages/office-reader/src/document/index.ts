@@ -1,0 +1,5 @@
+export { readDocx } from './read-docx.use-case'
+export type { ReadDocxOptions } from './read-docx.use-case'
+export type { WordDocument, DocumentBlock, Paragraph, DocumentTable, DocumentNote, DocumentLink } from './word-document.model'
+export { OfficeReadError } from '../read-error'
+export type { OfficeReadErrorCode } from '../read-error'

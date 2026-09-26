@@ -222,7 +222,7 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 
 | Step | Fields | Notes |
 |---|---|---|
-| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `jsonl`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`, `yaml`, `markdown`, `xml`), `encoding?`, `delimiter?`, `scalars?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck, `application/yaml` YAML, `application/x-ndjson` JSON Lines, `text/markdown` Markdown, an XML type XML: §4.12). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`, `.yaml`, `.yml`, `.jsonl`, `.ndjson`, `.md`, `.xml`, `.rss`, `.atom`, `.xml.gz`). 4xx/5xx fail the step. |
+| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `jsonl`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`, `yaml`, `markdown`, `xml`, `docx`), `encoding?`, `delimiter?`, `scalars?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck, `application/yaml` YAML, `application/x-ndjson` JSON Lines, `text/markdown` Markdown, an XML type XML: §4.12, a Word type a document read as HTML: §4.13). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`, `.yaml`, `.yml`, `.jsonl`, `.ndjson`, `.md`, `.xml`, `.rss`, `.atom`, `.xml.gz`, `.docx`). 4xx/5xx fail the step. |
 
 Text bodies are decoded from, in order: a byte-order mark, `encoding` (any WHATWG label: `windows-1252`,
 `iso-8859-15`, `shift_jis`), the charset the server declares, UTF-8, and Windows-1252 for text that is not
@@ -802,6 +802,30 @@ every table's header row with a ready `selector`.
 
 `xpath` also reads **fetched HTML** in api mode, parsed like a browser does: `//table[@class='variants']/tbody/tr`
 matches a page whose markup has no `<tbody>`.
+
+### 4.13 Word documents
+
+A `.docx` (a Word content type, `.docx`/`.docm`/`.dotx`, or `as: "docx"`) is read by `@opencraw/office-reader`
+and handed to the recipe as **HTML**, built like rendered Markdown (§4.10), so every tool for pages works on it:
+
+- headings (`Heading 1`, a localized `Titolo 2`, `Title`) become `<h1>`…`<h6>`, each in a
+  `<section data-heading="…" data-level="…">` with what follows it: `section[data-heading='Prezzi' i] table`;
+- bullets and numbering become nested `<ul>` / `<ol>`;
+- tables become `<table>`s with merged cells as `colspan` / `rowspan`, so a `table` extract reads a two-row
+  header (`headerRows: 2`) the way it reads a spreadsheet's (§4.11);
+- links become `<a href>`, a paragraph's Word style is `data-style` (`p[data-style='Prezzo']`);
+- headers, footers and notes come after the body: `header[data-part=header]`, `footer[data-part=footer]`,
+  `aside[data-part=notes] li#footnote-1`; the document's title is `<title>`.
+
+```json
+{ "type": "request", "url": "https://dealer.example/circolare.docx" },
+{ "type": "extract", "id": "prices", "selector": "^Modello", "kind": "table", "headerRows": 2,
+  "columns": { "model": "^Modello$", "list": "Listino", "net": "Netto" } },
+{ "type": "extract", "id": "conditions", "selector": "section[data-heading='Condizioni'] li", "kind": "css", "many": true }
+```
+
+Tracked changes read as accepted (insertions in, deletions out). A legacy `.doc` is refused with what to do: save
+it as `.docx`, or export it as PDF (§4.6). `probe` lists a document's sections and tables.
 
 ## 5. Mapping
 

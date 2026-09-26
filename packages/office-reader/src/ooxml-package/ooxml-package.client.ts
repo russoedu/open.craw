@@ -33,7 +33,7 @@ export class OoxmlPackage {
   static open (bytes: Uint8Array, limits: PackageLimits = {}): OoxmlPackage {
     if (isCompoundFile(bytes)) {
       if (holdsEncryptionInfo(bytes)) throw new OfficeReadError('encrypted', 'a password-protected Office file: remove the password and save it again')
-      throw new OfficeReadError('legacy-format', 'a legacy binary Office file (.xls, .ppt, .doc): save it as .xlsx or .pptx, or export it as PDF')
+      throw new OfficeReadError('legacy-format', 'a legacy binary Office file (.xls, .ppt, .doc): save it as .xlsx, .pptx or .docx, or export it as PDF')
     }
     const entries = new Map<string, { name: string, size: number }>()
     try {
@@ -49,7 +49,7 @@ export class OoxmlPackage {
     }
     const opened = new OoxmlPackage(bytes, entries, { entryBytes: limits.entryBytes ?? DEFAULT_ENTRY_BYTES, totalBytes: limits.totalBytes ?? DEFAULT_TOTAL_BYTES })
     const mimetype = opened.has('mimetype') ? opened.text('mimetype').trim() : ''
-    if (mimetype.startsWith('application/vnd.oasis.opendocument')) throw new OfficeReadError('unsupported-format', `an OpenDocument file (${mimetype}): save it as .xlsx or .pptx`)
+    if (mimetype.startsWith('application/vnd.oasis.opendocument')) throw new OfficeReadError('unsupported-format', `an OpenDocument file (${mimetype}): save it as .xlsx, .pptx or .docx`)
 
     return opened
   }

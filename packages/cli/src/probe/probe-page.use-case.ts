@@ -85,7 +85,7 @@ export async function probeUrl (url: string, options: { browser: boolean } & Com
     const text = body.kind === 'html' ? body.html : body.text
     const observed = options.browser && !target.startsWith('file:') ? await observeBrowserJson(url, options, lease) : []
 
-    const html = body.kind === 'html' ? { html: describeHtml(body.html, response.format === 'markdown') } : {}
+    const html = body.kind === 'html' ? { html: describeHtml(body.html, response.format === 'markdown' || response.format === 'docx') } : {}
 
     return { url: response.url, status: response.status, findings: findData(text), observed, ...html }
   } finally {

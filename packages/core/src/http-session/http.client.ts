@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { request } from 'playwright'
 import type { APIRequestContext, APIResponse } from 'playwright'
 import { readPptxDeck } from '../deck-document'
+import { readDocxHtml } from '../docx-document'
 import { readMarkdown } from '../markdown-document'
 import { readPdf } from '../pdf-document'
 import type { BodyKind } from '../recipe-schema'
@@ -128,6 +129,7 @@ async function parseBody (format: BodyKind, bytes: Uint8Array, url: string, read
 
     return { body: { kind: 'xml', xml: text }, warnings: [], format }
   }
+  if (format === 'docx') return { body: { kind: 'html', html: await readDocxHtml(bytes, url) }, warnings: [], format }
   if (format === 'markdown') {
     const { text } = decodeText(bytes, reading)
     const { html, warnings } = await readMarkdown(text, url)
@@ -173,6 +175,7 @@ function formatFromContentType (contentType: string, url: string): BodyKind {
   // A legacy .xls or .ppt goes to the Office reader too, which says what to do with it.
   if (type.includes('spreadsheetml') || type.startsWith('application/vnd.ms-excel')) return 'xlsx'
   if (type.includes('presentationml') || type.startsWith('application/vnd.ms-powerpoint')) return 'pptx'
+  if (type === 'application/msword' || type.includes('wordprocessingml') || type.startsWith('application/vnd.ms-word')) return 'docx'
   if (YAML_TYPES.has(type)) return 'yaml'
   if (type === 'text/markdown' || type === 'text/x-markdown') return 'markdown'
   if (type.includes('json')) return 'json'
@@ -191,7 +194,7 @@ const CSV_TYPES = new Set(['text/csv', 'application/csv', 'text/x-csv', 'applica
 function formatFromExtension (path: string): BodyKind {
   if (/\.xml\.gz$/i.test(path)) return 'xml'
   const extension = extname(path)
-  const formats: Record<string, BodyKind> = { '.json': 'json', '.jsonl': 'jsonl', '.ndjson': 'jsonl', '.pdf': 'pdf', '.csv': 'csv', '.tsv': 'csv', '.xlsx': 'xlsx', '.xlsm': 'xlsx', '.xls': 'xlsx', '.pptx': 'pptx', '.pptm': 'pptx', '.ppsx': 'pptx', '.ppt': 'pptx', '.yaml': 'yaml', '.yml': 'yaml', '.md': 'markdown', '.markdown': 'markdown', '.html': 'html', '.htm': 'html', '.xml': 'xml', '.rss': 'xml', '.atom': 'xml', '.kml': 'xml', '.gpx': 'xml' }
+  const formats: Record<string, BodyKind> = { '.json': 'json', '.jsonl': 'jsonl', '.ndjson': 'jsonl', '.pdf': 'pdf', '.csv': 'csv', '.tsv': 'csv', '.xlsx': 'xlsx', '.xlsm': 'xlsx', '.xls': 'xlsx', '.pptx': 'pptx', '.pptm': 'pptx', '.ppsx': 'pptx', '.ppt': 'pptx', '.docx': 'docx', '.docm': 'docx', '.dotx': 'docx', '.doc': 'docx', '.yaml': 'yaml', '.yml': 'yaml', '.md': 'markdown', '.markdown': 'markdown', '.html': 'html', '.htm': 'html', '.xml': 'xml', '.rss': 'xml', '.atom': 'xml', '.kml': 'xml', '.gpx': 'xml' }
 
   return formats[extension.toLowerCase()] ?? 'text'
 }

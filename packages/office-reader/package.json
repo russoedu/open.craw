@@ -21,6 +21,11 @@
       "types": "./dist/src/presentation/index.d.ts",
       "import": "./dist/pptx.esm.js",
       "default": "./dist/pptx.esm.js"
+    },
+    "./docx": {
+      "types": "./dist/src/document/index.d.ts",
+      "import": "./dist/docx.esm.js",
+      "default": "./dist/docx.esm.js"
     }
   },
   "files": [
@@ -36,7 +41,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "description": "Reads Office files (.xlsx workbooks, .pptx presentations) into plain objects: cells with merged ranges and hidden rows, slides with positioned text, tables and chart data. No Node built-ins beyond reading a path: runs in Node, browsers, workers and edge runtimes.",
+  "description": "Reads Office files (.xlsx workbooks, .pptx presentations, .docx documents) into plain objects: cells with merged ranges and hidden rows, slides with positioned text, tables and chart data, document paragraphs with headings, lists and tables. No Node built-ins beyond reading a path: runs in Node, browsers, workers and edge runtimes.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -50,6 +55,8 @@
     "pptx",
     "powerpoint",
     "presentation",
+    "docx",
+    "word",
     "office",
     "ooxml",
     "reader",

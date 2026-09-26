@@ -1335,7 +1335,8 @@
                 "pptx",
                 "yaml",
                 "markdown",
-                "xml"
+                "xml",
+                "docx"
               ]
             },
             "encoding": {
