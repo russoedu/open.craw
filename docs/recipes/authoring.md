@@ -144,7 +144,7 @@ fields is never de-duplicated. Duplicates are reported (`record:duplicate`) and 
 | `start` | One or more start points `{ url, vars? }`. Each runs the whole step list from a fresh scope with `start.url` and its `vars`. |
 | `vars` | Values templates read as `{{vars.name}}`. Start-point `vars` override recipe `vars`. |
 | `session` | §2.2. |
-| `limits` | `maxRecords` stops the walk after that many records, exactly, whatever runs in parallel. `delayMs` is the minimum interval between two request starts across the recipe. `timeoutMs` bounds navigations and requests. `concurrency` (default `1`) is how many `forEach` iterations may run at once in `api` mode (§3.9). `retry` sends a request that fails in passing again (§7; on by default). |
+| `limits` | `maxRecords` stops the walk after that many records, exactly, whatever runs in parallel. `delayMs` is the minimum interval between two request starts across the recipe. `timeoutMs` bounds navigations, requests and `wait` steps. `concurrency` (default `1`) is how many `forEach` iterations may run at once in `api` mode (§3.9). `retry` sends a request that fails in passing again (§7; on by default). |
 | `onError` | The default policy for every step. §7. |
 | `steps` | The acquisition recipe. §3. |
 | `mapping` | Output field → mapping rule. §5. |
@@ -208,8 +208,8 @@ Every step has `type`, and may have:
 | `press` | `key`, `selector?` or `target?` | A key on an element, or on the page. |
 | `select` | `selector` or `target`, one of `value`, `label`, `index` | Picks an option of a `<select>`; `value` and `label` are templates. Fires the page's `change` handlers. |
 | `scroll` | `to` (`bottom` or a selector), `times?`, `untilStable?` | `untilStable` keeps scrolling until the page stops growing: infinite lists. |
-| `wait` | one of `selector`, `ms`, `state: "networkidle"` | `selector` waits for visibility. Put a `wait` after `goto` on script-heavy pages before extracting. |
-| `evaluate` | `script` | JavaScript evaluated in the page; the result is bound under `id`. **Trusted recipes only.** |
+| `wait` | one of `selector`, `ms`, `state: "networkidle"`; `timeoutMs?` | `selector` waits for visibility. Put a `wait` after `goto` on script-heavy pages before extracting. `timeoutMs` bounds the `selector` and `state` forms; default `limits.timeoutMs`, else 30 s. Give a long one to wait for a slow report, or for a person in a headed run. |
+| `evaluate` | `script`, `args?` | JavaScript evaluated in the page; the result is bound under `id`. `script` is a template. With `args`, `script` is a function expression called with them, each string rendered (a lone placeholder keeps its type): `{ "script": "(a) => a.states.length", "args": { "states": "{{ split(vars.state) }}" } }`. **Trusted recipes only.** |
 | `screenshot` | `path` (template) | Full page. A debugging aid. |
 | `captcha` | `solver?`, `selector?`, `verify?`, `attempts?`, `timeoutMs?` | Solves the challenge on the page, if there is one (none is fine), reCAPTCHA v3 included. Missing fields come from `session.captcha`. §6.1. |
 
@@ -217,6 +217,8 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 
 `target` is a template instead of a selector: it renders either to a **live element** (the variable of a
 `forEach` over `selector`, §3.7) or to a selector string. Give one of `selector` and `target`, never both.
+A plain `selector` is never rendered, so a recipe with `{{` in one is refused at load time: put that selector
+in `target`.
 
 ### 3.2 Api steps (HTTP)
 
@@ -267,7 +269,7 @@ A placeholder may also be an **expression** over such paths:
 | comparison | `== != < <= > >=`. `==` is loose (`3 == '3'`, `null == missing`); ordering is numeric when both sides are numbers, else textual. |
 | logic | `&& || !` with recipe truthiness (below); `a ?? b` gives `b` only when `a` is missing (`null` / undefined) |
 | choice | `test ? a : b` |
-| functions | `upper(s)`, `lower(s)`, `trim(s)`, `len(list or text)`, `default(v, fallback)` (missing or blank), `round(n, digits?)`, `number(text)`, `join(list, sep?)`, `first(list)`, `last(list)`, `replace(s, pattern, replacement)` (a regular expression, global), `contains(list or text, needle)`, `split(text, sep?)`, `urlEncode(s)` (percent-encodes one URL component: `{{start.url}}/config/{{urlEncode(id)}}` turns `#` into `%23`, a space into `%20`) |
+| functions | `upper(s)`, `lower(s)`, `trim(s)`, `len(list or text)`, `default(v, fallback)` (missing or blank), `round(n, digits?)`, `number(text)`, `join(list, sep?)`, `first(list)`, `last(list)`, `replace(s, pattern, replacement)` (a regular expression, global), `contains(list or text, needle)`, `split(text, sep?)` (pieces trimmed, blank ones dropped: a blank text gives `[]`, so a `forEach` over it runs no iteration), `urlEncode(s)` (percent-encodes one URL component: `{{start.url}}/config/{{urlEncode(id)}}` turns `#` into `%23`, a space into `%20`) |
 
 ```json
 { "type": "set", "id": "next_url", "value": "{{ start.url }}?page={{ page.number + 1 }}" },

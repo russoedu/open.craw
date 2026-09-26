@@ -34,8 +34,14 @@ export interface PressStep extends StepBaseFields, TargetFields { type: 'press',
 /** Picks an option of a `<select>` by value, label or index. */
 export interface SelectStep extends StepBaseFields, TargetFields { type: 'select', value?: string, label?: string, index?: number }
 export interface ScrollStep extends StepBaseFields { type: 'scroll', to: string, times?: number, untilStable?: boolean }
-export interface WaitStep extends StepBaseFields { type: 'wait', selector?: string, ms?: number, state?: 'networkidle' }
-export interface EvaluateStep extends StepBaseFields { type: 'evaluate', script: string }
+/** Waits for an element, a time or the network to settle; `timeoutMs` bounds the element and network forms (default `limits.timeoutMs`). */
+export interface WaitStep extends StepBaseFields { type: 'wait', selector?: string, ms?: number, state?: 'networkidle', timeoutMs?: number }
+/**
+ * Runs JavaScript in the page and binds its result under `id`. `script` is a
+ * template; with `args`, it is a function expression called with them (each
+ * string in `args` rendered, a lone placeholder keeping its type).
+ */
+export interface EvaluateStep extends StepBaseFields { type: 'evaluate', script: string, args?: Record<string, unknown> }
 export interface ScreenshotStep extends StepBaseFields { type: 'screenshot', path: string }
 export interface RequestStep extends StepBaseFields {
   type:       'request'
@@ -149,7 +155,9 @@ const stepId = z.string().regex(/^[A-Z_]\w*$/i, 'an id is a word: letters, digit
 const base = { id: stepId.optional(), onError: errorPolicySchema.optional(), when: z.string().optional() }
 const stringMap = z.record(z.string(), z.string())
 
-const target = { selector: z.string().min(1).optional(), target: z.string().min(1).optional() }
+/** A plain selector: never rendered, so a placeholder in it is a mistake that would wait for the braces literally. */
+const plainSelector = z.string().min(1).refine(selector => !selector.includes('{{'), 'a selector is not a template: put a selector with placeholders in "target"')
+const target = { selector: plainSelector.optional(), target: z.string().min(1).optional() }
 const ONE_TARGET = 'give exactly one of selector or target'
 const oneTarget = (step: { selector?: string, target?: string }): boolean => (step.selector === undefined) !== (step.target === undefined)
 const gotoStep = z.strictObject({ ...base, type: z.literal('goto'), url: z.string().min(1), waitUntil: z.enum(WAIT_UNTIL).optional() })
@@ -161,8 +169,8 @@ const selectStep = z.strictObject({ ...base, ...target, type: z.literal('select'
   .refine(oneTarget, ONE_TARGET)
   .refine(step => [step.value, step.label, step.index].filter(choice => choice !== undefined).length === 1, 'give exactly one of value, label or index')
 const scrollStep = z.strictObject({ ...base, type: z.literal('scroll'), to: z.string().min(1), times: z.int().min(1).optional(), untilStable: z.boolean().optional() })
-const waitStep = z.strictObject({ ...base, type: z.literal('wait'), selector: z.string().optional(), ms: z.int().nonnegative().optional(), state: z.literal('networkidle').optional() })
-const evaluateStep = z.strictObject({ ...base, type: z.literal('evaluate'), script: z.string().min(1) })
+const waitStep = z.strictObject({ ...base, type: z.literal('wait'), selector: plainSelector.optional(), ms: z.int().nonnegative().optional(), state: z.literal('networkidle').optional(), timeoutMs: z.int().min(1).optional() })
+const evaluateStep = z.strictObject({ ...base, type: z.literal('evaluate'), script: z.string().min(1), args: z.record(z.string(), z.unknown()).optional() })
 const screenshotStep = z.strictObject({ ...base, type: z.literal('screenshot'), path: z.string().min(1) })
 const requestStep = z.strictObject({
   ...base,

@@ -66,6 +66,9 @@ describe('expressions', () => {
     expect(run("contains(tags, 'a') && contains(name, 'Shoe')")).toBe(true)
     expect(run("urlEncode('A#1 b&c+d é')")).toBe('A%231%20b%26c%2Bd%20%C3%A9')
     expect(run("len(split('a,b,c', ','))")).toBe(3)
+    // blank text is an empty list, and blank pieces are dropped: a forEach over a blank var runs no iteration
+    expect(run("split('', ',')")).toEqual([])
+    expect(run("split(' a , ,b,', ',')")).toEqual(['a', 'b'])
     expect(run('len(item)')).toBe(0)
   })
 

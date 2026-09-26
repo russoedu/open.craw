@@ -1045,7 +1045,8 @@
               "const": "wait"
             },
             "selector": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "ms": {
               "type": "integer",
@@ -1055,6 +1056,11 @@
             "state": {
               "type": "string",
               "const": "networkidle"
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -1133,6 +1139,13 @@
             "script": {
               "type": "string",
               "minLength": 1
+            },
+            "args": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
             }
           },
           "required": [

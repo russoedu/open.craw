@@ -151,4 +151,19 @@ describe('recipeKindOf', () => {
     ]))
     expect(ok.steps[0].type).toBe('forEach')
   })
+
+  it('refuses a placeholder in a plain selector, which is never rendered, and points to target', () => {
+    for (const step of [{ type: 'click', selector: '#item-{{id}}' }, { type: 'fill', selector: '#{{field}}', value: 'x' }, { type: 'wait', selector: '[data-id="{{id}}"]' }]) {
+      expect(() => parseInputRecipe(recipe([step]))).toThrow('a selector is not a template: put a selector with placeholders in "target"')
+    }
+    expect(parseInputRecipe(recipe([{ type: 'click', target: '#item-{{id}}' }])).steps[0]).toMatchObject({ target: '#item-{{id}}' })
+  })
+
+  it('takes a wait timeout and evaluate args', () => {
+    const parsed = parseInputRecipe(recipe([
+      { type: 'wait', selector: '#report', timeoutMs: 600_000 },
+      { type: 'evaluate', id: 'x', script: '(a) => a.state', args: { state: '{{vars.state}}', codes: ['{{vars.code}}'] } },
+    ]))
+    expect(parsed.steps).toMatchObject([{ timeoutMs: 600_000 }, { args: { state: '{{vars.state}}' } }])
+  })
 })

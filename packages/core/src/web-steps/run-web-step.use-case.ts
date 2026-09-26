@@ -73,7 +73,7 @@ export class WebStepRunner implements StepRunner {
       }
       case 'scroll': { await scroll(step, this.page); break
       }
-      case 'wait': { await wait(step, this.page); break
+      case 'wait': { await wait(step, this.page, this.recipe.limits?.timeoutMs); break
       }
       case 'screenshot': { await screenshot(step, this.page, scope); break
       }
