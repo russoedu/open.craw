@@ -375,8 +375,9 @@ user who never clears their history.
   for the CLI and the MCP server), one directory per name. Default: `.opencraw/profiles`. Profile names are
   letters, digits, hyphens and underscores.
 - **One browser at a time.** A second recipe of the same crawler that wants the profile waits for the first to
-  finish. Another process holding it makes the recipe fail with `browser profile "shop" is open in another
-  browser`.
+  finish. Another crawler holding it (another process, or another crawler in this one) makes the recipe fail
+  with `browser profile "shop" is open in another browser`. A `.opencraw.lock` file in the profile names the
+  process that holds it; one left by a run that crashed is taken over.
 - **The access lease still applies:** the profile's browser is launched through the recipe's proxy, and a
   rotation relaunches it on the new one. A remote browser (`cdp`) cannot use a local profile: that combination
   is refused.
