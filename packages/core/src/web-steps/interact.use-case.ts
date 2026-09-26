@@ -46,9 +46,49 @@ export async function press (step: PressStep, page: Page, scope: ExtractionScope
 }
 
 /** Picks an option of a `<select>` by value, label or index; each is a template. */
-export async function select (step: SelectStep, page: Page, scope: ExtractionScope): Promise<void> {
+/** What a select wants, in the page: option values or labels, or an index. */
+interface OptionQuery {
+  wanted:     string[]
+  index?:     number
+  ignoreCase: boolean
+  multiple:   boolean
+}
+
+/** What the page's select holds for a query: the option values to choose, what matched nothing, and a sample of what is there. */
+interface OptionMatch {
+  values:  string[]
+  missing: string[]
+  sample:  string[]
+}
+
+const OPTION_POLL_MS = 250
+const DEFAULT_OPTION_TIMEOUT_MS = 30_000
+
+/**
+ * Runs a `select` step. One `value`, `label` or `index` goes through
+ * Playwright, as a user picks (the select must be visible). `values`,
+ * `multiple` or `force` resolve each wanted value or label to its option,
+ * waiting while the page has not loaded it yet (a list that fills after
+ * another pick); with `force` the options are set on the element itself and
+ * `input` and `change` fired, so a hidden select behind a widget is driven the
+ * way the widget drives it.
+ *
+ * @param step - The step.
+ * @param page - The page.
+ * @param scope - The scope its templates render in.
+ * @param timeoutMs - The recipe's `limits.timeoutMs`, used when the step sets none.
+ * @throws Error naming what matched no option once the time is up.
+ */
+export async function select (step: SelectStep, page: Page, scope: ExtractionScope, timeoutMs?: number): Promise<void> {
   const lookup = (path: string): unknown => scope.lookup(path)
   const target = targetOf(step, page, scope)
+  if (step.values !== undefined || step.multiple === true || step.force === true) {
+    const query: OptionQuery = { wanted: wantedOf(step, lookup), index: step.index, ignoreCase: step.ignoreCase === true, multiple: step.multiple === true }
+    const values = await optionsFor(target, query, step.timeoutMs ?? timeoutMs ?? DEFAULT_OPTION_TIMEOUT_MS)
+    await (step.force === true ? target.evaluate(chooseOptions, values) : target.selectOption(values))
+
+    return
+  }
   if (step.index !== undefined) {
     await target.selectOption({ index: step.index })
   } else if (step.label === undefined) {
@@ -56,6 +96,58 @@ export async function select (step: SelectStep, page: Page, scope: ExtractionSco
   } else {
     await target.selectOption({ label: renderText(step.label, lookup) })
   }
+}
+
+/** The values and labels a step wants: `values` (an item rendering a list adds each), else `value` or `label`. */
+function wantedOf (step: SelectStep, lookup: (path: string) => unknown): string[] {
+  const items = step.values ?? [step.value ?? step.label].filter((item): item is string => item !== undefined)
+
+  return items.flatMap((item) => {
+    const value = render(item, lookup)
+
+    return (Array.isArray(value) ? value : [value]).map(entry => String(entry ?? '').trim()).filter(entry => entry !== '')
+  })
+}
+
+/** Waits until every wanted option exists, then gives their values. */
+async function optionsFor (target: Locator, query: OptionQuery, timeoutMs: number): Promise<string[]> {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const match = await target.evaluate(matchOptions, query)
+    if (match.missing.length === 0) return match.values
+    if (Date.now() >= deadline) throw new Error(`no option ${match.missing.map(item => `"${item}"`).join(', ')} after ${timeoutMs} ms (options: ${match.sample.join(', ') || 'none'})`)
+    await target.page().waitForTimeout(OPTION_POLL_MS)
+  }
+}
+
+/** Runs inside the page. Keep it self-contained; it is serialised. */
+function matchOptions (element: Element, query: OptionQuery): OptionMatch {
+  const select = element as HTMLSelectElement
+  const options = [...select.options]
+  const fold = (text: string): string => (query.ignoreCase ? text.trim().toLowerCase() : text.trim())
+  const sample = options.slice(0, 10).map(option => option.text.trim())
+  if (query.index !== undefined) {
+    const option = options[query.index]
+
+    return option === undefined ? { values: [], missing: [`#${query.index}`], sample } : { values: [option.value], missing: [], sample }
+  }
+  const chosen = query.multiple ? options.filter(option => option.selected).map(option => option.value) : []
+  const missing: string[] = []
+  for (const wanted of query.wanted) {
+    const option = options.find(candidate => fold(candidate.value) === fold(wanted)) ?? options.find(candidate => fold(candidate.text) === fold(wanted))
+    if (option === undefined) missing.push(wanted)
+    else if (!chosen.includes(option.value)) chosen.push(option.value)
+  }
+
+  return { values: chosen, missing, sample }
+}
+
+/** Runs inside the page. Keep it self-contained; it is serialised. */
+function chooseOptions (element: Element, values: string[]): void {
+  const select = element as HTMLSelectElement
+  for (const option of select.options) option.selected = values.includes(option.value)
+  select.dispatchEvent(new Event('input', { bubbles: true }))
+  select.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
 /**

@@ -203,10 +203,10 @@ Every step has `type`, and may have:
 | Step | Fields | Notes |
 |---|---|---|
 | `goto` | `url` (template), `waitUntil?` (`load`, `domcontentloaded`, `networkidle`, `commit`), `ready?` | Relative URLs resolve against the current page. Records `page.url`. `ready: { selector, timeoutMs?, reloads? }` is an element the page must show: a site that sometimes serves its shell without the content is loaded again, up to `reloads` times (default 2), each reload reported as `request:retry`. |
-| `click` | `selector` or `target`, `optional?` | First match. With `optional: true` a missing element is skipped after a 2 s wait. |
+| `click` | `selector` or `target`, `optional?`, `download?` | First match. With `optional: true` a missing element is skipped after a 2 s wait. With `download: { as?, saveTo?, encoding?, delimiter?, timeoutMs? }` the click downloads a file (an "Export to Excel" button): it is read like a fetched document (CSV, spreadsheet, PDF, Word, JSON…, by `as` or the file's name), becomes the current document, and the step `id` holds it; `saveTo` (a template) keeps a copy. Read it with `from: <id>` (a `table` extract without `from` reads the page's HTML). |
 | `fill` | `selector` or `target`, `value` (template) | |
 | `press` | `key`, `selector?` or `target?` | A key on an element, or on the page. |
-| `select` | `selector` or `target`, one of `value`, `label`, `index` | Picks an option of a `<select>`; `value` and `label` are templates. Fires the page's `change` handlers. |
+| `select` | `selector` or `target`, one of `value`, `label`, `index`, `values`; `multiple?`, `force?`, `ignoreCase?`, `timeoutMs?` | Picks an option of a `<select>`; `value` and `label` are templates. Fires the page's `change` handlers. `values` picks several, each matched by value or label (an item rendering a list, `{{ split(vars.states) }}`, adds each); `multiple` adds to what is chosen. `force` sets the options on the element itself, visible or not, and fires `input` and `change`: a hidden `<select multiple>` behind a script-built widget, when the page listens to the select (it usually does: that is how the widget's choice reaches the form). The step waits up to `timeoutMs` (`limits.timeoutMs`, else 30 s) for options the page loads after another pick, then names what matched nothing. |
 | `scroll` | `to` (`bottom` or a selector), `times?`, `untilStable?` | `untilStable` keeps scrolling until the page stops growing: infinite lists. |
 | `wait` | one of `selector`, `ms`, `state: "networkidle"`; `timeoutMs?` | `selector` waits for visibility. Put a `wait` after `goto` on script-heavy pages before extracting. `timeoutMs` bounds the `selector` and `state` forms; default `limits.timeoutMs`, else 30 s. Give a long one to wait for a slow report, or for a person in a headed run. |
 | `evaluate` | `script`, `args?` | JavaScript evaluated in the page; the result is bound under `id`. `script` is a template. With `args`, `script` is a function expression called with them, each string rendered (a lone placeholder keeps its type): `{ "script": "(a) => a.states.length", "args": { "states": "{{ split(vars.state) }}" } }`. **Trusted recipes only.** |
@@ -220,15 +220,39 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 A plain `selector` is never rendered, so a recipe with `{{` in one is refused at load time: put that selector
 in `target`.
 
-### 3.2 Api steps (HTTP)
+### 3.2 Requests (HTTP)
+
+`request` runs in both modes. In `api` mode it goes through the recipe's request context. In `web` mode it goes
+through **the page's own session** (its cookies: a login, a consent, a solved captcha), the way a page's scripts
+call their JSON endpoints: a report whose table the page reads from an API is read the same way, with no
+`evaluate` and `fetch` code.
 
 | Step | Fields | Notes |
 |---|---|---|
-| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `jsonl`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`, `yaml`, `markdown`, `xml`, `docx`), `encoding?`, `delimiter?`, `scalars?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck, `application/yaml` YAML, `application/x-ndjson` JSON Lines, `text/markdown` Markdown, an XML type XML: §4.12, a Word type a document read as HTML: §4.13). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`, `.yaml`, `.yml`, `.jsonl`, `.ndjson`, `.md`, `.xml`, `.rss`, `.atom`, `.xml.gz`, `.docx`). 4xx/5xx fail the step. |
+| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?` or `form?`, `as?` (`json`, `jsonl`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`, `yaml`, `markdown`, `xml`, `docx`), `encoding?`, `delimiter?`, `scalars?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck, `application/yaml` YAML, `application/x-ndjson` JSON Lines, `text/markdown` Markdown, an XML type XML: §4.12, a Word type a document read as HTML: §4.13). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`, `.yaml`, `.yml`, `.jsonl`, `.ndjson`, `.md`, `.xml`, `.rss`, `.atom`, `.xml.gz`, `.docx`). 4xx/5xx fail the step. |
 
 Text bodies are decoded from, in order: a byte-order mark, `encoding` (any WHATWG label: `windows-1252`,
 `iso-8859-15`, `shift_jis`), the charset the server declares, UTF-8, and Windows-1252 for text that is not
 UTF-8 (the usual European export). `delimiter` (one character) overrides a CSV's detected delimiter (§4.7).
+
+**A body from a form** (web mode): `form: { selector, omit?, set? }` posts the page's form as the browser would
+(its `FormData`: every chosen option of a multi-select, no disabled field, no unticked box), url-encoded, without
+the `omit` fields, with each `set` field (a template) replacing or adding one. The form's values are sent as
+read, never rendered. A report endpoint paged with a cursor:
+
+```json
+{ "type": "paginate", "next": { "jsonpath": "$.next", "as": "cursor" }, "until": "{{ !page_rows.hasMore }}", "steps": [
+  { "type": "request", "id": "page_rows", "url": "/report/rows", "method": "POST",
+    "form": { "selector": "#reportForm", "omit": ["captcha"], "set": { "pageSize": "25", "after": "{{ default(cursor, '') }}" } } },
+  { "type": "extract", "id": "rows", "selector": "$.rows[*]", "kind": "jsonpath", "take": "json", "many": true },
+  { "type": "forEach", "over": "rows", "as": "row", "emit": true, "steps": [] }
+] }
+```
+
+`until` stops on the endpoint's own "no more" flag: some keep returning a cursor on the last page.
+
+In web mode, a `jsonpath` extract reads the JSON the last `request` fetched (the live page is read by `css` and
+`xpath`), and `next.jsonpath` pages on it.
 
 `body` is templated **all the way down**: a string body is one template, and in an object or list body
 every string inside it is one, at any depth. A string that is exactly one placeholder keeps the value's type
@@ -315,8 +339,8 @@ Truthiness for `when`, `until`, `test` and the logical operators: `false`, `0`, 
 |---|---|---|
 | `{ "selector": "a.next" }` | web | Clicks it. If the body navigated away (a `forEach` visiting every item), the engine returns to the listing page first. No visible element within 2 s means no next page. |
 | `{ "url": "{{start.url}}?page={{page.number}}" }` | both | The rendered value is the next `page.url` (web mode navigates to it). Empty means no next page. |
-| `{ "jsonpath": "$.nextPage" }` | api | Evaluated on the current document; the value is the next URL, relative allowed. `null`, `false` or empty means no next page. |
-| `{ "jsonpath": "$.cursor", "as": "cursor" }` | api | The value is bound under `cursor` in the next page's scope and the body builds the URL itself (`?cursor={{cursor}}`); on page 1 it is unset. |
+| `{ "jsonpath": "$.nextPage" }` | api, web (on a `request`'s JSON) | Evaluated on the current document; the value is the next URL, relative allowed. `null`, `false` or empty means no next page. |
+| `{ "jsonpath": "$.cursor", "as": "cursor" }` | api, web (on a `request`'s JSON) | The value is bound under `cursor` in the next page's scope and the body builds the URL itself (`?cursor={{cursor}}`); on page 1 it is unset. |
 
 Pagination also stops when `until` renders truthy or at `maxPages`. `page.number` increments per page.
 

@@ -46,10 +46,24 @@ export class HttpClient implements HttpSender {
       proxy:             options.proxy,
     })
 
-    return new HttpClient(context, options.timeoutMs)
+    return new HttpClient(context, options.timeoutMs, true)
   }
 
-  private constructor (private readonly context: APIRequestContext, private readonly timeoutMs: number | undefined) {}
+  /**
+   * A client over a request context someone else owns: a browser context's
+   * `request`, which shares the page's cookies, so a web recipe's `request`
+   * rides the session its page opened (a login, a solved captcha).
+   * Disposing this client leaves the context alone.
+   *
+   * @param context - The request context.
+   * @param timeoutMs - The default timeout.
+   * @returns The client.
+   */
+  static over (context: APIRequestContext, timeoutMs?: number): HttpClient {
+    return new HttpClient(context, timeoutMs, false)
+  }
+
+  private constructor (private readonly context: APIRequestContext, private readonly timeoutMs: number | undefined, private readonly owned: boolean) {}
 
   /**
    * Sends a request and parses the body.
@@ -79,13 +93,26 @@ export class HttpClient implements HttpSender {
     return this.context.storageState()
   }
 
-  dispose (): Promise<void> {
-    return this.context.dispose()
+  async dispose (): Promise<void> {
+    if (this.owned) await this.context.dispose()
   }
 }
 
+/**
+ * Reads a file's bytes as a document, the way a fetched body is read: a
+ * downloaded CSV, spreadsheet, PDF, Word or JSON file.
+ *
+ * @param bytes - The file.
+ * @param name - Its name: the extension decides the format unless `reading.as` does.
+ * @param reading - `as`, `encoding`, `delimiter`, `scalars`.
+ * @returns The document, what reading noticed, and the format.
+ */
+export async function readFileBody (bytes: Uint8Array, name: string, reading: Pick<HttpRequest, 'as' | 'encoding' | 'delimiter' | 'scalars'> = {}): Promise<ReadBody> {
+  return parseBody(reading.as ?? formatFromExtension(name), bytes, name, reading)
+}
+
 /** A body as read, with what reading it noticed. */
-interface ReadBody {
+export interface ReadBody {
   body:     HttpBody
   warnings: string[]
   format:   BodyKind

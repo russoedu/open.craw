@@ -1,9 +1,11 @@
 import type { Page } from 'playwright'
+import { nextFromDocument } from '../api-steps'
 import { BrowserSession } from '../browser-session'
 import type { CaptchaGuard } from '../captcha'
 import type { EventBus } from '../crawl-events'
 import type { ExtractionScope, LiveElement } from '../extraction-scope'
 import type { CaptchaSubmitStep, GotoStep, InputRecipe, PaginateNext, Step } from '../recipe-schema'
+import { HttpClient } from '../http-session'
 import { BlockedError, RunGate } from '../step-flow'
 import type { NextPageResult, StepRunner } from '../step-flow'
 import { isTruthy, render, renderText } from '../template'
@@ -12,6 +14,8 @@ import { extractFromPage } from './extract-from-page.use-case'
 import { appears, click, fill, press, screenshot, scroll, select, wait } from './interact.use-case'
 import { snapshotElements } from './snapshot-elements.use-case'
 import { navigate } from './navigate.use-case'
+import { sendPageRequest } from './send-page-request.use-case'
+import { downloadByClick } from './download-by-click.use-case'
 
 const NEXT_LINK_TIMEOUT_MS = 2000
 /** Steps after which a page may show a new captcha (`session.captcha`). */
@@ -24,6 +28,8 @@ const CHALLENGING_STEPS = new Set<string>(['click', 'press'])
  */
 export class WebStepRunner implements StepRunner {
   private readonly page: Page
+  /** Requests through the page's own session, made on first use. */
+  private requests:      HttpClient | undefined
 
   constructor (
     private readonly session: BrowserSession,
@@ -73,13 +79,13 @@ export class WebStepRunner implements StepRunner {
         await this.captcha.step(this.page, step, submit === undefined ? undefined : () => this.submit(submit, scope))
         break
       }
-      case 'click': { await click(step, this.page, scope); break
+      case 'click': { await (step.download === undefined ? click(step, this.page, scope) : downloadByClick(step, this.page, scope, this.recipe, this.events)); break
       }
       case 'fill': { await fill(step, this.page, scope); break
       }
       case 'press': { await press(step, this.page, scope); break
       }
-      case 'select': { await select(step, this.page, scope); break
+      case 'select': { await select(step, this.page, scope, this.recipe.limits?.timeoutMs); break
       }
       case 'scroll': { await scroll(step, this.page); break
       }
@@ -88,6 +94,11 @@ export class WebStepRunner implements StepRunner {
       case 'screenshot': { await screenshot(step, this.page, scope); break
       }
       case 'evaluate': { await evaluateScript(step, this.page, scope); break
+      }
+      case 'request': {
+        this.requests ??= HttpClient.over(this.page.context().request, this.recipe.limits?.timeoutMs)
+        await sendPageRequest(step, this.page, scope, this.requests, this.recipe, this.gate, this.events)
+        break
       }
       case 'extract': { await extractFromPage(step, this.page, scope); break
       }
@@ -103,7 +114,8 @@ export class WebStepRunner implements StepRunner {
   }
 
   async nextPage (next: PaginateNext, scope: ExtractionScope): Promise<NextPageResult> {
-    if ('jsonpath' in next) throw new Error('next.jsonpath reads an api document; use next.selector or next.url in web mode')
+    // A cursor or URL in the JSON a `request` of the page body fetched.
+    if ('jsonpath' in next) return nextFromDocument(next, scope)
     if ('url' in next) {
       const target = renderText(next.url, path => scope.lookup(path))
       if (target === '') return null

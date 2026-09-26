@@ -17,7 +17,8 @@ const API_ONLY = new Set<string>(API_ONLY_STEPS)
  *   the mapping);
  * - every required output field is mapped, defaulted, or generated;
  * - step ids are unique along any path;
- * - web-only steps appear only in web recipes or inside a bootstrap, api-only
+ * - web-only steps appear only in web recipes or inside a bootstrap (a `request`
+ *   form body only in web mode), api-only
  *   steps only in api recipes, and `next.selector` only in web mode;
  * - exactly one emitting construct exists on any path (the two branches of an
  *   `if` are separate paths);
@@ -80,6 +81,7 @@ function walkSteps (steps: readonly Step[], path: string, mode: 'web' | 'api', k
 function walkStep (step: Step, at: string, mode: 'web' | 'api', known: Set<string>, report: (path: string, message: string) => void, state: WalkState): void {
   if (mode === 'api' && WEB_ONLY.has(step.type)) report(at, `"${step.type}" needs a browser; this recipe runs in api mode (use session.bootstrap for browser steps)`)
   if (mode === 'web' && API_ONLY.has(step.type)) report(at, `"${step.type}" is an api step; this recipe runs in web mode`)
+  if (mode === 'api' && step.type === 'request' && step.form !== undefined) report(`${at}.form`, 'a form body is read from a live page: web mode only (or send the fields as "body")')
   if (state.bootstrap === true && (step.type === 'emit' || (step.type === 'forEach' && step.emit !== undefined))) report(at, 'a bootstrap produces a session, not records')
   if (step.id !== undefined) {
     if (state.ids.has(step.id) || RESERVED.has(step.id)) report(at, `id "${step.id}" is already bound on this path`)
@@ -114,7 +116,6 @@ function walkStep (step: Step, at: string, mode: 'web' | 'api', known: Set<strin
     }
     case 'paginate': {
       if (mode === 'api' && 'selector' in step.next) report(`${at}.next`, 'next.selector needs a browser; use next.url or next.jsonpath in api mode')
-      if (mode === 'web' && 'jsonpath' in step.next) report(`${at}.next`, 'next.jsonpath reads an api document; use next.selector or next.url in web mode')
       if ('jsonpath' in step.next && step.next.as !== undefined) known.add(step.next.as)
 
       return walkSteps(step.steps, `${at}.steps`, mode, known, report, nested())

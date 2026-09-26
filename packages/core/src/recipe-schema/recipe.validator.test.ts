@@ -144,8 +144,8 @@ describe('recipeKindOf', () => {
     const neither = () => parseInputRecipe(recipe([{ type: 'forEach', as: 'o', steps: [] }]))
     expect(neither).toThrow('give exactly one of over')
     expect(() => parseInputRecipe(recipe([{ type: 'click' }]))).toThrow('give exactly one of selector or target')
-    expect(() => parseInputRecipe(recipe([{ type: 'select', target: '{{o}}' }]))).toThrow('give exactly one of value, label or index')
-    expect(() => parseInputRecipe(recipe([{ type: 'select', target: '{{o}}', value: '1', index: 1 }]))).toThrow('give exactly one of value, label or index')
+    expect(() => parseInputRecipe(recipe([{ type: 'select', target: '{{o}}' }]))).toThrow('give exactly one of value, label, index or values')
+    expect(() => parseInputRecipe(recipe([{ type: 'select', target: '{{o}}', value: '1', index: 1 }]))).toThrow('give exactly one of value, label, index or values')
     const ok = parseInputRecipe(recipe([
       { type: 'forEach', selector: 'select#trim option', as: 'o', emit: true, steps: [{ type: 'select', selector: 'select#trim', value: '{{o.attrs.value}}' }, { type: 'click', target: '{{o}}' }, { type: 'press', key: 'Enter' }] },
     ]))
@@ -165,6 +165,22 @@ describe('recipeKindOf', () => {
     expect(() => parseInputRecipe(recipe([{ ...form, verify: { failure: '#captchaMsg' } }]))).toThrow('a form captcha (image or submit) needs verify.selector')
     expect(() => parseInputRecipe(recipe([{ ...form, selector: '.g-recaptcha' }]))).toThrow('give image (a form captcha) or selector (a widget), not both')
     expect(() => parseInputRecipe(recipe([{ ...form, submit: [{ type: 'goto', url: 'x' }] }]))).toThrow()
+  })
+
+  it('takes several select values with force, and a click that downloads', () => {
+    const parsed = parseInputRecipe(recipe([
+      { type: 'select', selector: '#state', values: ['{{ split(vars.states) }}'], force: true, multiple: true, ignoreCase: true, timeoutMs: 20_000 },
+      { type: 'click', selector: '#export', id: 'file', download: { as: 'xlsx', saveTo: 'out/{{vars.name}}.xlsx', timeoutMs: 60_000 } },
+    ]))
+    expect(parsed.steps).toMatchObject([{ values: ['{{ split(vars.states) }}'], force: true }, { download: { as: 'xlsx' } }])
+    expect(() => parseInputRecipe(recipe([{ type: 'select', selector: '#s', value: 'a', values: ['b'] }]))).toThrow('give exactly one of value, label, index or values')
+    expect(() => parseInputRecipe(recipe([{ type: 'click', selector: '#x', download: { as: 'exe' } }]))).toThrow()
+  })
+
+  it('takes a request body from a form, but not with a body as well', () => {
+    const request = { type: 'request', url: '/rows', method: 'POST', form: { selector: '#reportForm', omit: ['captcha'], set: { pageSize: '25' } } }
+    expect(parseInputRecipe(recipe([request])).steps[0]).toMatchObject({ form: { selector: '#reportForm', set: { pageSize: '25' } } })
+    expect(() => parseInputRecipe(recipe([{ ...request, body: { a: 1 } }]))).toThrow('give body or form, not both')
   })
 
   it('takes a goto ready element, a wait timeout and evaluate args', () => {
