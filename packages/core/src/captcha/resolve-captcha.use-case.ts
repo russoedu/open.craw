@@ -140,6 +140,8 @@ async function solveOnce (plan: CaptchaAttemptPlan, challenge: CaptchaChallenge,
     }, plan.timeoutMs)
   })
   const log = (level: 'debug' | 'info' | 'warn' | 'error', message: string, meta?: Record<string, unknown>): void => {
+    // Debug lines are the solver's own detail: the trace shows what needs attention.
+    if (level === 'debug') return
     plan.events.emit({ type: level === 'error' ? 'error' : 'warning', recipeId: plan.recipeId, message: `[${plan.solver.name}] ${message}`, meta })
   }
   const solving = (async (): Promise<CaptchaOutcome> => {
