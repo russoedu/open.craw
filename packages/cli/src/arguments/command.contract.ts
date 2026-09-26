@@ -19,19 +19,27 @@ export type Command =
   { name: 'version' } |
   { name: 'validate', paths: string[] } |
   {
-    name:    'run'
-    paths:   string[]
+    name:      'run'
+    paths:     string[]
     /** A JSON Lines file; records go to stdout without it. */
-    out?:    string
-    append:  boolean
-    resume:  boolean
-    trace:   boolean
+    out?:      string
+    append:    boolean
+    resume:    boolean
+    trace:     boolean
     /** One record per input, with the scope it was mapped from. */
-    dryRun:  boolean
+    dryRun:    boolean
     /** Run only the input recipes with these ids. */
-    only:    string[]
-    headed:  boolean
-    options: CommonOptions
+    only:      string[]
+    headed:    boolean
+    /** How many input recipes run at once. */
+    parallel?: number
+    /** Tries per request for recipes whose `limits.retry` says nothing (1 turns retrying off). */
+    retries?:  number
+    /** Where `session.browserProfile` profiles live; `OPENCRAW_PROFILES` when not given. */
+    profiles?: string
+    /** Per-site politeness across every recipe: overrides the access config's `throttle` defaults. */
+    throttle:  { delayMs?: number, concurrency?: number }
+    options:   CommonOptions
   } |
   {
     name:    'probe'

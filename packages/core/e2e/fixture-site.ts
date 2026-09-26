@@ -115,7 +115,7 @@ const CONFIGURATOR = `<!doctype html><html lang="en"><head><title>Configurator</
   })
 </script></body></html>`
 
-const LOGIN_FORM = '<!doctype html><html lang="en"><head><title>Login</title></head><body><form method="post" action="/login"><input id="user" name="user"><input id="pass" name="pass" type="password"><button type="submit">Go</button></form></body></html>'
+const LOGIN_FORM = '<!doctype html><html lang="en"><head><title>Login</title></head><body><form method="post" action="/login"><input id="user" name="user"><input id="pass" name="pass" type="password"><label><input id="remember" name="remember" type="checkbox"> Remember me</label><button type="submit">Go</button></form></body></html>'
 const LOGGED_IN = '<!doctype html><html lang="en"><head><title>Account</title></head><body><p id="logged-in">Welcome</p></body></html>'
 
 /** The token the fake captcha accepts; anything else shows the challenge again. */
@@ -171,8 +171,43 @@ function captchaRoute (incoming: IncomingMessage, outgoing: ServerResponse, url:
   }
 }
 
+/** Hits per `/flaky` key, so each test gets its own failure count. */
+const flakyHits = new Map<string, number>()
+
+/**
+ * Fails its first `fail` hits per `key`, the way a struggling server does:
+ * `mode=reset` drops the connection, `status` answers 503, `retry-after`
+ * answers 429 asking for one second. Then it answers normally.
+ */
+function flakyRoute (incoming: IncomingMessage, outgoing: ServerResponse, url: URL): void {
+  const key = url.searchParams.get('key') ?? ''
+  const hits = (flakyHits.get(key) ?? 0) + 1
+  flakyHits.set(key, hits)
+  if (hits <= Number(url.searchParams.get('fail') ?? '0')) {
+    const mode = url.searchParams.get('mode')
+    if (mode === 'reset') {
+      incoming.socket.destroy()
+
+      return
+    }
+    outgoing.writeHead(mode === 'retry-after' ? 429 : 503, { 'content-type': 'text/plain', ...(mode === 'retry-after' && { 'retry-after': '1' }) })
+    outgoing.end('try later')
+
+    return
+  }
+  outgoing.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+  outgoing.end(`<!doctype html><html lang="en"><body><p id="ok">ok after ${hits}</p></body></html>`)
+}
+
+/** How many `/slow/` pages the site is serving at once, and the most it served at once since the last reset. */
+export const slowLoad = { now: 0, peak: 0 }
+
+/** When each request reached the site, for tests that check how requests are spaced. */
+export const arrivals: { path: string, at: number }[] = []
+
 function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
   const url = new URL(incoming.url ?? '/', FIXTURE_BASE)
+  arrivals.push({ path: `${url.pathname}${url.search}`, at: Date.now() })
   const html = (body: string, status = 200): void => {
     outgoing.writeHead(status, { 'content-type': 'text/html; charset=utf-8' })
     outgoing.end(body)
@@ -189,6 +224,21 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
     return html(productHtml(product(id)))
   }
   if (url.pathname.startsWith('/captcha/') && captchaRoute(incoming, outgoing, url, html)) return
+  if (url.pathname === '/flaky') return flakyRoute(incoming, outgoing, url)
+  if (url.pathname === '/slow') {
+    // A listing of six pages that each take 300 ms: sequential costs ~1.8 s, three at a time ~0.6 s.
+    return html(`<!doctype html><html lang="en"><body>${Array.from({ length: 6 }, (_, index) => `<a class="item" href="/slow/${index + 1}">${index + 1}</a>`).join('')}</body></html>`)
+  }
+  if (url.pathname.startsWith('/slow/')) {
+    slowLoad.now += 1
+    slowLoad.peak = Math.max(slowLoad.peak, slowLoad.now)
+    setTimeout(() => {
+      slowLoad.now -= 1
+      html(`<!doctype html><html lang="en"><body><h1>Item ${url.pathname.slice('/slow/'.length)}</h1></body></html>`)
+    }, 300)
+
+    return
+  }
   if (url.pathname === '/configurator') return html(CONFIGURATOR)
   if (url.pathname === '/login' && incoming.method === 'GET') return html(LOGIN_FORM)
   if (url.pathname === '/login' && incoming.method === 'POST') {
@@ -197,7 +247,8 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
     incoming.on('end', () => {
       const form = new URLSearchParams(body)
       if (form.get('user') === 'demo' && form.get('pass') === 'demo') {
-        outgoing.writeHead(302, { 'set-cookie': 'session=ok; Path=/; HttpOnly', 'location': '/account' })
+        // "Remember me" makes the cookie outlive the browser; without it, it is a session cookie.
+        outgoing.writeHead(302, { 'set-cookie': `session=ok; Path=/; HttpOnly${form.get('remember') === 'on' ? '; Max-Age=86400' : ''}`, 'location': '/account' })
         outgoing.end()
       } else {
         html(LOGIN_FORM, 401)

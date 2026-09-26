@@ -317,12 +317,86 @@ opencraw run recipes/ --plugins plugins.mjs --access access.json   # or OPENCRAW
 (or `OPENCRAW_HOOKS`) from its own environment, never from a tool call. A profile naming a plugin the module
 does not provide fails before the crawl starts.
 
-## Not covered yet
+## Throttling per site
 
-Tracked on issue #8:
+`limits.delayMs` and `limits.concurrency` belong to one recipe. Two recipes that crawl the same site each
+keep their own pace, so together they hit it twice as hard. The access config's `throttle` is the crawler's
+politeness towards each **site**, across every recipe and run it executes:
 
-- **Per-domain throttling** across recipes.
-- **Persistent browser profiles.**
+```json
+{
+  "profiles": {},
+  "throttle": {
+    "delayMs": 500,
+    "concurrency": 2,
+    "domains": {
+      "example.com":     { "delayMs": 2000, "concurrency": 1 },
+      "api.example.com": { "delayMs": 0 }
+    }
+  }
+}
+```
 
-A custom CA certificate is not a profile option either. Chromium reads its own certificate store, so use
+- `delayMs`: at least this long between two request starts to one site. `concurrency`: at most this many of
+  its requests in flight. At the top level they apply to every site; under `domains`, to that domain and its
+  subdomains (`example.com` covers `www.example.com`), the longest match winning.
+- A site is its host name unless a `domains` entry groups it: `www.example.com` and `shop.example.com` share
+  one lane under the `example.com` rule above, and have one each without it.
+- It counts every navigation, request, bootstrap page and `next.selector` click the engine starts. Requests
+  a page makes by itself (its images, its scripts, its XHRs) are not counted.
+- A recipe's own `limits` still apply on top: the stricter of the two wins.
+
+Like a single-lane bridge with a traffic light: however many recipes arrive, each car waits for the one ahead
+to be far enough across.
+
+From the command line, `--host-delay <ms>` and `--host-concurrency <n>` set the top-level defaults (over the
+file's). From code: `createCrawler({ throttle: { delayMs: 500, domains: { … } } })`.
+
+## Persistent browser profiles
+
+A fresh browser context forgets everything when it closes. Some sites judge you by what you have been: a
+login that lasts weeks, a consent choice, a trust score built over visits, a device check passed once.
+`session.browserProfile` runs a recipe in a **profile that persists**: a real browser user-data directory
+(cookies, local storage, IndexedDB, cache, service workers), reopened on every run. The browser version of a
+user who never clears their history.
+
+```json
+"session": {
+  "browserProfile": "shop",
+  "bootstrap": { "keep": ["cookies"], "steps": [ … the login … ] }
+}
+```
+
+- **Web recipes** run in the profile. The bootstrap runs in the same browser as the crawl, and what both leave
+  behind stays for the next run.
+- **Api recipes** take the profile's cookies and storage as their starting state: after the bootstrap when
+  there is one, else as the profile holds them. A login a web recipe made yesterday feeds today's api recipe.
+- **Where:** `profilesDir` (`createCrawler({ profilesDir })`, CLI `--profiles <dir>`, `OPENCRAW_PROFILES`
+  for the CLI and the MCP server), one directory per name. Default: `.opencraw/profiles`. Profile names are
+  letters, digits, hyphens and underscores.
+- **One browser at a time.** A second recipe of the same crawler that wants the profile waits for the first to
+  finish. Another crawler holding it (another process, or another crawler in this one) makes the recipe fail
+  with `browser profile "shop" is open in another browser`. A `.opencraw.lock` file in the profile names the
+  process that holds it; one left by a run that crashed is taken over.
+- **The access lease still applies:** the profile's browser is launched through the recipe's proxy, and a
+  rotation relaunches it on the new one. A remote browser (`cdp`) cannot use a local profile: that combination
+  is refused.
+
+What a profile keeps is what a real browser keeps. **Session cookies**, those without an expiry, end when the
+browser closes, profile or not. A login that must outlast a run needs the site's "remember me", or a saved
+`storageStatePath`.
+
+A bootstrap that runs every time would log in again every time. To log in only when needed, check first:
+
+```json
+"steps": [
+  { "type": "goto", "url": "https://shop.example/account" },
+  { "type": "extract", "id": "me", "selector": "#logged-in", "kind": "css", "many": true },
+  { "type": "if", "test": "{{ len(me) == 0 }}", "steps": [ … the login … ] }
+]
+```
+
+## Certificates
+
+A custom CA certificate is not a profile option. Chromium reads its own certificate store, so use
 `ignoreHTTPSErrors`, or set `NODE_EXTRA_CA_CERTS` for the HTTP side when a provider gives you a CA.

@@ -17,6 +17,8 @@ export type CrawlEvent =
   (Base & { type: 'access:blocked', url: string, status: number, reason: string }) |
   /** The run gave up its access lease after a block and is taking a new one. */
   (Base & { type: 'access:rotate', attempt: number, reason: string }) |
+  /** A request failed in passing (a dropped connection, a 503, a 429) and is sent again after `delayMs`. */
+  (Base & { type: 'request:retry', url: string, attempt: number, reason: string, delayMs: number }) |
   /** A captcha challenge is on the page. */
   (Base & { type: 'captcha:detected', url: string, kind: string, siteKey?: string }) |
   /** A solver is trying (`attempt` counts from 1 per challenge). */

@@ -105,6 +105,27 @@ export interface SessionSpec {
   blockedWhen?:      BlockRule
   onBlock?:          BlockRotation
   captcha?:          CaptchaSettings
+  /**
+   * A browser profile of the runner that persists between runs (cookies,
+   * storage, cache): web recipes and bootstraps run in it. A name; the runner
+   * decides where profiles live.
+   */
+  browserProfile?:   string
+}
+
+/**
+ * How a request that fails in passing (a dropped connection, a timeout, a
+ * 503, a 429) is sent again. On by default: three tries in all.
+ */
+export interface RetryRule {
+  /** Tries per request, the first included; `1` turns retrying off. Default 3. */
+  attempts?:   number
+  /** The first pause; it doubles on every retry. Default 1000. */
+  backoffMs?:  number
+  /** The longest pause, `Retry-After` included; a server asking for longer is not retried. Default 30000. */
+  maxDelayMs?: number
+  /** The statuses retried. Default `[408, 425, 429, 500, 502, 503, 504]`. */
+  statuses?:   number[]
 }
 
 export interface CrawlLimits {
@@ -112,8 +133,10 @@ export interface CrawlLimits {
   /** Minimum interval between two request starts across the recipe, whatever runs in parallel. */
   delayMs?:     number
   timeoutMs?:   number
-  /** How many `forEach` iterations may run at once (api mode; a web recipe drives one page). Default 1. */
+  /** How many `forEach` iterations over a list may run at once: requests in api mode, tabs in web mode. Default 1. */
   concurrency?: number
+  /** How requests that fail in passing are sent again; the crawler's `retry`, else three tries, when omitted. */
+  retry?:       RetryRule
 }
 
 /** Where to start, how to navigate, what to extract, and how it maps to one output recipe. */
@@ -204,6 +227,14 @@ export const sessionSpecSchema: z.ZodType<SessionSpec> = z.strictObject({
   blockedWhen:      blockRuleSchema.optional(),
   onBlock:          blockRotationSchema.optional(),
   captcha:          captchaSettingsSchema.optional(),
+  browserProfile:   z.string().regex(/^[\w-]+$/, 'a browser profile name is letters, digits, hyphens and underscores').optional(),
+})
+
+export const retryRuleSchema: z.ZodType<RetryRule> = z.strictObject({
+  attempts:   z.int().min(1).max(10).optional(),
+  backoffMs:  z.int().nonnegative().optional(),
+  maxDelayMs: z.int().nonnegative().optional(),
+  statuses:   z.array(z.int().min(400).max(599)).optional(),
 })
 
 const limitsSchema: z.ZodType<CrawlLimits> = z.strictObject({
@@ -211,6 +242,7 @@ const limitsSchema: z.ZodType<CrawlLimits> = z.strictObject({
   delayMs:     z.int().nonnegative().optional(),
   timeoutMs:   z.int().positive().optional(),
   concurrency: z.int().min(1).max(64).optional(),
+  retry:       retryRuleSchema.optional(),
 })
 
 export const inputRecipeSchema: z.ZodType<InputRecipe> = z.strictObject({

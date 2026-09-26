@@ -58,6 +58,18 @@ async function blockResources (context: BrowserContext, types: ReadonlySet<strin
   })
 }
 
+/**
+ * What a context gets after it opened: the cookies to add and the resource
+ * types to skip.
+ *
+ * @param context - The context.
+ * @param options - The session options.
+ */
+export async function applySessionExtras (context: BrowserContext, options: SessionOptions): Promise<void> {
+  if (options.cookies !== undefined && options.cookies.length > 0) await context.addCookies(options.cookies)
+  if (options.blockResources !== undefined && options.blockResources.length > 0) await blockResources(context, new Set(options.blockResources))
+}
+
 /** A launched browser; sessions are opened from it and closed independently. */
 export class BrowserClient {
   static async launch (config: BrowserSessionConfig = {}): Promise<BrowserClient> {
@@ -114,8 +126,7 @@ export class BrowserClient {
     }
     const context = await this.browser.newContext(contextOptions)
     if (this.config.timeoutMs !== undefined) context.setDefaultTimeout(this.config.timeoutMs)
-    if (options.cookies !== undefined && options.cookies.length > 0) await context.addCookies(options.cookies)
-    if (options.blockResources !== undefined && options.blockResources.length > 0) await blockResources(context, new Set(options.blockResources))
+    await applySessionExtras(context, options)
     const page = await context.newPage()
 
     return new BrowserSession(context, page)

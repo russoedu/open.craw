@@ -37,6 +37,9 @@ a module of its choosing.
 credentials as `{{env.NAME}}` read from the server's environment. The `probe` and `run` tools then take an
 `access` argument naming a profile. The file and the credentials never pass through a tool call.
 
+`OPENCRAW_PROFILES` is the directory of the persistent browser profiles recipes name in
+`session.browserProfile` (default `.opencraw/profiles` in the server's working directory).
+
 ## Tools
 
 ### `probe`
@@ -90,6 +93,7 @@ Crawls the recipes at the given paths, or passed inline.
 | `dryRun?` | One record per input recipe instead of a full crawl — for checking a recipe under construction. |
 | `headed?`, `browserPath?`, `insecureTls?`, `userAgent?` | As in the cli. |
 | `access?` | The access profile for recipes that name none, from the server's `OPENCRAW_ACCESS` config. |
+| `parallel?` | How many input recipes run at once (1 to 16, default 1). |
 
 Returns `{ report: CrawlReport, records?, truncated? }`. `records`/`truncated` are present only when `out`
 was not given, and `records` is capped at 50 even then.

@@ -1,5 +1,5 @@
 import type { Page } from 'playwright'
-import type { BrowserSession } from '../browser-session'
+import { BrowserSession } from '../browser-session'
 import type { CaptchaGuard } from '../captcha'
 import type { EventBus } from '../crawl-events'
 import type { ExtractionScope, LiveElement } from '../extraction-scope'
@@ -104,13 +104,33 @@ export class WebStepRunner implements StepRunner {
     const link = this.page.locator(next.selector).first()
     if (!await appears(link, NEXT_LINK_TIMEOUT_MS)) return null
     const before = this.page.url()
-    await link.click()
-    await this.page.waitForLoadState()
+    const release = await this.gate.request(before)
+    try {
+      await link.click()
+      await this.page.waitForLoadState()
+    } finally {
+      release()
+    }
     if (this.page.url() === before) await this.page.waitForTimeout(NEXT_LINK_TIMEOUT_MS / 4)
     this.events.emit({ type: 'page:visit', recipeId: this.recipe.id, url: this.page.url(), number: (scope.pageState?.number ?? 1) + 1 })
     await this.captcha?.check(this.page)
 
     return { kind: 'url', url: this.page.url() }
+  }
+
+  /**
+   * A runner on a new tab of the same context, for one parallel iteration:
+   * it shares cookies, the gate and the captcha guard; disposing it closes the tab only.
+   *
+   * @returns The forked runner.
+   */
+  async fork (): Promise<WebStepRunner> {
+    const { context } = this.session
+    const page = await context.newPage()
+    const viewport = this.recipe.session?.viewport
+    if (viewport !== undefined) await page.setViewportSize(viewport)
+
+    return new WebStepRunner(new BrowserSession(context, page, async () => { await page.close() }), this.recipe, this.events, this.gate, this.captcha)
   }
 
   async elements (selector: string): Promise<LiveElement[]> {

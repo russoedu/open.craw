@@ -1,10 +1,12 @@
 import { AccessBroker } from '../access'
-import { BrowserClient } from '../browser-session'
+import { resolve } from 'node:path'
+import { BrowserClient, BrowserProfiles } from '../browser-session'
 import { CaptchaSolverRegistry } from '../captcha'
 import { EventBus } from '../crawl-events'
 import { HookRegistry } from '../hooks'
 import type { RecipeSet } from '../recipe-loading'
 import { DedupePolicy, memorySink } from '../record-sink'
+import { HostThrottle } from '../step-flow'
 import type { CrawlOptions } from './crawl-options.config'
 import type { CrawlReport } from './crawl-report.model'
 import { runCrawl } from './run-crawl.use-case'
@@ -31,6 +33,8 @@ export function createCrawler (options: CrawlOptions = {}): Crawler {
   const access = new AccessBroker(options.access, options.accessPlugins)
   const hooks = new HookRegistry(options.hooks)
   const captchaSolvers = new CaptchaSolverRegistry(options.captchaSolvers)
+  const hosts = new HostThrottle(options.throttle ?? options.access?.throttle)
+  const profiles = new BrowserProfiles(options.profilesDir ?? resolve(options.storageStateDir ?? '.', '.opencraw', 'profiles'), options.browser)
   const events = new EventBus(options.onEvent)
   let browser: Promise<BrowserClient> | undefined
   const launch = (): Promise<BrowserClient> => {
@@ -51,9 +55,12 @@ export function createCrawler (options: CrawlOptions = {}): Crawler {
       debug:           options.debug === true,
       access,
       captchaSolvers,
+      hosts,
+      profiles,
+      retry:           options.retry,
 
       ignoreHTTPSErrors: options.browser?.ignoreHTTPSErrors,
-    }, options.onRecipeError ?? 'continue'),
+    }, options.onRecipeError ?? 'continue', options.parallel ?? 1),
     async close () {
       const launched = browser
       browser = undefined

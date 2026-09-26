@@ -289,6 +289,45 @@
     },
     "default": {
       "type": "string"
+    },
+    "throttle": {
+      "type": "object",
+      "properties": {
+        "delayMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "domains": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[\\w.-]+$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "delayMs": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "concurrency": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 256
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [

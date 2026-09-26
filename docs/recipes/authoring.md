@@ -144,7 +144,7 @@ fields is never de-duplicated. Duplicates are reported (`record:duplicate`) and 
 | `start` | One or more start points `{ url, vars? }`. Each runs the whole step list from a fresh scope with `start.url` and its `vars`. |
 | `vars` | Values templates read as `{{vars.name}}`. Start-point `vars` override recipe `vars`. |
 | `session` | §2.2. |
-| `limits` | `maxRecords` stops the walk after that many records, exactly, whatever runs in parallel. `delayMs` is the minimum interval between two request starts across the recipe. `timeoutMs` bounds navigations and requests. `concurrency` (default `1`) is how many `forEach` iterations may run at once in `api` mode (§3.9). |
+| `limits` | `maxRecords` stops the walk after that many records, exactly, whatever runs in parallel. `delayMs` is the minimum interval between two request starts across the recipe. `timeoutMs` bounds navigations and requests. `concurrency` (default `1`) is how many `forEach` iterations may run at once in `api` mode (§3.9). `retry` sends a request that fails in passing again (§7; on by default). |
 | `onError` | The default policy for every step. §7. |
 | `steps` | The acquisition recipe. §3. |
 | `mapping` | Output field → mapping rule. §5. |
@@ -171,6 +171,7 @@ steps in its bootstrap** to obtain a session (§2.2).
 | `access` | `{ profile?, country?, sticky? }`: what the site needs from the network. `profile` names a profile of the runner's access config (its default when omitted), `country` is a two-letter code for profiles that target by country, `sticky: false` lets the provider change IP per request. Never credentials: those live in the access config. See [access.md](./access.md). |
 | `blockedWhen` | `{ status?, header?, text? }`: what counts as the site refusing the crawl, checked on every navigation and request. Default: 403, 429, or an AWS WAF challenge header. A block fails the step with the URL and reason instead of a later selector miss. |
 | `onBlock` | `{ rotate?, solve?, attempts? }`. `rotate: true`: on a block, take a new access lease (a new IP), reopen the session (re-running the bootstrap) and retry the step, up to `attempts` times per run (default 2). `solve: true` (web mode, needs `captcha`): a block page showing a captcha is solved on the spot; rotation, if on, applies only when solving fails. |
+| `browserProfile` | A persistent browser profile of the runner (cookies, storage, cache kept between runs): web recipes and bootstraps run in it, api recipes start from its cookies. See [access.md](access.md#persistent-browser-profiles). |
 | `captcha` | `{ solver, detect?, verify?, attempts?, timeoutMs?, maxSolves? }`, web mode and bootstraps: after every navigation, click and key press, a visible challenge is solved by the named solver before the next step runs. §6.1. |
 
 A login looks like this and works for both modes:
@@ -414,19 +415,37 @@ The trace shows the branch taken as `⑂ steps.N  then`.
 
 ### 3.9 Concurrency
 
-`limits.concurrency: 3` lets a `forEach` run three iterations at once: a listing whose body fetches every
-item's page fans out, three requests in flight, and records come out in completion order rather than list
-order. Rules:
+Two dials, one inside a recipe and one across recipes.
 
-- **api mode only**. A web recipe drives one browser page, so it stays sequential whatever the limit says.
+**Inside a recipe**, `limits.concurrency: 3` lets a `forEach` over a list run three iterations at once: a
+listing whose body fetches every item's page fans out, and records come out in completion order rather than
+list order.
+
+- **api mode:** three requests in flight on one HTTP session.
+- **web mode:** three **tabs** of the recipe's browser context, one per iteration: they share cookies (the
+  login), each has its own page, and each closes when its iteration ends. A tab opens blank, so the body must
+  start with a `goto` (`{{item.url}}`). A `forEach` over `selector` stays sequential: its live elements
+  belong to one page.
 - The limit is **per recipe run**, not per loop: nested loops share it. The outermost concurrent loop takes
   the permits; a loop inside one of its iterations runs its body sequentially, so nesting never multiplies
   the number of requests in flight.
 - `delayMs` is a **rate**, not a per-request pause: the minimum time between two request starts across
   every iteration. `concurrency: 4, delayMs: 250` means at most four requests per second, in flight or not.
 - `maxRecords` is exact: once reached, iterations still in flight finish but emit nothing more.
+- Politeness towards a **site** across recipes is the runner's `throttle` ([access.md](access.md#throttling-per-site)),
+  on top of these per-recipe limits.
 - A failing step under the `fail` policy stops new iterations; the ones in flight settle, then the recipe
   fails as usual.
+- A block under `onBlock.rotate` rotates once for the whole recipe; every tab reopens on the new lease.
+
+**Across recipes**, `createCrawler({ parallel: 3 })` (CLI `--parallel 3`, MCP `run` with `parallel: 3`) runs
+three input recipes of a set at once, each in its own browser context or HTTP session. They share the browser,
+the sink and the per-site throttle. Reports keep the set's order. Under `onRecipeError: 'stop'`, a failure stops
+the recipes not started yet. De-duplication under `dedupe: 'recipe'` stays per recipe; under `run`, the recipe
+that emits a key first keeps it.
+
+Parallel is only faster if the site lets it be. Pair it with the per-site `throttle`
+([access.md](access.md#throttling-per-site)), which bounds what all of this adds up to on one site.
 
 ---
 
@@ -961,6 +980,32 @@ CapSolver, the costs, and when not to.
 | `skip` | The id stays unset, the walk continues, a `step:skip` event is reported. |
 | `retry` | The step is re-run up to `attempts` times with linear `backoffMs`, then treated as `fail`. |
 
+**A request fails in passing** (a dropped connection, a timeout, a 503, a 429). Before any of the above, the
+engine sends the same request again: that is `limits.retry`, and it is **on by default**.
+
+```json
+"limits": { "retry": { "attempts": 4, "backoffMs": 500, "maxDelayMs": 20000, "statuses": [429, 502, 503, 504] } }
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `attempts` | `3` | Tries per request, the first included. `1` turns it off. |
+| `backoffMs` | `1000` | The first pause. It doubles on each retry, give or take 25% so parallel requests do not retry in step. |
+| `maxDelayMs` | `30000` | The longest pause. A server whose `Retry-After` asks for longer is not retried: it means "come back much later". |
+| `statuses` | `[408, 425, 429, 500, 502, 503, 504]` | Answers retried. Connection failures always are: resets, refusals, timeouts, a DNS lookup that could not run, a proxy that dropped the tunnel. A host that does not exist is not. |
+
+- It covers every `goto`, `request` and `next.url` page. A `Retry-After` (seconds or a date) is honoured, and it
+  holds back **every** request to that site, not only the one that got it.
+- A retry is the same request again, on the same access lease. It does not spend the step's `onError` retries,
+  and each one is a `request:retry` event (`↺` in the trace).
+- When the tries run out, the last answer counts. A 429 or 403 that is still there becomes a block
+  (`session.blockedWhen`), so `onBlock.rotate` takes over; a 503 fails the step, and the step's `onError` applies.
+- The crawler sets the default for every recipe: `createCrawler({ retry: { attempts: 5 } })`, CLI `--retries <n>`.
+  A recipe's `limits.retry` wins over it.
+
+Like redialling a busy number: wait a moment, dial again, give up after a few tries. If the other end said "call
+back in a minute", wait that minute.
+
 **A mapped value is missing** (`undefined`, `null`, `""`; an empty list is a value). The policy is the
 mapping rule's `onMissing`, else the field's, else `default` when the field has a `default`, else the
 recipe's, else `fail` for required fields and `null` otherwise:
@@ -1031,7 +1076,7 @@ a resumed run costs the requests but not the duplicates. Any sink can support th
 ### 8.1 Events and the trace
 
 Everything the engine does is an event: `recipe:start` / `recipe:finish`, `page:visit` (with the HTTP status),
-`access:lease` / `access:blocked` / `access:rotate`, `captcha:detected` / `captcha:solve` / `captcha:solved` /
+`access:lease` / `access:blocked` / `access:rotate`, `request:retry`, `captcha:detected` / `captcha:solve` / `captcha:solved` /
 `captcha:failed` / `captcha:budget`, `step:start` /
 `step:finish` / `step:retry` / `step:skip` (with the step type, its id and its path such as
 `steps.8.steps.2`), `step:branch`, `record:emit` / `record:reject` / `record:duplicate` / `record:skipped`,
