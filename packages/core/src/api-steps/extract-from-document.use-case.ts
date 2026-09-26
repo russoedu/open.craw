@@ -6,15 +6,16 @@ import { fillDown, findGridTables, htmlTableSheets, isWorkbookDocument, workbook
 import type { ExtractStep } from '../recipe-schema'
 import { parseJsonText, selectHtml, selectJson, selectRegex, takeFromHtml, takeFromJson, tryParseJson } from '../selection'
 import { hasPlaceholder, renderText } from '../template'
+import { htmlAsXml, isXmlDocument, parseXml, selectXpath, takeFromXml } from '../xml-document'
 import { NoMatchError } from '../step-flow'
 
 /**
  * Runs an `extract` step against a static document: the value bound under
- * `from`, else the scope's current document. `css` reads HTML, `jsonpath`
- * reads JSON (or a read PDF, workbook or deck as data), `table` reads the
- * tables of a PDF, a workbook (a spreadsheet, a CSV), a deck (a presentation)
- * or HTML (its `<table>`s), `regex` reads any document as text; `xpath` needs
- * a live page and is refused here.
+ * `from`, else the scope's current document. `css` reads HTML (or XML),
+ * `xpath` reads XML (a feed, a sitemap) or HTML parsed as a browser parses
+ * it, `jsonpath` reads JSON (or a read PDF, workbook or deck as data), `table`
+ * reads the tables of a PDF, a workbook (a spreadsheet, a CSV), a deck (a
+ * presentation) or HTML (its `<table>`s), `regex` reads any document as text.
  *
  * A `jsonpath` extract whose `from` is text parses that text as JSON, and a
  * list of texts (every `<script type="application/ld+json">` of a page) becomes
@@ -32,6 +33,7 @@ export function extractFromDocument (step: ExtractStep, scope: ExtractionScope):
   let values: unknown[]
   switch (step.kind) {
     case 'jsonpath': {
+      if (document.kind === 'xml') throw new Error('jsonpath needs a JSON document; the current document is xml (read it with kind "xpath")')
       if (document.kind === 'html' || document.kind === 'text') throw new Error(`jsonpath needs a JSON document; the current document is ${document.kind}`)
       values = selectJson(document.kind === 'json' ? document.data : document, selector).map(node => takeFromJson(node, take))
 
@@ -43,8 +45,18 @@ export function extractFromDocument (step: ExtractStep, scope: ExtractionScope):
       break
     }
     case 'css': {
+      if (document.kind === 'xml') {
+        values = selectHtml(document.xml, selector, true).map(match => takeFromHtml(match, take))
+
+        break
+      }
       if (document.kind !== 'html') throw new Error(`css needs an HTML document; the current document is ${document.kind}${['workbook', 'pdf', 'deck'].includes(document.kind) ? ' (read it with kind "table", "regex" or "jsonpath")' : ''}`)
       values = selectHtml(document.html, selector).map(match => takeFromHtml(match, take))
+
+      break
+    }
+    case 'xpath': {
+      values = selectXpath(xpathDocument(document), selector, { namespaces: step.namespaces, ignoreNamespaces: step.ignoreNamespaces }).map(node => takeFromXml(node, take))
 
       break
     }
@@ -54,7 +66,7 @@ export function extractFromDocument (step: ExtractStep, scope: ExtractionScope):
       break
     }
     default: {
-      throw new Error('xpath works on a live page only; use css on fetched HTML')
+      throw new Error(`unknown extract kind ${String(step.kind)}`)
     }
   }
   if (step.many === true) {
@@ -145,9 +157,29 @@ function patternOf (source: string, where: string): RegExp {
   }
 }
 
+/** What an xpath extract queries: XML as it is, HTML parsed the way a browser would. */
+function xpathDocument (document: ScopeDocument): Document {
+  if (document.kind === 'xml') return parseXml(document.xml, 'the document')
+  if (document.kind === 'html') return htmlAsXml(document.html)
+  if (document.kind === 'text') return parseXml(document.text, 'the document')
+  throw new Error(`xpath reads XML or HTML; the current document is ${document.kind} (read it with kind ${document.kind === 'json' ? '"jsonpath"' : '"table", "regex" or "jsonpath"'})`)
+}
+
+/** Markup bound to an id: XML when it is well-formed (a feed entry taken with `take: "json"`), else HTML. */
+function markupDocument (markup: string): ScopeDocument {
+  try {
+    parseXml(markup, 'markup')
+
+    return { kind: 'xml', xml: markup }
+  } catch {
+    return { kind: 'html', html: markup }
+  }
+}
+
 /** The text a regex extract reads: markup, text, a PDF's or a workbook's rows, or JSON re-serialised (a list of texts joined by newlines). */
 function textOf (document: ScopeDocument): string {
   if (document.kind === 'html') return document.html
+  if (document.kind === 'xml') return document.xml
   if (document.kind === 'text') return document.text
   if (document.kind === 'pdf') return pdfText(document)
   if (document.kind === 'workbook') return workbookText(document)
@@ -166,7 +198,12 @@ function documentFor (step: ExtractStep, scope: ExtractionScope): ScopeDocument 
   }
   const source = scope.get(step.from)
   if (source === undefined) throw new Error(`"${step.from}" is not bound`)
-  if (isPdfDocument(source) || isWorkbookDocument(source) || isDeckDocument(source)) return source
+  if (isPdfDocument(source) || isWorkbookDocument(source) || isDeckDocument(source) || isXmlDocument(source)) return source
+  if (step.kind === 'xpath') {
+    if (typeof source !== 'string') throw new Error(`"${step.from}" is not markup; xpath reads XML or HTML text`)
+
+    return markupDocument(source)
+  }
   if (step.kind === 'table') throw new Error(`"${step.from}" is not a PDF, a workbook or a deck; request it with "as": "pdf", "csv", "xlsx" or "pptx"`)
   if (step.kind === 'regex') {
     if (typeof source === 'string') return { kind: 'text', text: source }

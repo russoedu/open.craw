@@ -16,10 +16,10 @@ const FRONT_MATTER = /<script type="application\/json" data-front-matter>([\s\S]
 
 /**
  * Summarises an HTML document for a `table` extract, and, when it is rendered
- * Markdown, its outline and front matter.
+ * Markdown or a Word document, its outline (and Markdown's front matter).
  *
  * @param html - The document.
- * @param markdown - Whether it was rendered from Markdown.
+ * @param markdown - Whether it was rendered from Markdown or Word, and so has sections.
  * @returns The findings.
  */
 export function describeHtml (html: string, markdown: boolean): HtmlFindings {

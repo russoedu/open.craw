@@ -19,6 +19,17 @@ export type Command =
   { name: 'version' } |
   { name: 'validate', paths: string[] } |
   {
+    name:     'diff'
+    previous: string
+    current:  string
+    /** The fields that identify a record; empty uses each line's `_key`. */
+    key:      string[]
+    /** Fields left out of the comparison. */
+    ignore:   string[]
+    /** Where to write the changes as JSON Lines. */
+    changes?: string
+  } |
+  {
     name:      'run'
     paths:     string[]
     /** A JSON Lines file; records go to stdout without it. */
@@ -31,6 +42,10 @@ export type Command =
     /** Run only the input recipes with these ids. */
     only:      string[]
     headed:    boolean
+    /** A previous run's JSON Lines file to compare this run's records with. */
+    diff?:     string
+    /** Where to write the changes `diff` finds, as JSON Lines. */
+    changes?:  string
     /** How many input recipes run at once. */
     parallel?: number
     /** Tries per request for recipes whose `limits.retry` says nothing (1 turns retrying off). */

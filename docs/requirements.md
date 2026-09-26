@@ -95,6 +95,14 @@ over the default of 3 tries, 1 s doubling with ±25 % jitter, capped at 30 s, st
 `request` and `next.url`; each retry is a `request:retry` event. After the last try the outcome goes on as
 before: block detection, then the step's `onError`.
 
+**Change detection.** `diffRecords(previous, current, { key?, ignore?, shrink? })` compares two runs' records
+by key (the key fields' values, the `recordKey` formula, or each line's `_key`): `added`, `removed`, `changed`
+with dotted per-field `before`/`after` (objects compared by value, arrays whole), `unchanged`, `repeated` keys,
+and `shrunk` when the current run holds under `1 - shrink` (default half) of the previous records.
+`diffOptionsFor(output)` gives the output recipe's key fields and its `generated: now`/`uuid` fields to ignore;
+`readRecordsFile` reads a JSON Lines file. CLI: `opencraw diff`, `run --diff <previous> [--changes <file>]`
+(the previous file is read before the crawl; refused with `--resume`). MCP: the `diff` tool.
+
 **Browser profiles.** `session.browserProfile: name` runs web recipes and bootstraps in a persistent browser
 profile (`launchPersistentContext` on `<profilesDir>/<name>`; `CrawlOptions.profilesDir`, CLI `--profiles`,
 env `OPENCRAW_PROFILES`, default `.opencraw/profiles`). Api recipes start from the profile's storage state.
@@ -131,7 +139,7 @@ optional `when` template that must render truthy for the step to run.
 | `evaluate` | web | value | `script`, JavaScript run in the page. Trusted recipes only. |
 | `screenshot` | web | – | `path` |
 | `captcha` | web | – | `solver?`, `selector?`, `verify?`, `attempts?`, `timeoutMs?`; defaults from `session.captcha` |
-| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'jsonl' \| 'html' \| 'text' \| 'pdf' \| 'csv' \| 'xlsx' \| 'pptx' \| 'yaml' \| 'markdown'`, `encoding?`, `delimiter?` (CSV), `scalars?` (YAML) |
+| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'jsonl' \| 'html' \| 'text' \| 'pdf' \| 'csv' \| 'xlsx' \| 'pptx' \| 'yaml' \| 'markdown' \| 'xml' \| 'docx'`, `encoding?`, `delimiter?` (CSV), `scalars?` (YAML) |
 | `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex' \| 'table'`, `take`, `many?`, `from?`; `table` also `columns?`, `until?`, `align?` (PDF), `fillDown?`, `sheet?`, `headerRows?`, `includeHidden?` (workbook), `slide?`, `shapes?` (deck) |
 | `set` | both | value | `value` (template or literal) |
 | `collect` | both | – | `into` (a list id bound in an enclosing scope), `value` (template or literal); appends, so values outlive the `forEach` iteration or `paginate` page that found them |
@@ -188,8 +196,15 @@ data-front-matter>` in the head, raw HTML kept (parsed, never run). `table` read
 `<table>`s (fetched, rendered Markdown, or the live page in web mode) as grids — rows in order, `th`/`td`
 alike, `colspan`/`rowspan` as merged ranges, nested tables on their own — through the grid table reader.
 
-`take` is `text` (default), `html`, `value`, `json` or `attr:<name>`. `xpath` works on live pages only; on
-fetched HTML use `css`; on JSON use `jsonpath`. A `jsonpath` extract whose `from` is text parses it as JSON; a list of
+`take` is `text` (default), `html`, `value`, `json` or `attr:<name>`. `xpath` (XPath 1.0, `xpath` +
+`@xmldom/xmldom`) reads live pages, fetched XML and fetched HTML (parsed with the HTML5 parser, then queried
+without namespaces); on XML `namespaces` maps prefixes to URIs (the root's declared prefixes are known) and
+`ignoreNamespaces` drops them. XML (`as: 'xml'`, `*/xml`, `*+xml`, `.xml`, `.rss`, `.atom`, gzipped `.xml.gz`)
+is parsed strictly; DOCTYPE entities are never expanded and nothing external is fetched. On JSON use `jsonpath`.
+Word (`as: 'docx'`, a WordprocessingML type, `.docx`/`.docm`/`.dotx`) is read by `@opencraw/office-reader`'s
+`readDocx` and becomes an HTML document: headings sectioned like Markdown (`section[data-heading]`), nested
+lists, tables with `colspan`/`rowspan` from merged cells, links as anchors, `data-style` per paragraph, headers,
+footers and notes after the body. A `jsonpath` extract whose `from` is text parses it as JSON; a list of
 texts becomes the array of its parsable entries (the JSON-LD blocks of a page), and the path runs over that array.
 
 **Templates** are `{{ }}` placeholders resolved against the scope: a path (any id, the current `forEach`

@@ -109,6 +109,21 @@ call, for checking what already exists before writing a new recipe.
 
 Returns `{ outputs: [{ path, id }], inputs: [{ path, id, output, mode }], others: string[] }`.
 
+### `diff`
+
+Compares two runs' JSON Lines files by record key: what was added, what was removed, and which fields changed,
+before and after. For "what changed in this price list since last week" without re-reading it all.
+
+| Input | Meaning |
+|---|---|
+| `previous`, `current` | The two runs' files (a `run`'s `out`). |
+| `key?` | The fields that identify a record (the output recipe's key fields). Default: each line's `_key`, which a run with `append` writes. |
+| `ignore?` | Fields not compared, such as a `scrapedAt` the crawl stamps. |
+
+Returns `{ added, removed, changed, unchanged, shrunk?, summary, changes }`: `summary` is the report a person
+reads, `changes` the first 200 changes (`removed`, `changed` with `fields: [{ field, before, after }]`, `added`),
+and `shrunk` is set when the current run holds under half the records the previous one did.
+
 ## Building
 
 `nx build @opencraw/mcp`, `nx test @opencraw/mcp` (unit tests per tool), `nx run @opencraw/mcp:e2e`

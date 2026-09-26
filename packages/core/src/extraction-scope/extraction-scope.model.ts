@@ -8,6 +8,7 @@
  * default) is scope state too, bound in the innermost scope that navigated.
  */
 
+import type { XmlDocument } from '../xml-document'
 import type { DeckDocument } from '../deck-document'
 import type { PdfDocument } from '../pdf-document'
 import type { WorkbookDocument } from '../workbook-document'
@@ -18,6 +19,7 @@ export type ScopeDocument =
   | PdfDocument |
   WorkbookDocument |
   DeckDocument |
+  XmlDocument |
   { kind: 'json', data: unknown } |
   { kind: 'html', html: string } |
   { kind: 'text', text: string }

@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { AccessBroker, BrowserClient, HttpClient } from '@opencraw/core'
+import { AccessBroker, BrowserClient, HttpClient, parseXml } from '@opencraw/core'
 import type { AccessLease } from '@opencraw/core'
 import { resolveAccess } from '../access'
 import { loadPlugins } from '../hooks-module'
@@ -15,7 +15,9 @@ import { describeJson } from './json-findings.mapper'
 import type { JsonFindings } from './json-findings.mapper'
 import { describePdf } from './pdf-findings.mapper'
 import type { PdfFindings } from './pdf-findings.mapper'
-import { deckReport, jsonReport, pdfReport, probeReport, workbookReport } from './probe-report.mapper'
+import { deckReport, jsonReport, pdfReport, probeReport, workbookReport, xmlReport } from './probe-report.mapper'
+import { describeXml } from './xml-findings.mapper'
+import type { XmlFindings } from './xml-findings.mapper'
 import { describeWorkbook } from './workbook-findings.mapper'
 import type { WorkbookFindings } from './workbook-findings.mapper'
 
@@ -39,6 +41,8 @@ export interface ProbeResult {
   json?:     JsonFindings
   /** Present for HTML: its tables' headers; for rendered Markdown also its outline and front matter. */
   html?:     HtmlFindings
+  /** Present for XML: its namespaces, repeated elements and structure. */
+  xml?:      XmlFindings
 }
 
 /**
@@ -77,10 +81,11 @@ export async function probeUrl (url: string, options: { browser: boolean } & Com
     if (body.kind === 'workbook') return { url: response.url, status: response.status, findings: findData(''), observed: [], workbook: describeWorkbook(body) }
     if (body.kind === 'deck') return { url: response.url, status: response.status, findings: findData(''), observed: [], deck: describeDeck(body) }
     if (body.kind === 'json') return { url: response.url, status: response.status, findings: findData(''), observed: [], json: describeJson(body.data, response.format ?? 'json') }
+    if (body.kind === 'xml') return { url: response.url, status: response.status, findings: findData(''), observed: [], xml: describeXml(parseXml(body.xml, response.url)) }
     const text = body.kind === 'html' ? body.html : body.text
     const observed = options.browser && !target.startsWith('file:') ? await observeBrowserJson(url, options, lease) : []
 
-    const html = body.kind === 'html' ? { html: describeHtml(body.html, response.format === 'markdown') } : {}
+    const html = body.kind === 'html' ? { html: describeHtml(body.html, response.format === 'markdown' || response.format === 'docx') } : {}
 
     return { url: response.url, status: response.status, findings: findData(text), observed, ...html }
   } finally {
@@ -136,6 +141,7 @@ function reportOf (result: ProbeResult): string {
   if (result.workbook !== undefined) return workbookReport(result.url, result.workbook)
   if (result.deck !== undefined) return deckReport(result.url, result.deck)
   if (result.json !== undefined) return jsonReport(result.url, result.json)
+  if (result.xml !== undefined) return xmlReport(result.url, result.xml)
 
   return probeReport(result.url, result.status, result.findings, result.observed, result.html)
 }

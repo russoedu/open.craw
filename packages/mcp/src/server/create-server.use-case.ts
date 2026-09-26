@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { diffInputShape, diffTool } from '../diff-tool'
 import { listRecipesInputShape, listRecipesTool } from '../list-tool'
 import { probeInputShape, probeTool } from '../probe-tool'
 import { runInputShape, runTool } from '../run-tool'
@@ -8,7 +9,7 @@ const SERVER_INFO = { name: 'opencraw', version: '0.0.1' }
 
 /**
  * Builds the MCP server: one tool per crawl primitive (`probe`, `validate`,
- * `run`, `list_recipes`), each a thin wrapper over `@opencraw/core` and
+ * `run`, `list_recipes`, `diff`), each a thin wrapper over `@opencraw/core` and
  * `@opencraw/cli`'s structured helpers. No transport is attached; `main`
  * connects it over stdio.
  *
@@ -36,6 +37,12 @@ export function createServer (): McpServer {
     'list_recipes',
     { description: 'List the recipe files in a directory, split by kind, with their ids. Check before writing a new recipe, or to see what an existing output recipe covers.', inputSchema: listRecipesInputShape },
     args => listRecipesTool(args),
+  )
+
+  server.registerTool(
+    'diff',
+    { description: 'Compare two runs\' JSON Lines files by record key: what was added, removed, and changed (each field before and after). Use to report what changed in a source since the last crawl.', inputSchema: diffInputShape },
+    args => diffTool(args),
   )
 
   return server

@@ -11,6 +11,13 @@ export interface MarkdownRead {
   warnings:    string[]
 }
 
+/**
+ * `<` as the JSON escape `\u003c`, so a front matter value holding `</script>`
+ * cannot close its element. Built from char codes: a formatter would turn a
+ * literal escape back into `<`.
+ */
+const ESCAPED_LESS_THAN = String.fromCodePoint(92, 117, 48, 48, 51, 99)
+
 /** A leading `---` block of YAML. */
 const FRONT_MATTER = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/
 
@@ -40,13 +47,21 @@ export async function readMarkdown (text: string, source: string): Promise<Markd
   const { marked } = await import('marked')
   const rendered = marked.parse(body, { gfm: true, async: false })
   const sections = sectioned(rendered)
-  const head = front === undefined ? '' : `<script type="application/json" data-front-matter>${JSON.stringify(front.data ?? null).replaceAll('<', '<')}</script>`
+  const head = front === undefined ? '' : `<script type="application/json" data-front-matter>${JSON.stringify(front.data ?? null).replaceAll('<', () => ESCAPED_LESS_THAN)}</script>`
 
   return { html: `<!doctype html><html><head>${head}</head><body>${sections}</body></html>`, frontMatter: front?.data, warnings: front?.warnings ?? [] }
 }
 
-/** Wraps each heading and what follows it, up to the next heading of the same or a higher level, in a section. */
-function sectioned (html: string): string {
+/**
+ * Wraps each heading and what follows it, up to the next heading of the same
+ * or a higher level, in `<section data-heading="…" data-level="…">`, sections
+ * nesting; headings get slug ids. Rendered Markdown and Word documents both go
+ * through it, so one selector finds "the table under *Prezzi*" in either.
+ *
+ * @param html - Top-level HTML: headings among paragraphs, lists, tables.
+ * @returns The same content, sectioned.
+ */
+export function sectioned (html: string): string {
   const $ = load(html, null, false)
   const open: number[] = []
   const used = new Map<string, number>()

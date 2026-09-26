@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { join } from 'node:path'
+import { gzipSync } from 'node:zlib'
 import type { BrowserSessionConfig } from '../src/index'
 
 /**
@@ -36,6 +37,21 @@ models:
     name: Avenger
     price: 24950
 `
+
+/** An Atom feed: a default namespace, a second prefixed one, an escaped title and a CDATA one. */
+const FEED = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
+  <title>Incentivi</title>
+  <entry><title>Pandina &amp; Pandina Cross</title><link href="/product/11"/><media:thumbnail url="/img/11-1.jpg"/><updated>2026-06-01T09:00:00Z</updated></entry>
+  <entry><title><![CDATA[600e <La Prima>]]></title><link href="/product/12"/><updated>2026-06-02T09:00:00Z</updated></entry>
+</feed>`
+
+/** A sitemap of the product pages, served gzipped as sites serve `sitemap.xml.gz`. */
+function sitemap (): Buffer {
+  const urls = [11, 12, 21].map(id => `<url><loc>${FIXTURE_BASE}/product/${id}</loc></url>`).join('')
+
+  return gzipSync(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`)
+}
 
 const PAGES = 3
 const PER_PAGE = 2
@@ -225,6 +241,18 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
   }
   if (url.pathname.startsWith('/captcha/') && captchaRoute(incoming, outgoing, url, html)) return
   if (url.pathname === '/flaky') return flakyRoute(incoming, outgoing, url)
+  if (url.pathname === '/feed.xml') {
+    outgoing.writeHead(200, { 'content-type': 'application/atom+xml; charset=utf-8' })
+    outgoing.end(FEED)
+
+    return
+  }
+  if (url.pathname === '/sitemap.xml.gz') {
+    outgoing.writeHead(200, { 'content-type': 'application/x-gzip' })
+    outgoing.end(sitemap())
+
+    return
+  }
   if (url.pathname === '/slow') {
     // A listing of six pages that each take 300 ms: sequential costs ~1.8 s, three at a time ~0.6 s.
     return html(`<!doctype html><html lang="en"><body>${Array.from({ length: 6 }, (_, index) => `<a class="item" href="/slow/${index + 1}">${index + 1}</a>`).join('')}</body></html>`)
@@ -274,6 +302,12 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
   if (url.pathname === '/incentivi.pptx') {
     outgoing.writeHead(200, { 'content-type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation' })
     outgoing.end(readFileSync(join(__dirname, '..', '..', 'office-reader', 'src', 'presentation', 'fixtures', 'incentivi.pptx')))
+
+    return
+  }
+  if (url.pathname === '/circolare.docx') {
+    outgoing.writeHead(200, { 'content-type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+    outgoing.end(readFileSync(join(__dirname, '..', '..', 'office-reader', 'src', 'document', 'fixtures', 'incentivi.docx')))
 
     return
   }

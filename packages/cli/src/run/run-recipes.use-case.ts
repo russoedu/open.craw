@@ -1,5 +1,6 @@
-import { RecipeBindingError, RecipeSet, RecipeValidationError, createCrawler, jsonLinesSink, memorySink, traceLine } from '@opencraw/core'
-import type { CrawlEvent, ThrottleConfig } from '@opencraw/core'
+import { RecipeBindingError, RecipeSet, RecipeValidationError, createCrawler, diffOptionsFor, diffRecords, jsonLinesSink, memorySink, readRecordsFile, traceLine } from '@opencraw/core'
+import type { CrawlEvent, StoredRecord, ThrottleConfig } from '@opencraw/core'
+import { diffReport, writeChanges } from '../diff'
 import { resolveAccess } from '../access'
 import { loadPlugins } from '../hooks-module'
 import type { Command } from '../arguments'
@@ -34,9 +35,13 @@ export async function runRecipes (command: Extract<Command, { name: 'run' }>, te
 
   let access
   let plugins
+  let previous: StoredRecord[] | undefined
+  const emitted: StoredRecord[] = []
   try {
     access = await resolveAccess(command.options)
     plugins = command.options.plugins === undefined ? undefined : await loadPlugins(command.options.plugins)
+    // Read before the crawl: --diff may name the very file --out is about to overwrite.
+    previous = command.diff === undefined ? undefined : await readRecordsFile(command.diff)
   } catch (error) {
     terminal.err(error instanceof Error ? error.message : String(error))
 
@@ -60,7 +65,10 @@ export async function runRecipes (command: Extract<Command, { name: 'run' }>, te
       executablePath:    command.options.browserPath,
       ignoreHTTPSErrors: command.options.insecureTls,
     },
-    onEvent: (event) => onEvent(event, command, terminal),
+    onEvent: (event) => {
+      if (previous !== undefined && event.type === 'record:emit') emitted.push(event.data)
+      onEvent(event, command, terminal)
+    },
   })
   try {
     const inputs = command.dryRun ? set.inputs.map(input => ({ ...input, limits: { ...input.limits, maxRecords: 1 } })) : set.inputs
@@ -70,6 +78,12 @@ export async function runRecipes (command: Extract<Command, { name: 'run' }>, te
       terminal.err(`${recipe.recipeId}: ${recipe.emitted} emitted, ${recipe.rejected} rejected, ${recipe.duplicates} duplicates, ${recipe.skipped} skipped, ${recipe.stepsSkipped > 0 ? `${recipe.stepsSkipped} steps skipped (see --trace), ` : ''}${recipe.pages} pages, ${recipe.durationMs} ms${recipe.error === undefined ? '' : `, stopped: ${recipe.error}`}`)
     }
     if (!command.dryRun) terminal.err(`${report.records} records${report.sink.location === undefined ? '' : ` written to ${report.sink.location}`}`)
+    if (previous !== undefined) {
+      const diff = diffRecords(previous, emitted, diffOptionsFor(set.output))
+      terminal.err(`compared with ${command.diff ?? ''}:`)
+      for (const line of diffReport(diff)) terminal.err(`  ${line}`)
+      if (command.changes !== undefined) await writeChanges(command.changes, diff)
+    }
 
     return report.recipes.some(recipe => recipe.error !== undefined) ? 1 : 0
   } finally {

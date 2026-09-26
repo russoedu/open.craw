@@ -33,6 +33,26 @@ export function relationshipsOf (pkg: OoxmlPackage, part: string): Map<string, R
 }
 
 /**
+ * A part's hyperlinks: the external targets its relationships point at, by id.
+ *
+ * @param pkg - The package.
+ * @param part - The part (`word/document.xml`).
+ * @returns The URLs by relationship id.
+ */
+export function hyperlinksOf (pkg: OoxmlPackage, part: string): Map<string, string> {
+  const directory = part.includes('/') ? part.slice(0, part.lastIndexOf('/')) : ''
+  const file = part.slice(part.lastIndexOf('/') + 1)
+  const links = new Map<string, string>()
+  walkXml(pkg.text(`${directory === '' ? '' : `${directory}/`}_rels/${file}.rels`), {
+    open: (name, attributes) => {
+      if (name === 'Relationship' && attributes.TargetMode === 'External' && attributes.Id !== undefined && attributes.Target !== undefined) links.set(attributes.Id, attributes.Target)
+    },
+  })
+
+  return links
+}
+
+/**
  * The first relationship of a type.
  *
  * @param relationships - A part's relationships.

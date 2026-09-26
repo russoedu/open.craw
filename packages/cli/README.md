@@ -54,6 +54,33 @@ opencraw run recipes/ --out out/products.jsonl --trace
 opencraw run recipes/movie.output.json recipes/tmdb.input.json --dry-run
 ```
 
+### `diff`
+
+```sh
+opencraw diff last-week.jsonl today.jsonl --key model,trim --ignore scrapedAt
+opencraw run recipes/ --out today.jsonl --diff last-week.jsonl --changes changes.jsonl
+```
+
+Compares two runs' records **by key**, not line by line, so a reordered file is no change:
+
+```text
+1 added, 1 removed, 2 changed, 38 unchanged (41 records before, 41 now)
+- 600e · La Prima
+~ Avenger · Summit  price.amount: 24950 → 23950; inStock: true → false
+~ Pandina · Hybrid  title: "Pandina" → "Pandina Hybrid"
++ Grande Panda · Icon
+```
+
+- `diff <previous> <current>`: `--key` names the fields that identify a record (default: each line's `_key`,
+  which `--append` writes); `--ignore` leaves fields out; `--changes <file>` also writes every change as a
+  JSON line (`{ change, key, before?, after?, fields? }`).
+- `run --diff <previous>` compares the records this run emits with a previous file, taking the key and the
+  fields to ignore (`generated: now` / `uuid`) from the output recipe. The file is read before the crawl, so it
+  may be `--out` itself: `run … --out prices.jsonl --diff prices.jsonl` keeps one file and reports each change.
+  Not with `--resume`, which skips records.
+- A run that holds under half the records the previous one did gets a warning: when the source did not
+  shrink, the site changed and the recipe quietly stopped finding everything.
+
 ### `probe`
 
 Fetches a page and reports where its data lives: JSON-LD blocks, inline JSON objects, `.json` URLs
@@ -72,7 +99,10 @@ rows, and every row that looks like a table header, with the `selector` a `table
 also names the encoding and the delimiter it detected; for a presentation, its charts and the slides whose
 text boxes look like a table. JSON, JSON Lines and YAML show their structure instead, and every list of
 records with the `jsonpath` that walks it. An HTML page also lists its tables' header rows, and Markdown
-(a `.md` URL is read as Markdown even when served as `text/plain`) its sections and front matter keys.
+(a `.md` URL is read as Markdown even when served as `text/plain`) its sections and front matter keys. XML
+(a feed, a sitemap, an export) shows its namespaces with the `namespaces` line an `xpath` extract needs, the
+elements that repeat (its records), and its structure; a sitemap says how many pages it lists. A Word document
+(`.docx`) lists its sections and tables, like Markdown.
 
 ```sh
 opencraw probe https://example.com/price-list.pdf

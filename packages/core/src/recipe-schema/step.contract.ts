@@ -53,31 +53,35 @@ export interface RequestStep extends StepBaseFields {
   scalars?:   'typed' | 'text'
 }
 export interface ExtractStep extends StepBaseFields {
-  type:           'extract'
-  selector:       string
-  kind:           SelectorKind
-  take?:          TakeKind
-  many?:          boolean
+  type:              'extract'
+  selector:          string
+  kind:              SelectorKind
+  take?:             TakeKind
+  many?:             boolean
   /** Id of a document or fragment to read instead of the current document. */
-  from?:          string
+  from?:             string
   /** `table` only: output key -> a pattern (case-insensitive) for that column's header cell. */
-  columns?:       Record<string, string>
+  columns?:          Record<string, string>
   /** `table` only: a pattern (case-insensitive) for the row that ends a table. */
-  until?:         string
+  until?:            string
   /** `table` only: how a row's values sit against a cell wrapped over several lines (PDF); default `auto`. */
-  align?:         TableAlign
+  align?:            TableAlign
   /** `table` only: a pattern (case-insensitive) for the names of the sheets to read (workbook); default every sheet. */
-  sheet?:         string
+  sheet?:            string
   /** `table` only: how many rows the header spans (workbook); a column's key joins its header texts. Default 1. */
-  headerRows?:    number
+  headerRows?:       number
   /** `table` only: output keys whose empty cells take the value of the row above. */
-  fillDown?:      string[]
+  fillDown?:         string[]
   /** `table` only: read hidden sheets and rows (workbook) or hidden slides (deck) too. */
-  includeHidden?: boolean
+  includeHidden?:    boolean
   /** `table` only: a pattern (case-insensitive) for the titles of the slides to read (deck); default every slide. */
-  slide?:         string
+  slide?:            string
   /** `table` only: read text boxes laid out as a table instead of native tables (deck). */
-  shapes?:        boolean
+  shapes?:           boolean
+  /** `xpath` on XML only: prefix to namespace URI (`{ "atom": "http://www.w3.org/2005/Atom" }`). Prefixes the root declares are known already. */
+  namespaces?:       Record<string, string>
+  /** `xpath` on XML only: drop the document's namespaces, so `//entry/title` matches `<entry xmlns="…">`. */
+  ignoreNamespaces?: boolean
 }
 export interface SetStep extends StepBaseFields { type: 'set', value: unknown }
 /**
@@ -178,22 +182,29 @@ const requestStep = z.strictObject({
 const tableOnly = ['columns', 'until', 'align', 'sheet', 'headerRows', 'fillDown', 'includeHidden', 'slide', 'shapes'] as const
 const extractStep = z.strictObject({
   ...base,
-  type:          z.literal('extract'),
-  selector:      z.string().min(1),
-  kind:          z.enum(SELECTOR_KINDS),
-  take:          takeKindSchema.optional(),
-  many:          z.boolean().optional(),
-  from:          stepId.optional(),
-  columns:       stringMap.optional(),
-  until:         z.string().min(1).optional(),
-  align:         z.enum(TABLE_ALIGNS).optional(),
-  sheet:         z.string().min(1).optional(),
-  headerRows:    z.int().min(1).optional(),
-  fillDown:      z.array(z.string().min(1)).min(1).optional(),
-  includeHidden: z.boolean().optional(),
-  slide:         z.string().min(1).optional(),
-  shapes:        z.boolean().optional(),
+  type:             z.literal('extract'),
+  selector:         z.string().min(1),
+  kind:             z.enum(SELECTOR_KINDS),
+  take:             takeKindSchema.optional(),
+  many:             z.boolean().optional(),
+  from:             stepId.optional(),
+  columns:          stringMap.optional(),
+  until:            z.string().min(1).optional(),
+  align:            z.enum(TABLE_ALIGNS).optional(),
+  sheet:            z.string().min(1).optional(),
+  headerRows:       z.int().min(1).optional(),
+  fillDown:         z.array(z.string().min(1)).min(1).optional(),
+  includeHidden:    z.boolean().optional(),
+  slide:            z.string().min(1).optional(),
+  shapes:           z.boolean().optional(),
+  namespaces:       z.record(z.string().regex(/^[A-Z_][\w.-]*$/i, 'a namespace prefix such as atom'), z.string().min(1)).optional(),
+  ignoreNamespaces: z.boolean().optional(),
 }).check((context) => {
+  if (context.value.kind !== 'xpath') {
+    for (const key of ['namespaces', 'ignoreNamespaces'] as const) {
+      if (context.value[key] !== undefined) context.issues.push({ code: 'custom', input: context.value, path: [key], message: `"${key}" belongs to kind "xpath"` })
+    }
+  }
   if (context.value.kind === 'table') return
   for (const key of tableOnly) {
     if (context.value[key] !== undefined) context.issues.push({ code: 'custom', input: context.value, path: [key], message: `"${key}" belongs to kind "table"` })

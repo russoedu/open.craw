@@ -1,0 +1,5 @@
+export type { XmlDocument } from './xml-document.model'
+export { isXmlDocument } from './xml-document.model'
+export { parseXml, htmlAsXml, withoutNamespaces, serializeXml, gunzipIfNeeded } from './xml-parser.client'
+export { selectXpath, takeFromXml } from './xpath.algorithm'
+export type { XpathValue, XpathOptions } from './xpath.algorithm'

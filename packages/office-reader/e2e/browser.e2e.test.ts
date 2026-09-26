@@ -13,6 +13,7 @@ import { rollup } from 'rollup'
 const dist = join(__dirname, '..', 'dist')
 const fixture = readFileSync(join(__dirname, '..', 'src', 'spreadsheet', 'fixtures', 'incentivi.xlsx'))
 const deck = readFileSync(join(__dirname, '..', 'src', 'presentation', 'fixtures', 'incentivi.pptx'))
+const circular = readFileSync(join(__dirname, '..', 'src', 'document', 'fixtures', 'incentivi.docx'))
 
 let browser: Browser
 beforeAll(async () => {
@@ -71,6 +72,27 @@ describe('office-reader in a browser', () => {
         return read.slides.map(slide => [slide.title, slide.charts.length])
       }, deck.toString('base64'))
       expect(slides).toEqual([['Incentivi giugno', 0], ['Griglia prezzi Jeep', 0], ['Vendite', 1], ['Bozza', 0]])
+    } finally {
+      await page.close()
+    }
+  })
+
+  it('bundles the Word reader the same way and reads a document from a Blob', async () => {
+    const code = await bundle('docx.esm.js')
+    expect(code).not.toMatch(/^import[^;]*from\s*['"]node:/m)
+    const page = await browser.newPage()
+    try {
+      await page.setContent('<!doctype html><title>office-reader</title>')
+      await page.addScriptTag({ type: 'module', content: `${code}\nwindow.officeReader = { readDocx }` })
+      await page.waitForFunction('window.officeReader !== undefined')
+      const read = await page.evaluate(async (base64) => {
+        const bytes = Uint8Array.from(atob(base64), char => char.codePointAt(0) ?? 0)
+        const reader = (globalThis as unknown as { officeReader: { readDocx: (source: Blob) => Promise<{ title?: string, body: { kind: string, heading?: number, text?: string }[] }> } }).officeReader
+        const document = await reader.readDocx(new Blob([bytes]))
+
+        return [document.title, document.body.filter(block => block.heading !== undefined).map(block => block.text), document.body.filter(block => block.kind === 'table').length]
+      }, circular.toString('base64'))
+      expect(read).toEqual(['Circolare giugno', ['Circolare incentivi giugno 2026', 'Condizioni', 'Prezzi'], 1])
     } finally {
       await page.close()
     }

@@ -4,7 +4,9 @@ Reads Office files into plain objects:
 
 - **workbooks** (`.xlsx`, `.xlsm`) as sheets of cells, with their merged ranges and hidden rows;
 - **presentations** (`.pptx`, `.pptm`, `.ppsx`) as slides of positioned text boxes, tables, chart data and
-  speaker notes.
+  speaker notes;
+- **documents** (`.docx`, `.docm`, `.dotx`) as paragraphs with their heading and list levels and links, tables
+  with their merged cells, headers, footers and notes.
 
 - **What the file holds, faithfully.** Formulas give their cached value, and nothing is evaluated. Dates are
   dates, in both the 1900 and 1904 systems. Merged ranges and hidden rows and sheets are reported, not
@@ -110,10 +112,10 @@ says what to do:
 
 | `code` | The file is |
 |---|---|
-| `legacy-format` | a legacy binary `.xls`, `.ppt` or `.doc`: save it as `.xlsx` / `.pptx`, or export it as PDF |
+| `legacy-format` | a legacy binary `.xls`, `.ppt` or `.doc`: save it as `.xlsx` / `.pptx` / `.docx`, or export it as PDF |
 | `encrypted` | password-protected |
-| `unsupported-format` | an OpenDocument `.ods` / `.odp` |
-| `not-xlsx` / `not-pptx` | a zip package of the other kind (a `.pptx` given to `readXlsx`, say) |
+| `unsupported-format` | an OpenDocument `.ods` / `.odp` / `.odt` |
+| `not-xlsx` / `not-pptx` / `not-docx` | a zip package of another kind (a `.pptx` given to `readXlsx`, say) |
 | `not-zip` | not a zip at all |
 | `too-large` | past the `limits` |
 | `malformed` | damaged: a part does not inflate |
@@ -171,6 +173,50 @@ Tested against the 100 presentations of Apache POI's test corpus. It reads 90 of
 28 charts), and every placeholder gets a position. The other 10 are fuzzer cases and a truncated zip, all
 refused with an `OfficeReadError`.
 
+## Read a Word document
+
+```ts
+import { readDocx } from '@opencraw/office-reader/docx'
+
+const document = await readDocx('./circolare.docx')
+```
+
+```ts
+// { title: 'Circolare giugno',
+//   body: [
+//     { kind: 'paragraph', text: 'Circolare incentivi giugno 2026', style: 'Title', heading: 1 },
+//     { kind: 'paragraph', text: 'Condizioni', style: 'Heading1', heading: 1 },
+//     { kind: 'paragraph', text: 'Solo rottamazione', style: 'ListBullet', list: { level: 0, ordered: false } },
+//     { kind: 'paragraph', text: 'Prezzi', style: 'Titolo2', heading: 2 },
+//     { kind: 'table', name: 'table 1', hidden: false, hiddenRows: [],
+//       rows: [['Modello', 'Prezzo', '', 'Sconto'], ['', 'Listino', 'Netto', ''], ['Pandina', '15.950', '13.955', '12,5%'], …],
+//       merges: ['B1:C1', 'A1:A2', 'D1:D2'] },
+//     { kind: 'paragraph', text: 'Listino completo: listino giugno', links: [{ text: 'listino giugno', href: 'https://…/listino.pdf' }] },
+//     … ],
+//   headers: [[{ kind: 'paragraph', text: 'Stellantis Italia – riservato' }]],
+//   footers: [[…]],
+//   notes: [{ kind: 'footnote', id: '1', text: 'Prezzi chiavi in mano, IPT esclusa.' }] }
+```
+
+`readDocx(source, options?)` takes the same sources as `readXlsx`. Options: `extras` (default `true`; `false`
+skips headers, footers and notes) and `limits`.
+
+- **Headings:** a paragraph whose style is named `heading N` (the built-in names stay English in every
+  language: an Italian `Titolo2` is still named `heading 2`), has an outline level (its own or its style's,
+  through `basedOn`), or is `Title` (level 1).
+- **Lists:** numbering from the paragraph or its style (`List Bullet`); `ordered` says whether the level is
+  numbered (`1.`, `a)`, `i.`) or bulleted.
+- **Tables:** grids like a workbook's sheets. A cell spanning columns (`gridSpan`) fills the columns after it
+  with `''`; a cell merged down (`vMerge`) leaves `''` below it; both are listed in `merges`. A table inside a
+  cell is a block of its own, and its text is in the cell too.
+- **Text:** tabs as `\t`, line breaks as `\n`. Tracked insertions read as text, deletions do not. Field codes
+  are left out, their results kept. A text box's paragraphs follow the paragraph that holds it, once (Word
+  also writes a fallback copy for old readers, which is skipped).
+- **Links:** external links by URL, internal ones as `#bookmark`.
+
+Tested against the 130 documents of Apache POI's test corpus. It reads 115 of them (1,500 paragraphs, 5,115
+tables, 352 links) and refuses the other 15, fuzzer cases and truncated zips, with an `OfficeReadError`.
+
 ## How it compares
 
 | | office-reader | SheetJS (`xlsx` on npm) | ExcelJS | read-excel-file |
@@ -196,6 +242,7 @@ Tested against the 367 workbooks of Apache POI's test corpus, real files and fuz
 
 - **Writing files.**
 - **Evaluating formulas, and applying display formats.** A percentage stays `0.125` and a price stays `15950`.
-- **Legacy `.xls`, `.ppt`, `.xlsb` and OpenDocument `.ods` / `.odp`.** These are refused with a code.
+- **Legacy `.xls`, `.ppt`, `.doc`, `.xlsb` and OpenDocument `.ods` / `.odp` / `.odt`.** These are refused with a code.
 - **In workbooks:** charts, pivot tables, images, comments and data validation.
 - **In presentations:** SmartArt text, text inside images (no OCR), animations and themes.
+- **In documents:** comments, formatting (bold, colours, fonts), images, equations, and the text of charts.

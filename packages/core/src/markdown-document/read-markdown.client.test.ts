@@ -42,4 +42,11 @@ describe('readMarkdown', () => {
     expect(html).toContain('<section data-heading="Hi" data-level="1"><h1 id="hi">Hi</h1>')
     await expect(readMarkdown('---\na: [1\n---\n# x', 'bad.md')).rejects.toThrow(/bad\.md front matter: not YAML/)
   })
+
+  it('keeps a front matter value holding </script> inside the script, as data', async () => {
+    const { html } = await readMarkdown('---\ntitle: "a </script><p id=injected>b"\n---\n# H', 'x.md')
+    const $ = load(html)
+    expect(JSON.parse($('script[data-front-matter]').text())).toEqual({ title: 'a </script><p id=injected>b' })
+    expect($('#injected')).toHaveLength(0)
+  })
 })
