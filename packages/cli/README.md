@@ -54,6 +54,33 @@ opencraw run recipes/ --out out/products.jsonl --trace
 opencraw run recipes/movie.output.json recipes/tmdb.input.json --dry-run
 ```
 
+### `diff`
+
+```sh
+opencraw diff last-week.jsonl today.jsonl --key model,trim --ignore scrapedAt
+opencraw run recipes/ --out today.jsonl --diff last-week.jsonl --changes changes.jsonl
+```
+
+Compares two runs' records **by key**, not line by line, so a reordered file is no change:
+
+```text
+1 added, 1 removed, 2 changed, 38 unchanged (41 records before, 41 now)
+- 600e · La Prima
+~ Avenger · Summit  price.amount: 24950 → 23950; inStock: true → false
+~ Pandina · Hybrid  title: "Pandina" → "Pandina Hybrid"
++ Grande Panda · Icon
+```
+
+- `diff <previous> <current>`: `--key` names the fields that identify a record (default: each line's `_key`,
+  which `--append` writes); `--ignore` leaves fields out; `--changes <file>` also writes every change as a
+  JSON line (`{ change, key, before?, after?, fields? }`).
+- `run --diff <previous>` compares the records this run emits with a previous file, taking the key and the
+  fields to ignore (`generated: now` / `uuid`) from the output recipe. The file is read before the crawl, so it
+  may be `--out` itself: `run … --out prices.jsonl --diff prices.jsonl` keeps one file and reports each change.
+  Not with `--resume`, which skips records.
+- A run that holds under half the records the previous one did gets a warning: when the source did not
+  shrink, the site changed and the recipe quietly stopped finding everything.
+
 ### `probe`
 
 Fetches a page and reports where its data lives: JSON-LD blocks, inline JSON objects, `.json` URLs

@@ -32,5 +32,7 @@ export type { WorkbookDocument, WorkbookCell, Sheet, CsvFormat, GridTable, GridT
 export { StepFailure, HostThrottle, DEFAULT_RETRY_RULE } from './step-flow'
 export type { ThrottleConfig, HostRule } from './step-flow'
 export { TransformError } from './transformation'
+export { diffRecords, diffOptionsFor, readableKey, readRecordsFile } from './record-diff'
+export type { RecordDiff, RecordChange, FieldChange, DiffOptions, StoredRecord } from './record-diff'
 export { CaptchaError, DEFAULT_CAPTCHA_SELECTOR, detectChallenge } from './captcha'
 export type { CaptchaSolver, CaptchaChallenge, CaptchaContext, CaptchaOutcome, CaptchaKind, CaptchaLog } from './captcha'

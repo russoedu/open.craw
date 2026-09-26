@@ -18,6 +18,8 @@ describe('parseArguments', () => {
       profiles: undefined,
       retries:  undefined,
       parallel: undefined,
+      diff:     undefined,
+      changes:  undefined,
       throttle: { delayMs: undefined, concurrency: undefined },
       options:  { browserPath: undefined, insecureTls: true, userAgent: undefined, access: undefined, accessProfile: undefined, plugins: undefined },
     })
@@ -36,6 +38,8 @@ describe('parseArguments', () => {
     expect(parseArguments(['run', 'r/'], { OPENCRAW_PROFILES: '/p' })).toMatchObject({ profiles: '/p' })
     expect(parseArguments(['run', 'r/', '--retries', '1'])).toMatchObject({ retries: 1 })
     expect(parseArguments(['run', 'r/', '--parallel', '4'])).toMatchObject({ parallel: 4 })
+    expect(parseArguments(['run', 'r/', '--diff', 'last.jsonl', '--changes', 'c.jsonl'])).toMatchObject({ diff: 'last.jsonl', changes: 'c.jsonl' })
+    expect(parseArguments(['diff', 'a.jsonl', 'b.jsonl', '--key', 'model, trim', '--ignore', 'scrapedAt'])).toEqual({ name: 'diff', previous: 'a.jsonl', current: 'b.jsonl', key: ['model', 'trim'], ignore: ['scrapedAt'], changes: undefined })
     expect(parseArguments(['run', 'r/', '--profiles', 'here'], { OPENCRAW_PROFILES: '/p' })).toMatchObject({ profiles: 'here' })
   })
 
@@ -46,6 +50,9 @@ describe('parseArguments', () => {
     expect(() => parseArguments(['run', 'a', '--append'])).toThrow('need --out')
     expect(() => parseArguments(['probe'])).toThrow('exactly one URL')
     expect(() => parseArguments(['run', 'a', '--bogus'])).toThrow(/Unknown option/)
+    expect(() => parseArguments(['diff', 'a.jsonl'])).toThrow('diff needs two JSON Lines files')
+    expect(() => parseArguments(['run', 'a', '--diff', 'x', '--resume', '--append', '--out', 'o'])).toThrow('use one or the other')
+    expect(() => parseArguments(['run', 'a', '--changes', 'c'])).toThrow('--changes needs --diff')
     expect(() => parseArguments(['run', 'a', '--host-concurrency', '0'])).toThrow('--host-concurrency needs a whole number of at least 1, not "0"')
     expect(() => parseArguments(['run', 'a', '--host-delay', 'soon'])).toThrow('--host-delay needs a whole number')
   })

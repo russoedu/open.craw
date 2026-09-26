@@ -1129,7 +1129,25 @@ reported as `record:skipped`. The steps still run (the engine has to reach the r
 a resumed run costs the requests but not the duplicates. Any sink can support this by implementing `has(key)`;
 `memorySink` does. `resume` with a sink that cannot answer throws at `createCrawler`.
 
-### 8.1 Events and the trace
+### 8.1 Change detection
+
+A price list crawled every week answers "what is there", but the question is usually "what changed". Records
+have keys, so two runs compare **record by record**, like a spreadsheet's "compare versions" rather than a text
+diff: a reordered file is no change, and a changed price shows as that field, before and after.
+
+```sh
+opencraw run recipes/ --out prices.jsonl --diff prices.jsonl --changes changes.jsonl
+```
+
+reads the previous `prices.jsonl` before crawling, overwrites it, and reports `added` / `removed` / `changed`
+(nested fields dotted: `price.amount: 24950 → 23950`), ignoring the fields the engine stamps (`generated:
+now`, `uuid`). From code: `diffRecords(previous, current, diffOptionsFor(output))`; from the MCP server, the
+`diff` tool.
+
+It also watches the recipe: a run with under half the previous run's records is flagged. A site that changed
+its markup rarely makes a recipe fail; it makes it find less.
+
+### 8.2 Events and the trace
 
 Everything the engine does is an event: `recipe:start` / `recipe:finish`, `page:visit` (with the HTTP status),
 `access:lease` / `access:blocked` / `access:rotate`, `request:retry`, `captcha:detected` / `captcha:solve` / `captcha:solved` /

@@ -92,4 +92,30 @@ describe('opencraw cli', () => {
       stderr: expect.stringContaining('plugin "missing", which is not registered'),
     })
   }, 60000)
+
+  it('run --diff and diff: compare a run with the previous one, by key, field by field', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'cli-diff-'))
+    const out = join(directory, 'products.jsonl')
+    await run('node', [BIN, 'run', recipesDir, '--only', 'shop-api', '--out', out, '--hooks', hooksModule])
+    // Last week's file: one product missing, one priced differently, one since withdrawn.
+    const firstRun = await readFile(out, 'utf8')
+    const lines = firstRun.trim().split('\n').map(line => JSON.parse(line) as Record<string, unknown>)
+    const [first, second, ...rest] = lines
+    const previous = [{ ...second, title: 'Old name' }, ...rest, { ...rest[0], url: 'http://127.0.0.1:4546/product/99', title: 'Withdrawn' }]
+    const previousFile = join(directory, 'previous.jsonl')
+    await writeFile(previousFile, previous.map(line => JSON.stringify(line)).join('\n'))
+    const changes = join(directory, 'changes.jsonl')
+    const { stderr } = await run('node', [BIN, 'run', recipesDir, '--only', 'shop-api', '--out', out, '--hooks', hooksModule, '--diff', previousFile, '--changes', changes])
+    expect(stderr).toContain('1 added, 1 removed, 1 changed, 4 unchanged (6 records before, 6 now)')
+    expect(stderr).toContain(`+ ${String(first.url)}`)
+    expect(stderr).toContain('- http://127.0.0.1:4546/product/99')
+    expect(stderr).toContain(`~ ${String(second.url)}  title: "Old name" → "${String(second.title)}"`)
+    const changeLines = await readFile(changes, 'utf8')
+    const written = changeLines.trim().split('\n').map(line => (JSON.parse(line) as { change: string }).change)
+    expect(written).toEqual(['removed', 'changed', 'added'])
+    // The same comparison between two files, naming the key.
+    const { stdout } = await run('node', [BIN, 'diff', previousFile, out, '--key', 'url', '--ignore', 'scrapedAt'])
+    expect(stdout.split('\n', 1)[0]).toBe('1 added, 1 removed, 1 changed, 4 unchanged (6 records before, 6 now)')
+    await expect(run('node', [BIN, 'diff', previousFile, out])).rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('has no _key: name the fields that identify a record') })
+  }, 90000)
 })

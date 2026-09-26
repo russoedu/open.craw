@@ -95,6 +95,14 @@ over the default of 3 tries, 1 s doubling with ±25 % jitter, capped at 30 s, st
 `request` and `next.url`; each retry is a `request:retry` event. After the last try the outcome goes on as
 before: block detection, then the step's `onError`.
 
+**Change detection.** `diffRecords(previous, current, { key?, ignore?, shrink? })` compares two runs' records
+by key (the key fields' values, the `recordKey` formula, or each line's `_key`): `added`, `removed`, `changed`
+with dotted per-field `before`/`after` (objects compared by value, arrays whole), `unchanged`, `repeated` keys,
+and `shrunk` when the current run holds under `1 - shrink` (default half) of the previous records.
+`diffOptionsFor(output)` gives the output recipe's key fields and its `generated: now`/`uuid` fields to ignore;
+`readRecordsFile` reads a JSON Lines file. CLI: `opencraw diff`, `run --diff <previous> [--changes <file>]`
+(the previous file is read before the crawl; refused with `--resume`). MCP: the `diff` tool.
+
 **Browser profiles.** `session.browserProfile: name` runs web recipes and bootstraps in a persistent browser
 profile (`launchPersistentContext` on `<profilesDir>/<name>`; `CrawlOptions.profilesDir`, CLI `--profiles`,
 env `OPENCRAW_PROFILES`, default `.opencraw/profiles`). Api recipes start from the profile's storage state.

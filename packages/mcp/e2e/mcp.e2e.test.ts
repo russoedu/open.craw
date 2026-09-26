@@ -42,7 +42,7 @@ function oneLine (path: string): string {
 describe('opencraw mcp server', () => {
   it('lists the four crawl-primitive tools', async () => {
     const { tools } = await client.listTools()
-    expect(tools.map(tool => tool.name).sort((a, b) => a.localeCompare(b))).toEqual(['list_recipes', 'probe', 'run', 'validate'])
+    expect(tools.map(tool => tool.name).sort((a, b) => a.localeCompare(b))).toEqual(['diff', 'list_recipes', 'probe', 'run', 'validate'])
   })
 
   it('validate: accepts the reference recipes and reports the binding', async () => {
