@@ -220,15 +220,37 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 A plain `selector` is never rendered, so a recipe with `{{` in one is refused at load time: put that selector
 in `target`.
 
-### 3.2 Api steps (HTTP)
+### 3.2 Requests (HTTP)
+
+`request` runs in both modes. In `api` mode it goes through the recipe's request context. In `web` mode it goes
+through **the page's own session** (its cookies: a login, a consent, a solved captcha), the way a page's scripts
+call their JSON endpoints: a report whose table the page reads from an API is read the same way, with no
+`evaluate` and `fetch` code.
 
 | Step | Fields | Notes |
 |---|---|---|
-| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `jsonl`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`, `yaml`, `markdown`, `xml`, `docx`), `encoding?`, `delimiter?`, `scalars?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck, `application/yaml` YAML, `application/x-ndjson` JSON Lines, `text/markdown` Markdown, an XML type XML: §4.12, a Word type a document read as HTML: §4.13). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`, `.yaml`, `.yml`, `.jsonl`, `.ndjson`, `.md`, `.xml`, `.rss`, `.atom`, `.xml.gz`, `.docx`). 4xx/5xx fail the step. |
+| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?` or `form?`, `as?` (`json`, `jsonl`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`, `yaml`, `markdown`, `xml`, `docx`), `encoding?`, `delimiter?`, `scalars?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck, `application/yaml` YAML, `application/x-ndjson` JSON Lines, `text/markdown` Markdown, an XML type XML: §4.12, a Word type a document read as HTML: §4.13). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`, `.yaml`, `.yml`, `.jsonl`, `.ndjson`, `.md`, `.xml`, `.rss`, `.atom`, `.xml.gz`, `.docx`). 4xx/5xx fail the step. |
 
 Text bodies are decoded from, in order: a byte-order mark, `encoding` (any WHATWG label: `windows-1252`,
 `iso-8859-15`, `shift_jis`), the charset the server declares, UTF-8, and Windows-1252 for text that is not
 UTF-8 (the usual European export). `delimiter` (one character) overrides a CSV's detected delimiter (§4.7).
+
+**A body from a form** (web mode): `form: { selector, omit?, set? }` posts the page's form as the browser would
+(its `FormData`: every chosen option of a multi-select, no disabled field, no unticked box), url-encoded, without
+the `omit` fields, with each `set` field (a template) replacing or adding one. The form's values are sent as
+read, never rendered. A report endpoint paged with a cursor:
+
+```json
+{ "type": "paginate", "next": { "jsonpath": "$.next", "as": "cursor" }, "steps": [
+  { "type": "request", "url": "/report/rows", "method": "POST",
+    "form": { "selector": "#reportForm", "omit": ["captcha"], "set": { "pageSize": "25", "after": "{{ default(cursor, '') }}" } } },
+  { "type": "extract", "id": "rows", "selector": "$.rows[*]", "kind": "jsonpath", "take": "json", "many": true },
+  { "type": "forEach", "over": "rows", "as": "row", "emit": true, "steps": [] }
+] }
+```
+
+In web mode, a `jsonpath` extract reads the JSON the last `request` fetched (the live page is read by `css` and
+`xpath`), and `next.jsonpath` pages on it.
 
 `body` is templated **all the way down**: a string body is one template, and in an object or list body
 every string inside it is one, at any depth. A string that is exactly one placeholder keeps the value's type
@@ -315,8 +337,8 @@ Truthiness for `when`, `until`, `test` and the logical operators: `false`, `0`, 
 |---|---|---|
 | `{ "selector": "a.next" }` | web | Clicks it. If the body navigated away (a `forEach` visiting every item), the engine returns to the listing page first. No visible element within 2 s means no next page. |
 | `{ "url": "{{start.url}}?page={{page.number}}" }` | both | The rendered value is the next `page.url` (web mode navigates to it). Empty means no next page. |
-| `{ "jsonpath": "$.nextPage" }` | api | Evaluated on the current document; the value is the next URL, relative allowed. `null`, `false` or empty means no next page. |
-| `{ "jsonpath": "$.cursor", "as": "cursor" }` | api | The value is bound under `cursor` in the next page's scope and the body builds the URL itself (`?cursor={{cursor}}`); on page 1 it is unset. |
+| `{ "jsonpath": "$.nextPage" }` | api, web (on a `request`'s JSON) | Evaluated on the current document; the value is the next URL, relative allowed. `null`, `false` or empty means no next page. |
+| `{ "jsonpath": "$.cursor", "as": "cursor" }` | api, web (on a `request`'s JSON) | The value is bound under `cursor` in the next page's scope and the body builds the URL itself (`?cursor={{cursor}}`); on page 1 it is unset. |
 
 Pagination also stops when `until` renders truthy or at `maxPages`. `page.number` increments per page.
 

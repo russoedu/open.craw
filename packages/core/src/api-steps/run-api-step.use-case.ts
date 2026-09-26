@@ -9,6 +9,25 @@ import { renderText } from '../template'
 import { extractFromDocument } from './extract-from-document.use-case'
 import { sendRequest } from './send-request.use-case'
 
+/**
+ * The next page a `next.jsonpath` finds in the page body's last fetched JSON
+ * document: a URL to fetch, or (with `as`) a cursor the next body reads.
+ *
+ * @param next - The paginate rule.
+ * @param scope - The page scope, holding the document.
+ * @returns The next page, or `null` when the value is empty.
+ */
+export function nextFromDocument (next: { jsonpath: string, as?: string }, scope: ExtractionScope): NextPageResult {
+  const document = scope.document
+  if (document?.kind !== 'json') throw new Error('next.jsonpath needs a JSON document from a request in the page body')
+  const value = selectJson(document.data, next.jsonpath)[0]
+  if ([undefined, null, '', false].includes(value as null)) return null
+  if (next.as !== undefined) return { kind: 'value', name: next.as, value }
+  if (typeof value !== 'string') throw new Error(`next.jsonpath ${next.jsonpath} must yield a URL; got ${typeof value} (use "as" to bind a cursor instead)`)
+
+  return { kind: 'url', url: new URL(value, scope.pageState?.url).href }
+}
+
 /** Runs api-mode leaf steps against an HTTP sender. */
 export class ApiStepRunner implements StepRunner {
   constructor (
@@ -32,14 +51,8 @@ export class ApiStepRunner implements StepRunner {
 
       return url === '' ? null : { kind: 'url', url: new URL(url, current).href }
     }
-    const document = scope.document
-    if (document?.kind !== 'json') throw new Error('next.jsonpath needs a JSON document from a request in the page body')
-    const value = selectJson(document.data, next.jsonpath)[0]
-    if ([undefined, null, '', false].includes(value as null)) return null
-    if (next.as !== undefined) return { kind: 'value', name: next.as, value }
-    if (typeof value !== 'string') throw new Error(`next.jsonpath ${next.jsonpath} must yield a URL; got ${typeof value} (use "as" to bind a cursor instead)`)
 
-    return { kind: 'url', url: new URL(value, current).href }
+    return nextFromDocument(next, scope)
   }
 
   async dispose (): Promise<void> {

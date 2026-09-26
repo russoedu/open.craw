@@ -20,8 +20,8 @@ export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'] as
 
 /** Steps that only make sense with a live browser page. */
 export const WEB_ONLY_STEPS = ['goto', 'click', 'fill', 'press', 'select', 'scroll', 'wait', 'evaluate', 'screenshot', 'captcha'] as const
-/** Steps that only make sense against an HTTP request context. */
-export const API_ONLY_STEPS = ['request'] as const
+/** Steps that only make sense against an HTTP request context: none since web mode sends `request` through the page's session. */
+export const API_ONLY_STEPS = [] as const
 
 export type RecipeKind = typeof RECIPE_KINDS[number]
 export type CrawlMode = typeof CRAWL_MODES[number]

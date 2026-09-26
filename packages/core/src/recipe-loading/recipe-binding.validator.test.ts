@@ -55,14 +55,16 @@ describe('validateBinding', () => {
     ]))
   })
 
-  it('rejects browser steps in api mode outside the bootstrap, and api steps in web mode', () => {
+  it('rejects browser steps in api mode outside the bootstrap, and a form body in api mode; takes request in web mode', () => {
     const badApi: InputRecipe = { ...api, steps: [{ type: 'goto', url: 'x' }, ...api.steps] }
     expect(messages(badApi)[0]).toMatch(/steps\.0: "goto" needs a browser/)
-    const badWeb: InputRecipe = { ...web, steps: [{ type: 'request', url: 'x', id: 'r' }, ...web.steps] }
-    expect(messages(badWeb)[0]).toMatch(/steps\.0: "request" is an api step/)
+    const formInApi: InputRecipe = { ...api, steps: [{ type: 'request', url: 'x', id: 'r', form: { selector: 'form' } }, ...api.steps] }
+    expect(messages(formInApi)).toContain('steps.0.form: a form body is read from a live page: web mode only (or send the fields as "body")')
+    const webRequest: InputRecipe = { ...web, steps: [{ type: 'request', url: 'x', id: 'r', form: { selector: 'form' } }, ...web.steps] }
+    expect(messages(webRequest)).toEqual([])
   })
 
-  it('rejects next.selector in api mode and next.jsonpath in web mode', () => {
+  it('rejects next.selector in api mode', () => {
     const badApi: InputRecipe = { ...api, steps: [{ type: 'paginate', next: { selector: 'a' }, steps: api.steps[0].type === 'paginate' ? api.steps[0].steps : [] }] }
     expect(messages(badApi)).toContain('steps.0.next: next.selector needs a browser; use next.url or next.jsonpath in api mode')
   })

@@ -23,17 +23,21 @@ import type { RunGate } from '../step-flow'
  * @param recipe - The recipe: its limits, block rule and id.
  * @param gate - Spaces request starts by `delayMs`.
  * @param events - Where to report the visit.
+ * @param formBody - The url-encoded body a web runner read from the page's form (`step.form`).
  * @throws BlockedError when the response is a block, or a captcha page under `session.captcha`; HttpError for any other 4xx/5xx.
  */
-export async function sendRequest (step: RequestStep, scope: ExtractionScope, client: HttpSender, recipe: InputRecipe, gate: RunGate, events: EventBus): Promise<void> {
+export async function sendRequest (step: RequestStep, scope: ExtractionScope, client: HttpSender, recipe: InputRecipe, gate: RunGate, events: EventBus, formBody?: string): Promise<void> {
+  if (formBody === undefined && step.form !== undefined) throw new Error('a form body is read from a live page: this recipe runs in api mode')
   const lookup = (path: string): unknown => scope.lookup(path)
+  const headers = step.headers === undefined ? undefined : renderMap(step.headers, lookup)
   const url = resolveUrl(renderText(step.url, lookup), scope.pageState?.url)
   const request = {
     method:    step.method,
     url,
     query:     step.query === undefined ? undefined : renderMap(step.query, lookup),
-    headers:   step.headers === undefined ? undefined : renderMap(step.headers, lookup),
-    body:      renderDeep(step.body, lookup),
+    // A form body is sent as read from the page: its values are data, never templates.
+    headers:   formBody === undefined ? headers : { 'content-type': 'application/x-www-form-urlencoded;charset=UTF-8', ...headers },
+    body:      formBody ?? renderDeep(step.body, lookup),
     as:        step.as,
     encoding:  step.encoding,
     delimiter: step.delimiter,

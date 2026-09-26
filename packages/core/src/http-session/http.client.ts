@@ -46,10 +46,24 @@ export class HttpClient implements HttpSender {
       proxy:             options.proxy,
     })
 
-    return new HttpClient(context, options.timeoutMs)
+    return new HttpClient(context, options.timeoutMs, true)
   }
 
-  private constructor (private readonly context: APIRequestContext, private readonly timeoutMs: number | undefined) {}
+  /**
+   * A client over a request context someone else owns: a browser context's
+   * `request`, which shares the page's cookies, so a web recipe's `request`
+   * rides the session its page opened (a login, a solved captcha).
+   * Disposing this client leaves the context alone.
+   *
+   * @param context - The request context.
+   * @param timeoutMs - The default timeout.
+   * @returns The client.
+   */
+  static over (context: APIRequestContext, timeoutMs?: number): HttpClient {
+    return new HttpClient(context, timeoutMs, false)
+  }
+
+  private constructor (private readonly context: APIRequestContext, private readonly timeoutMs: number | undefined, private readonly owned: boolean) {}
 
   /**
    * Sends a request and parses the body.
@@ -79,8 +93,8 @@ export class HttpClient implements HttpSender {
     return this.context.storageState()
   }
 
-  dispose (): Promise<void> {
-    return this.context.dispose()
+  async dispose (): Promise<void> {
+    if (this.owned) await this.context.dispose()
   }
 }
 

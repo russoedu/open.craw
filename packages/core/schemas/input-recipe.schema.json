@@ -1367,6 +1367,35 @@
               }
             },
             "body": {},
+            "form": {
+              "type": "object",
+              "properties": {
+                "selector": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "omit": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "set": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "selector"
+              ],
+              "additionalProperties": false
+            },
             "as": {
               "type": "string",
               "enum": [

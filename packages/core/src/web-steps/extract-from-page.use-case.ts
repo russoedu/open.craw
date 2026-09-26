@@ -8,10 +8,12 @@ import { NoMatchError } from '../step-flow'
 /**
  * Runs an `extract` step on the live page (css or xpath through locators, one
  * round trip for all matches). With `from`, it reads a fragment bound earlier
- * instead, the same way api mode reads a fetched document.
+ * instead, and a `jsonpath` reads the JSON a `request` fetched, the same way
+ * api mode reads a fetched document.
  */
 export async function extractFromPage (step: ExtractStep, page: Page, scope: ExtractionScope): Promise<void> {
-  if (step.from !== undefined) {
+  // A bound fragment, or JSON a `request` fetched: read as api mode reads a document.
+  if (step.from !== undefined || step.kind === 'jsonpath') {
     extractFromDocument(step, scope)
 
     return

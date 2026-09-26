@@ -55,6 +55,17 @@ export interface WaitStep extends StepBaseFields { type: 'wait', selector?: stri
  */
 export interface EvaluateStep extends StepBaseFields { type: 'evaluate', script: string, args?: Record<string, unknown> }
 export interface ScreenshotStep extends StepBaseFields { type: 'screenshot', path: string }
+/**
+ * A request body taken from a form on the live page (web mode): its fields as
+ * the browser would post them, url-encoded, without `omit`, with `set` (each
+ * value a template) replacing or adding fields.
+ */
+export interface RequestForm {
+  selector: string
+  omit?:    string[]
+  set?:     Record<string, string>
+}
+
 export interface RequestStep extends StepBaseFields {
   type:       'request'
   method?:    HttpMethod
@@ -62,6 +73,8 @@ export interface RequestStep extends StepBaseFields {
   query?:     Record<string, string>
   headers?:   Record<string, string>
   body?:      unknown
+  /** The body from a form on the page (web mode); instead of `body`. */
+  form?:      RequestForm
   as?:        BodyKind
   /** The body's text encoding (a WHATWG label, `windows-1252`); default: the BOM, the declared charset, UTF-8, else Windows-1252. */
   encoding?:  string
@@ -204,6 +217,8 @@ const scrollStep = z.strictObject({ ...base, type: z.literal('scroll'), to: z.st
 const waitStep = z.strictObject({ ...base, type: z.literal('wait'), selector: plainSelector.optional(), ms: z.int().nonnegative().optional(), state: z.literal('networkidle').optional(), timeoutMs: z.int().min(1).optional() })
 const evaluateStep = z.strictObject({ ...base, type: z.literal('evaluate'), script: z.string().min(1), args: z.record(z.string(), z.unknown()).optional() })
 const screenshotStep = z.strictObject({ ...base, type: z.literal('screenshot'), path: z.string().min(1) })
+const formFields = z.array(z.string().min(1))
+const requestForm = z.strictObject({ selector: plainSelector, omit: formFields.optional(), set: stringMap.optional() })
 const requestStep = z.strictObject({
   ...base,
   type:      z.literal('request'),
@@ -212,11 +227,13 @@ const requestStep = z.strictObject({
   query:     stringMap.optional(),
   headers:   stringMap.optional(),
   body:      z.unknown().optional(),
+  form:      requestForm.optional(),
   as:        z.enum(BODY_KINDS).optional(),
   encoding:  z.string().min(1).optional(),
   delimiter: z.string().length(1).optional(),
   scalars:   z.enum(YAML_SCALARS).optional(),
 })
+  .refine(step => step.body === undefined || step.form === undefined, { message: 'give body or form, not both', path: ['form'] })
   .refine(step => step.delimiter === undefined || step.as === undefined || step.as === 'csv', { message: '"delimiter" reads CSV only: drop it or set "as": "csv"', path: ['delimiter'] })
   .refine(step => step.scalars === undefined || step.as === undefined || step.as === 'yaml', { message: '"scalars" reads YAML only: drop it or set "as": "yaml"', path: ['scalars'] })
 const tableOnly = ['columns', 'until', 'align', 'sheet', 'headerRows', 'fillDown', 'includeHidden', 'slide', 'shapes'] as const

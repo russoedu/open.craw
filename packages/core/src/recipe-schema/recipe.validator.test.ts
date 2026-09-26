@@ -167,6 +167,12 @@ describe('recipeKindOf', () => {
     expect(() => parseInputRecipe(recipe([{ ...form, submit: [{ type: 'goto', url: 'x' }] }]))).toThrow()
   })
 
+  it('takes a request body from a form, but not with a body as well', () => {
+    const request = { type: 'request', url: '/rows', method: 'POST', form: { selector: '#reportForm', omit: ['captcha'], set: { pageSize: '25' } } }
+    expect(parseInputRecipe(recipe([request])).steps[0]).toMatchObject({ form: { selector: '#reportForm', set: { pageSize: '25' } } })
+    expect(() => parseInputRecipe(recipe([{ ...request, body: { a: 1 } }]))).toThrow('give body or form, not both')
+  })
+
   it('takes a goto ready element, a wait timeout and evaluate args', () => {
     const parsed = parseInputRecipe(recipe([
       { type: 'goto', url: '{{start.url}}', ready: { selector: '#yAxis', timeoutMs: 20_000, reloads: 3 } },
