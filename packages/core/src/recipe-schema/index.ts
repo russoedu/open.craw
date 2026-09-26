@@ -5,7 +5,7 @@ export { stepSchema, errorPolicySchema, paginateNextSchema } from './step.contra
 export type {
   Step, StepType, StepBaseFields, TargetFields, ErrorPolicy, PaginateNext, TakeKind,
   GotoStep, GotoReady, ClickStep, FillStep, PressStep, SelectStep, ScrollStep, WaitStep, EvaluateStep, ScreenshotStep,
-  RequestStep, ExtractStep, SetStep, CollectStep, ForEachStep, IfStep, PaginateStep, EmitStep, HookStep, CaptchaStep, CaptchaCheck,
+  RequestStep, ExtractStep, SetStep, CollectStep, ForEachStep, IfStep, PaginateStep, EmitStep, HookStep, CaptchaStep, CaptchaCheck, CaptchaSubmitStep,
 } from './step.contract'
 export { transformRuleSchema, mappingRuleSchema } from './transform-rule.contract'
 export type { TransformRule, TransformOp, MappingRule, FromRule, EachRule } from './transform-rule.contract'

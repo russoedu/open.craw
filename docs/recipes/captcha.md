@@ -30,6 +30,7 @@ a solver:
 | After a navigation, click or key press | `session.captcha` | Looks for a visible widget after every `goto`, `click`, `press` and pagination click, and solves it before the next step. |
 | As the block page itself (a 403 with a challenge) | `session.onBlock: { solve: true }` | A block whose page shows a widget is solved instead of failing; with `rotate: true` too, rotation is the fallback. |
 | At one known point (a login form, an invisible reCAPTCHA v3) | a `captcha` step | Solves whatever challenge is on the page, v3 included; none is fine. |
+| In a form, checked only when the form is posted (an image code) | a `captcha` step with `image` | The solver fills the answer, the step's `submit` posts the form, the page says yes or no. [Below](#form-captchas-checked-when-the-form-is-posted). |
 
 ```json
 {
@@ -67,6 +68,47 @@ a solver:
 
 The report counts them: `captchas: { detected, solved, failed }`.
 
+## Form captchas: checked when the form is posted
+
+Some sites have no "check" for their captcha: it is a code drawn as an image, a text field, and the form's
+own button. Whether the code was right is only known once the form is posted and the page comes back, with
+the result or with "Invalid CAPTCHA." and a new image. The public Vahan registrations report works this way,
+and so does this step:
+
+```json
+{ "type": "captcha", "solver": "tesseract",
+  "image":   "#captchaImage",
+  "refresh": "#captchaImg",
+  "field":   "#externalCaptcha",
+  "submit":  [ { "type": "click", "selector": "#applyTrigger" } ],
+  "verify":  { "selector": "#makerDynamicReportHeader", "failure": "#captchaMsg", "timeoutMs": 30000 },
+  "attempts": 5 }
+```
+
+Put it after the steps that fill the form. Each attempt:
+
+1. **The solver does its part.** It gets the image (`challenge.selector`), the answer field (`challenge.field`)
+   and the refresh control (`challenge.refresh`). A reader reads the image, clicks refresh when it is unsure
+   (that costs nothing: no form is posted), and fills the field.
+2. **The engine runs `submit`**: the button, or the fills a form that empties itself after a wrong code needs
+   first. Clicks, fills, key presses, selects, waits and scripts; each may have a `when`.
+3. **The page answers.** `verify.selector` showing is a yes. `verify.failure` showing is a no, at once, not
+   after a timeout, even when the page already showed the message from the attempt before (the engine tells
+   the new page from the old one). The page keeps a captcha after a success (the next report needs a new
+   one), so `gone` is not asked.
+4. **The solver hears the verdict** (`verdict`, below), and the next attempt starts on the new image.
+
+A form captcha needs `verify.selector`. Every report costs one captcha: a crawl of many reports is many
+solves, and `maxSolves` caps them.
+
+### The manual solver
+
+`"solver": "manual"` is built in, for headed runs: a person types the code in the browser window and presses
+the button. The solver waits (10 minutes, or the step's `timeoutMs`) until the page navigates or the success
+element shows, and the engine checks the page as for any solver; the `submit` steps do not run, since the
+person submitted. Paired with a reader's audit, it collects what people typed and whether the site took it:
+the labelled images a reader is tuned on.
+
 ## Money
 
 Every attempt is paid, successful or not, and a detector that matches the wrong element would drain a balance.
@@ -89,9 +131,14 @@ export const mySolver: CaptchaSolver = {
 }
 ```
 
-- **Apply the answer yourself.** Put the token where the widget would (`g-recaptcha-response`,
-  `cf-turnstile-response`), then run the widget's `data-callback` or submit its form. The engine does not know
-  how each site consumes the token.
+- **Do your part, then return `solved`.** A reader fills `challenge.field`; a widget solver puts the token
+  where the widget would (`g-recaptcha-response`, `cf-turnstile-response`) and runs its `data-callback` or
+  submits its form. When the recipe has `submit` steps, the engine runs them after you; return
+  `{ status: 'solved', submitted: true }` when you submitted yourself (or a person did).
+- **`verdict(challenge, { status: 'solved' | 'rejected', reason? })`**, optional, tells you what the page said
+  after a `solved`: for an audit log, or to report a bad token to a service that refunds them.
+- **`close()`**, optional, runs when the crawler closes: let a worker or a connection go.
+- **`timeoutMs`**, optional, is your default time per solve when the recipe does not set one.
 - **Throw or return `failed`** with a reason: both count as a failed attempt, and the reason reaches the trace.
 - **Honour `signal`.** Stop polling your service when it aborts.
 - **Use `lease` when the service accepts a proxy**: tokens are often tied to the IP that asked for them.

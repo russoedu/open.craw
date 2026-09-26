@@ -159,6 +159,14 @@ describe('recipeKindOf', () => {
     expect(parseInputRecipe(recipe([{ type: 'click', target: '#item-{{id}}' }])).steps[0]).toMatchObject({ target: '#item-{{id}}' })
   })
 
+  it('takes a form captcha step, which needs the element that shows once accepted', () => {
+    const form = { type: 'captcha', solver: 'reader', image: '#captchaImage', refresh: '#captchaImg', field: '#externalCaptcha', submit: [{ type: 'click', selector: '#applyTrigger' }], verify: { selector: '#report', failure: '#captchaMsg', timeoutMs: 30_000 } }
+    expect(parseInputRecipe(recipe([form])).steps[0]).toMatchObject({ image: '#captchaImage', submit: [{ type: 'click' }] })
+    expect(() => parseInputRecipe(recipe([{ ...form, verify: { failure: '#captchaMsg' } }]))).toThrow('a form captcha (image or submit) needs verify.selector')
+    expect(() => parseInputRecipe(recipe([{ ...form, selector: '.g-recaptcha' }]))).toThrow('give image (a form captcha) or selector (a widget), not both')
+    expect(() => parseInputRecipe(recipe([{ ...form, submit: [{ type: 'goto', url: 'x' }] }]))).toThrow()
+  })
+
   it('takes a goto ready element, a wait timeout and evaluate args', () => {
     const parsed = parseInputRecipe(recipe([
       { type: 'goto', url: '{{start.url}}', ready: { selector: '#yAxis', timeoutMs: 20_000, reloads: 3 } },

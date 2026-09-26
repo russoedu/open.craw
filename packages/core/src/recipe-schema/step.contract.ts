@@ -121,11 +121,18 @@ export interface HookStep extends StepBaseFields { type: 'hook', name: string, a
  * word): the challenge is gone, and/or an element appears.
  */
 export interface CaptchaCheck {
-  /** The detected challenge must be off the page. Default `true`. */
-  gone?:     boolean
+  /** The detected challenge must be off the page. Default `true`; `false` for a form captcha (`image`), whose page keeps a captcha. */
+  gone?:      boolean
   /** An element that must appear once solved. */
-  selector?: string
+  selector?:  string
+  /** An element that shows when the answer was refused ("Invalid CAPTCHA"): the attempt fails at once instead of by timeout. */
+  failure?:   string
+  /** How long the page has to confirm, a submit's navigation included. Default 10000. */
+  timeoutMs?: number
 }
+
+/** The steps a form captcha's `submit` may hold: interactions on the page. */
+export type CaptchaSubmitStep = ClickStep | FillStep | PressStep | SelectStep | WaitStep | EvaluateStep
 
 /**
  * Solves the captcha on the live page, if there is one (none is not an error):
@@ -138,6 +145,18 @@ export interface CaptchaStep extends StepBaseFields {
   solver?:    string
   /** Where the challenge is (a Playwright selector); the common widgets when omitted. */
   selector?:  string
+  /**
+   * A form captcha: the image of the code. The step solves it when the image
+   * shows; the solver reads it and fills `field`; the engine runs `submit` and
+   * waits for `verify.selector` or `verify.failure`.
+   */
+  image?:     string
+  /** What gives a new image (handed to the solver). */
+  refresh?:   string
+  /** Where the answer goes (handed to the solver). */
+  field?:     string
+  /** What sends the answer, run after the solver on every attempt: a click on the form's button, or the fills a form that clears itself needs first. */
+  submit?:    CaptchaSubmitStep[]
   verify?:    CaptchaCheck
   attempts?:  number
   timeoutMs?: number
@@ -236,16 +255,29 @@ const collectStep = z.strictObject({ ...base, type: z.literal('collect'), into: 
 const emitStep = z.strictObject({ ...base, type: z.literal('emit'), output: z.string().optional() })
 const hookStep = z.strictObject({ ...base, type: z.literal('hook'), name: z.string().min(1), args: z.record(z.string(), z.unknown()).optional() })
 
-export const captchaCheckSchema: z.ZodType<CaptchaCheck> = z.strictObject({ gone: z.boolean().optional(), selector: z.string().min(1).optional() })
+export const captchaCheckSchema: z.ZodType<CaptchaCheck> = z.strictObject({
+  gone:      z.boolean().optional(),
+  selector:  plainSelector.optional(),
+  failure:   plainSelector.optional(),
+  timeoutMs: z.int().min(1000).optional(),
+})
+const captchaSubmitStep = z.union([clickStep, fillStep, pressStep, selectStep, waitStep, evaluateStep])
+const FORM_CAPTCHA = 'a form captcha (image or submit) needs verify.selector: the element that shows once the answer is accepted'
 const captchaStep = z.strictObject({
   ...base,
   type:      z.literal('captcha'),
   solver:    z.string().min(1).optional(),
-  selector:  z.string().min(1).optional(),
+  selector:  plainSelector.optional(),
+  image:     plainSelector.optional(),
+  refresh:   plainSelector.optional(),
+  field:     plainSelector.optional(),
+  submit:    z.array(captchaSubmitStep).min(1).optional(),
   verify:    captchaCheckSchema.optional(),
   attempts:  z.int().min(1).max(10).optional(),
   timeoutMs: z.int().min(1000).optional(),
 })
+  .refine(step => step.image === undefined || step.selector === undefined, 'give image (a form captcha) or selector (a widget), not both')
+  .refine(step => (step.image === undefined && step.submit === undefined) || step.verify?.selector !== undefined, FORM_CAPTCHA)
 
 const emitFlag = z.union([z.literal(true), z.strictObject({ output: z.string().min(1) })])
 

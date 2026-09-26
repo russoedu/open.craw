@@ -4,6 +4,7 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import type { BrowserSessionConfig } from '../src/index'
+import { formCaptchaRoute } from './form-captcha-site'
 
 /**
  * The shop the e2e recipes crawl. Three catalog pages of two products each,
@@ -248,6 +249,7 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
   }
   if (url.pathname.startsWith('/captcha/') && captchaRoute(incoming, outgoing, url, html)) return
   if (url.pathname === '/flaky') return flakyRoute(incoming, outgoing, url)
+  if (url.pathname.startsWith('/form-captcha') && formCaptchaRoute(incoming, outgoing, url)) return
   if (url.pathname === '/feed.xml') {
     outgoing.writeHead(200, { 'content-type': 'application/atom+xml; charset=utf-8' })
     outgoing.end(FEED)

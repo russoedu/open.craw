@@ -211,7 +211,7 @@ Every step has `type`, and may have:
 | `wait` | one of `selector`, `ms`, `state: "networkidle"`; `timeoutMs?` | `selector` waits for visibility. Put a `wait` after `goto` on script-heavy pages before extracting. `timeoutMs` bounds the `selector` and `state` forms; default `limits.timeoutMs`, else 30 s. Give a long one to wait for a slow report, or for a person in a headed run. |
 | `evaluate` | `script`, `args?` | JavaScript evaluated in the page; the result is bound under `id`. `script` is a template. With `args`, `script` is a function expression called with them, each string rendered (a lone placeholder keeps its type): `{ "script": "(a) => a.states.length", "args": { "states": "{{ split(vars.state) }}" } }`. **Trusted recipes only.** |
 | `screenshot` | `path` (template) | Full page. A debugging aid. |
-| `captcha` | `solver?`, `selector?`, `verify?`, `attempts?`, `timeoutMs?` | Solves the challenge on the page, if there is one (none is fine), reCAPTCHA v3 included. Missing fields come from `session.captcha`. §6.1. |
+| `captcha` | `solver?`, `selector?`, `verify?`, `attempts?`, `timeoutMs?`; a form captcha: `image`, `refresh?`, `field?`, `submit?` | Solves the challenge on the page, if there is one (none is fine), reCAPTCHA v3 included. Missing fields come from `session.captcha`. With `image`, a captcha checked when its form is posted: the solver fills `field`, `submit` posts the form, `verify.selector` / `verify.failure` say yes or no. §6.1. |
 
 Clicks and key presses can navigate; the engine re-reads the page URL after every web step.
 
@@ -978,7 +978,7 @@ import type { CaptchaSolver } from '@opencraw/core'
 const solver: CaptchaSolver = {
   name:  'my-solver',
   solve: async (challenge, { page, lease, attempt, signal, log }) => {
-    // challenge: { kind, url, siteKey?, action?, selector? }
+    // challenge: { kind, url, siteKey?, action?, selector?, field?, refresh? }
     const token = await myService.solve(challenge.kind, challenge.siteKey, challenge.url, { signal })
     await page.locator('[name="g-recaptcha-response"]').evaluate((field, value) => { field.value = value }, token)
     await page.locator('form').first().evaluate(form => form.submit())
@@ -1000,7 +1000,7 @@ A recipe names it in `session.captcha` (checked after every navigation, click an
 |---|---|---|
 | `solver` | | A registered solver's name. An unknown name fails the recipe before its first page. |
 | `detect.selector` | the common widgets | Where challenges are: visible `.g-recaptcha`, `.h-captcha`, `.cf-turnstile`, or their iframes. |
-| `verify` | `{ gone: true }` | How a solve is confirmed: the challenge is `gone` and/or an element (`selector`) appears. The solver's `solved` is only a claim. |
+| `verify` | `{ gone: true }` | How a solve is confirmed: the challenge is `gone` and/or an element (`selector`) appears; a `failure` element showing refuses it at once; `timeoutMs` (10000) is how long the page has. The solver's `solved` is only a claim. |
 | `attempts` | 3 | Solves tried per challenge. |
 | `timeoutMs` | 120000 | Time one solve may take; then `signal` aborts and the attempt fails. |
 | `maxSolves` | 10 | Solves the whole run may spend, rotations and bootstrap included. `0` detects without paying. |
@@ -1017,6 +1017,14 @@ What happens:
 4. **Give up.** After `attempts`, or when `maxSolves` is spent, the step fails with a `CaptchaError`. It is a
    block, so `onBlock.rotate` retries the step on a new IP (often an easier challenge, or none), then the step's
    `onError` applies.
+
+**Form captchas.** A `captcha` step with `image` is a captcha the site checks only when its form is posted
+(an image code, a field, the form's button). `refresh` and `field` go to the solver with the challenge;
+`submit` (clicks, fills, key presses, selects, waits, scripts) posts the form after the solver on every
+attempt; `verify.selector` is required, and `verify.failure` names the refusal message. The solver fills the
+field and returns `solved` (or `{ status: 'solved', submitted: true }` when it, or a person, posted the form);
+its optional `verdict` hook hears the page's answer. `"solver": "manual"` is built in: a person solves it in a
+headed browser. [captcha.md](captcha.md#form-captchas-checked-when-the-form-is-posted).
 
 Solvers get the access `lease`: token services solve faster, and more often correctly, through the same proxy
 as the browser. Api recipes cannot solve (there is no page): with `session.captcha`, a fetched page showing a

@@ -62,6 +62,8 @@ export function createCrawler (options: CrawlOptions = {}): Crawler {
       ignoreHTTPSErrors: options.browser?.ignoreHTTPSErrors,
     }, options.onRecipeError ?? 'continue', options.parallel ?? 1),
     async close () {
+      const unclosed = await captchaSolvers.close()
+      for (const message of unclosed) events.emit({ type: 'warning', recipeId: '', message })
       const launched = browser
       browser = undefined
       if (launched === undefined) return

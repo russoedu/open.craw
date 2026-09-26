@@ -8,6 +8,7 @@ import { DEFAULT_CAPTCHA_SELECTOR, detectChallenge } from './captcha-detection.c
 import type { CaptchaSolverRegistry } from './captcha-solver-registry.store'
 import type { CaptchaChallenge } from './captcha-solver.contract'
 import { DEFAULT_CAPTCHA_ATTEMPTS, DEFAULT_CAPTCHA_TIMEOUT_MS, resolveCaptcha } from './resolve-captcha.use-case'
+import type { CaptchaForm } from './resolve-captcha.use-case'
 
 export interface CaptchaGuardOptions {
   recipe:  InputRecipe
@@ -20,11 +21,13 @@ export interface CaptchaGuardOptions {
 }
 
 interface Resolved {
-  solver:    string
-  selector:  string
-  verify?:   CaptchaCheck
-  attempts:  number
-  timeoutMs: number
+  solver:     string
+  selector:   string
+  verify?:    CaptchaCheck
+  attempts:   number
+  /** The recipe's; the solver's own, else the default, when unset. */
+  timeoutMs?: number
+  form?:      CaptchaForm
 }
 
 /**
@@ -44,14 +47,16 @@ export class CaptchaGuard {
       selector:  captcha.detect?.selector ?? DEFAULT_CAPTCHA_SELECTOR,
       verify:    captcha.verify,
       attempts:  captcha.attempts ?? DEFAULT_CAPTCHA_ATTEMPTS,
-      timeoutMs: captcha.timeoutMs ?? DEFAULT_CAPTCHA_TIMEOUT_MS,
+      timeoutMs: captcha.timeoutMs,
     }
   }
 
   private async solve (page: Page, challenge: CaptchaChallenge, settings: Resolved): Promise<void> {
     const { recipe, events, solvers, budget, lease } = this.options
     events.emit({ type: 'captcha:detected', recipeId: recipe.id, url: challenge.url, kind: challenge.kind, siteKey: challenge.siteKey })
-    await resolveCaptcha({ recipeId: recipe.id, page, challenge, solver: solvers.resolve(settings.solver), selector: settings.selector, verify: settings.verify, attempts: settings.attempts, timeoutMs: settings.timeoutMs, budget, events, lease })
+    const solver = solvers.resolve(settings.solver)
+    const timeoutMs = settings.timeoutMs ?? solver.timeoutMs ?? DEFAULT_CAPTCHA_TIMEOUT_MS
+    await resolveCaptcha({ recipeId: recipe.id, page, challenge, solver, selector: settings.selector, verify: settings.verify, attempts: settings.attempts, timeoutMs, budget, events, lease, form: settings.form })
   }
 
   /** Whether a block page is searched for a challenge before the block counts. */
@@ -93,24 +98,29 @@ export class CaptchaGuard {
 
   /**
    * A `captcha` step: solves the challenge the page shows, reCAPTCHA v3
-   * included; a page without one is fine.
+   * included; a page without one is fine. With `image`, a form captcha: the
+   * solver gets the answer field and the refresh control, and `submit` sends
+   * the form after it on every attempt.
    *
    * @param page - The live page.
    * @param step - The step.
+   * @param submit - Runs the step's `submit` steps, in the recipe's scope.
    * @throws CaptchaError when the challenge could not be solved.
    */
-  async step (page: Page, step: CaptchaStep): Promise<void> {
+  async step (page: Page, step: CaptchaStep, submit?: () => Promise<void>): Promise<void> {
     const base = this.settings()
     const solver = step.solver ?? base?.solver
     if (solver === undefined) throw new Error('a captcha step needs a solver: name one ("solver") or add session.captcha')
+    const isForm = step.image !== undefined || step.field !== undefined || step.submit !== undefined
     const settings: Resolved = {
       solver,
-      selector:  step.selector ?? base?.selector ?? DEFAULT_CAPTCHA_SELECTOR,
+      selector:  step.image ?? step.selector ?? base?.selector ?? DEFAULT_CAPTCHA_SELECTOR,
       verify:    step.verify ?? base?.verify,
       attempts:  step.attempts ?? base?.attempts ?? DEFAULT_CAPTCHA_ATTEMPTS,
-      timeoutMs: step.timeoutMs ?? base?.timeoutMs ?? DEFAULT_CAPTCHA_TIMEOUT_MS,
+      timeoutMs: step.timeoutMs ?? base?.timeoutMs,
+      ...(isForm && { form: { field: step.field, refresh: step.refresh, submit } }),
     }
-    const challenge = await detectChallenge(page, settings.selector, { v3: true })
+    const challenge = await detectChallenge(page, settings.selector, { v3: step.image === undefined })
     if (challenge !== undefined) await this.solve(page, challenge, settings)
   }
 }
