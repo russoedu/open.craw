@@ -98,8 +98,21 @@ export class HttpClient implements HttpSender {
   }
 }
 
+/**
+ * Reads a file's bytes as a document, the way a fetched body is read: a
+ * downloaded CSV, spreadsheet, PDF, Word or JSON file.
+ *
+ * @param bytes - The file.
+ * @param name - Its name: the extension decides the format unless `reading.as` does.
+ * @param reading - `as`, `encoding`, `delimiter`, `scalars`.
+ * @returns The document, what reading noticed, and the format.
+ */
+export async function readFileBody (bytes: Uint8Array, name: string, reading: Pick<HttpRequest, 'as' | 'encoding' | 'delimiter' | 'scalars'> = {}): Promise<ReadBody> {
+  return parseBody(reading.as ?? formatFromExtension(name), bytes, name, reading)
+}
+
 /** A body as read, with what reading it noticed. */
-interface ReadBody {
+export interface ReadBody {
   body:     HttpBody
   warnings: string[]
   format:   BodyKind

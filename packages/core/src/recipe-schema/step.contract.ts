@@ -40,11 +40,47 @@ export interface GotoReady {
 export interface GotoStep extends StepBaseFields { type: 'goto', url: string, waitUntil?: WaitUntil, ready?: GotoReady }
 /** Where an interaction lands: a selector, or a `target` template that renders to a live element (a `forEach` over `selector`) or to a selector string. */
 export interface TargetFields { selector?: string, target?: string }
-export interface ClickStep extends StepBaseFields, TargetFields { type: 'click', optional?: boolean }
+/** What a click that downloads a file does with it: reads it like a fetched document, and keeps it if asked. */
+export interface ClickDownload {
+  /** How to read it; default: from the file's name. */
+  as?:        BodyKind
+  /** Also save it here (a template). */
+  saveTo?:    string
+  encoding?:  string
+  delimiter?: string
+  /** How long the download may take to start; `limits.timeoutMs`, else 30 s. */
+  timeoutMs?: number
+}
+export interface ClickStep extends StepBaseFields, TargetFields {
+  type:      'click'
+  optional?: boolean
+  /** The click downloads a file: it becomes the current document, and the step id holds it. */
+  download?: ClickDownload
+}
 export interface FillStep extends StepBaseFields, TargetFields { type: 'fill', value: string }
 export interface PressStep extends StepBaseFields, TargetFields { type: 'press', key: string }
-/** Picks an option of a `<select>` by value, label or index. */
-export interface SelectStep extends StepBaseFields, TargetFields { type: 'select', value?: string, label?: string, index?: number }
+/**
+ * Picks options of a `<select>`: one by `value`, `label` or `index`, or several
+ * by `values` (each a value or a label). With `force`, the options are set on
+ * the element directly and `input` and `change` fired: a hidden select behind
+ * a script-built widget, whose page listens to the select itself.
+ */
+export interface SelectStep extends StepBaseFields, TargetFields {
+  type:        'select'
+  value?:      string
+  label?:      string
+  index?:      number
+  /** Several options, each matched by value or label; an item that renders a list (`{{ split(vars.states) }}`) adds each. */
+  values?:     string[]
+  /** Add to the options already chosen instead of replacing them. */
+  multiple?:   boolean
+  /** Set the options on the element itself, visible or not, and fire `input` and `change`. */
+  force?:      boolean
+  /** Match labels and values without regard to case. */
+  ignoreCase?: boolean
+  /** How long to wait for the options to exist (a list the page loads after another pick); `limits.timeoutMs`, else 30 s. */
+  timeoutMs?:  number
+}
 export interface ScrollStep extends StepBaseFields { type: 'scroll', to: string, times?: number, untilStable?: boolean }
 /** Waits for an element, a time or the network to settle; `timeoutMs` bounds the element and network forms (default `limits.timeoutMs`). */
 export interface WaitStep extends StepBaseFields { type: 'wait', selector?: string, ms?: number, state?: 'networkidle', timeoutMs?: number }
@@ -206,13 +242,26 @@ const ONE_TARGET = 'give exactly one of selector or target'
 const oneTarget = (step: { selector?: string, target?: string }): boolean => (step.selector === undefined) !== (step.target === undefined)
 const gotoReady = z.strictObject({ selector: plainSelector, timeoutMs: z.int().min(1).optional(), reloads: z.int().min(0).max(10).optional() })
 const gotoStep = z.strictObject({ ...base, type: z.literal('goto'), url: z.string().min(1), waitUntil: z.enum(WAIT_UNTIL).optional(), ready: gotoReady.optional() })
-const clickStep = z.strictObject({ ...base, ...target, type: z.literal('click'), optional: z.boolean().optional() }).refine(oneTarget, ONE_TARGET)
+const clickDownload = z.strictObject({ as: z.enum(BODY_KINDS).optional(), saveTo: z.string().min(1).optional(), encoding: z.string().min(1).optional(), delimiter: z.string().length(1).optional(), timeoutMs: z.int().min(1).optional() })
+const clickStep = z.strictObject({ ...base, ...target, type: z.literal('click'), optional: z.boolean().optional(), download: clickDownload.optional() }).refine(oneTarget, ONE_TARGET)
 const fillStep = z.strictObject({ ...base, ...target, type: z.literal('fill'), value: z.string() }).refine(oneTarget, ONE_TARGET)
 const pressStep = z.strictObject({ ...base, ...target, type: z.literal('press'), key: z.string().min(1) })
   .refine(step => step.selector === undefined || step.target === undefined, 'give selector or target, not both')
-const selectStep = z.strictObject({ ...base, ...target, type: z.literal('select'), value: z.string().optional(), label: z.string().optional(), index: z.int().nonnegative().optional() })
+const selectStep = z.strictObject({
+  ...base,
+  ...target,
+  type:       z.literal('select'),
+  value:      z.string().optional(),
+  label:      z.string().optional(),
+  index:      z.int().nonnegative().optional(),
+  values:     z.array(z.string()).min(1).optional(),
+  multiple:   z.boolean().optional(),
+  force:      z.boolean().optional(),
+  ignoreCase: z.boolean().optional(),
+  timeoutMs:  z.int().min(1).optional(),
+})
   .refine(oneTarget, ONE_TARGET)
-  .refine(step => [step.value, step.label, step.index].filter(choice => choice !== undefined).length === 1, 'give exactly one of value, label or index')
+  .refine(step => [step.value, step.label, step.index, step.values].filter(choice => choice !== undefined).length === 1, 'give exactly one of value, label, index or values')
 const scrollStep = z.strictObject({ ...base, type: z.literal('scroll'), to: z.string().min(1), times: z.int().min(1).optional(), untilStable: z.boolean().optional() })
 const waitStep = z.strictObject({ ...base, type: z.literal('wait'), selector: plainSelector.optional(), ms: z.int().nonnegative().optional(), state: z.literal('networkidle').optional(), timeoutMs: z.int().min(1).optional() })
 const evaluateStep = z.strictObject({ ...base, type: z.literal('evaluate'), script: z.string().min(1), args: z.record(z.string(), z.unknown()).optional() })

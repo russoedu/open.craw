@@ -15,6 +15,7 @@ import { appears, click, fill, press, screenshot, scroll, select, wait } from '.
 import { snapshotElements } from './snapshot-elements.use-case'
 import { navigate } from './navigate.use-case'
 import { sendPageRequest } from './send-page-request.use-case'
+import { downloadByClick } from './download-by-click.use-case'
 
 const NEXT_LINK_TIMEOUT_MS = 2000
 /** Steps after which a page may show a new captcha (`session.captcha`). */
@@ -78,13 +79,13 @@ export class WebStepRunner implements StepRunner {
         await this.captcha.step(this.page, step, submit === undefined ? undefined : () => this.submit(submit, scope))
         break
       }
-      case 'click': { await click(step, this.page, scope); break
+      case 'click': { await (step.download === undefined ? click(step, this.page, scope) : downloadByClick(step, this.page, scope, this.recipe, this.events)); break
       }
       case 'fill': { await fill(step, this.page, scope); break
       }
       case 'press': { await press(step, this.page, scope); break
       }
-      case 'select': { await select(step, this.page, scope); break
+      case 'select': { await select(step, this.page, scope, this.recipe.limits?.timeoutMs); break
       }
       case 'scroll': { await scroll(step, this.page); break
       }
