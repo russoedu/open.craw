@@ -84,6 +84,8 @@ export async function select (step: SelectStep, page: Page, scope: ExtractionSco
   const target = targetOf(step, page, scope)
   if (step.values !== undefined || step.multiple === true || step.force === true) {
     const query: OptionQuery = { wanted: wantedOf(step, lookup), index: step.index, ignoreCase: step.ignoreCase === true, multiple: step.multiple === true }
+    // `values` that render to nothing (a blank filter var) leave the control alone.
+    if (step.values !== undefined && query.wanted.length === 0) return
     const values = await optionsFor(target, query, step.timeoutMs ?? timeoutMs ?? DEFAULT_OPTION_TIMEOUT_MS)
     await (step.force === true ? target.evaluate(chooseOptions, values) : target.selectOption(values))
 

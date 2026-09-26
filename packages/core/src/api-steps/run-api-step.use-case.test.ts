@@ -71,6 +71,33 @@ async function crawl (input: InputRecipe, sender: HttpSender): Promise<Record<st
 }
 
 describe('ApiStepRunner', () => {
+  it('walks rows keyed by name with entries, one record per name and column, skipping zeros', async () => {
+    pages['http://shop/api/report'] = { rows: { 'TATA MOTORS': { DIESEL: 5, CNG: 94, EV: 0 }, 'EICHER': { DIESEL: 23 } } }
+    const keyed: InputRecipe = {
+      ...recipe,
+      start: [{ url: 'http://shop/api/report' }],
+      steps: [
+        { type: 'request', id: 'data', url: '{{start.url}}', as: 'json' },
+        { type: 'set', id: 'makers', value: '{{ entries(data.rows) }}' },
+        {
+          type:  'forEach',
+          over:  'makers',
+          as:    'maker',
+          steps: [
+            { type: 'set', id: 'fuels', value: '{{ entries(maker.value) }}' },
+            { type: 'forEach', over: 'fuels', as: 'fuel', steps: [{ type: 'emit', when: '{{ fuel.value > 0 }}' }] },
+          ],
+        },
+      ],
+    }
+    const emitted = await crawl(keyed, fakeSender())
+    expect(emitted.map(snapshot => [(snapshot.maker as { key: string }).key, (snapshot.fuel as { key: string }).key, (snapshot.fuel as { value: number }).value])).toEqual([
+      ['TATA MOTORS', 'DIESEL', 5],
+      ['TATA MOTORS', 'CNG', 94],
+      ['EICHER', 'DIESEL', 23],
+    ])
+  })
+
   it('pages through a JSON API following nextPage URLs, with rendered headers', async () => {
     const sender = fakeSender()
     const emitted = await crawl(recipe, sender)

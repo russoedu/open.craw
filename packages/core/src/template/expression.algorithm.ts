@@ -54,8 +54,19 @@ const FUNCTION_ENTRIES: [string, Fn][] = [
   // Blank pieces are dropped: a blank text is an empty list, not one blank item.
   ['split', ([value, separator]) => stringify(value).split(stringify(separator ?? ',')).map(piece => piece.trim()).filter(piece => piece !== '')],
   ['urlEncode', ([value]) => encodeURIComponent(stringify(value))],
+  // An object keyed by name (report rows keyed by maker) as a list forEach can walk.
+  ['entries', ([value]) => entriesOf(value).map(([key, item]) => ({ key, value: item }))],
+  ['keys', ([value]) => entriesOf(value).map(([key]) => key)],
+  ['values', ([value]) => entriesOf(value).map(([, item]) => item)],
 ]
 const FUNCTIONS = new Map<string, Fn>(FUNCTION_ENTRIES)
+
+/** An object's own entries in key order; a list's by index; nothing for anything else. */
+function entriesOf (value: unknown): [string, unknown][] {
+  if (Array.isArray(value)) return value.map((item, index): [string, unknown] => [String(index), item])
+
+  return typeof value === 'object' && value !== null ? Object.entries(value) : []
+}
 
 /** The names an expression may call. */
 export const EXPRESSION_FUNCTIONS: readonly string[] = FUNCTION_ENTRIES.map(([name]) => name)
