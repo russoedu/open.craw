@@ -25,7 +25,10 @@
     "mcp:build": "nx run mcp:build",
     "office-reader:qa": "nx run office-reader:lint && nx run office-reader:test",
     "office-reader:build": "nx run office-reader:build",
-    "office-reader:e2e": "nx run office-reader:e2e"
+    "office-reader:e2e": "nx run office-reader:e2e",
+    "captcha-tesseract:qa": "nx run captcha-tesseract:lint && nx run captcha-tesseract:test",
+    "captcha-tesseract:build": "nx run captcha-tesseract:build",
+    "captcha-tesseract:e2e": "nx run captcha-tesseract:e2e"
   },
   "private": true,
   "devDependencies": {
@@ -44,6 +47,7 @@
     "@swc/jest": "~0.2.38",
     "@types/jest": "~30.0.0",
     "@types/node": "^24.0.0",
+    "@types/pngjs": "^6.0.5",
     "@typescript/native": "npm:typescript@^7.0.2",
     "eslint": "^10.8.0",
     "husky": "^9.1.7",
@@ -98,6 +102,5 @@
         }
       }
     }
-  },
-  "dependencies": {}
+  }
 }

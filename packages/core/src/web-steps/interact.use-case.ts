@@ -78,10 +78,18 @@ export async function scroll (step: ScrollStep, page: Page): Promise<void> {
   }
 }
 
-export async function wait (step: WaitStep, page: Page): Promise<void> {
-  if (step.selector !== undefined) await page.locator(step.selector).first().waitFor({ state: 'visible' })
+/**
+ * Runs a `wait` step: for an element to show, a time, or the network to settle.
+ *
+ * @param step - The step; its `timeoutMs` bounds the element and network forms.
+ * @param page - The page.
+ * @param timeoutMs - The recipe's `limits.timeoutMs`, used when the step sets none; the browser default otherwise.
+ */
+export async function wait (step: WaitStep, page: Page, timeoutMs?: number): Promise<void> {
+  const timeout = step.timeoutMs ?? timeoutMs
+  if (step.selector !== undefined) await page.locator(step.selector).first().waitFor({ state: 'visible', timeout })
   if (step.ms !== undefined) await page.waitForTimeout(step.ms)
-  if (step.state !== undefined) await page.waitForLoadState(step.state)
+  if (step.state !== undefined) await page.waitForLoadState(step.state, { timeout })
 }
 
 /**

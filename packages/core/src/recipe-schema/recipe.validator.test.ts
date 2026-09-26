@@ -151,4 +151,29 @@ describe('recipeKindOf', () => {
     ]))
     expect(ok.steps[0].type).toBe('forEach')
   })
+
+  it('refuses a placeholder in a plain selector, which is never rendered, and points to target', () => {
+    for (const step of [{ type: 'click', selector: '#item-{{id}}' }, { type: 'fill', selector: '#{{field}}', value: 'x' }, { type: 'wait', selector: '[data-id="{{id}}"]' }]) {
+      expect(() => parseInputRecipe(recipe([step]))).toThrow('a selector is not a template: put a selector with placeholders in "target"')
+    }
+    expect(parseInputRecipe(recipe([{ type: 'click', target: '#item-{{id}}' }])).steps[0]).toMatchObject({ target: '#item-{{id}}' })
+  })
+
+  it('takes a form captcha step, which needs the element that shows once accepted', () => {
+    const form = { type: 'captcha', solver: 'reader', image: '#captchaImage', refresh: '#captchaImg', field: '#externalCaptcha', submit: [{ type: 'click', selector: '#applyTrigger' }], verify: { selector: '#report', failure: '#captchaMsg', timeoutMs: 30_000 } }
+    expect(parseInputRecipe(recipe([form])).steps[0]).toMatchObject({ image: '#captchaImage', submit: [{ type: 'click' }] })
+    expect(() => parseInputRecipe(recipe([{ ...form, verify: { failure: '#captchaMsg' } }]))).toThrow('a form captcha (image or submit) needs verify.selector')
+    expect(() => parseInputRecipe(recipe([{ ...form, selector: '.g-recaptcha' }]))).toThrow('give image (a form captcha) or selector (a widget), not both')
+    expect(() => parseInputRecipe(recipe([{ ...form, submit: [{ type: 'goto', url: 'x' }] }]))).toThrow()
+  })
+
+  it('takes a goto ready element, a wait timeout and evaluate args', () => {
+    const parsed = parseInputRecipe(recipe([
+      { type: 'goto', url: '{{start.url}}', ready: { selector: '#yAxis', timeoutMs: 20_000, reloads: 3 } },
+      { type: 'wait', selector: '#report', timeoutMs: 600_000 },
+      { type: 'evaluate', id: 'x', script: '(a) => a.state', args: { state: '{{vars.state}}', codes: ['{{vars.code}}'] } },
+    ]))
+    expect(parsed.steps).toMatchObject([{ ready: { selector: '#yAxis', reloads: 3 } }, { timeoutMs: 600_000 }, { args: { state: '{{vars.state}}' } }])
+    expect(() => parseInputRecipe(recipe([{ type: 'goto', url: 'x', ready: { selector: '#{{id}}' } }]))).toThrow('a selector is not a template')
+  })
 })

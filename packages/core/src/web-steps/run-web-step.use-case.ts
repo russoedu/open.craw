@@ -3,10 +3,10 @@ import { BrowserSession } from '../browser-session'
 import type { CaptchaGuard } from '../captcha'
 import type { EventBus } from '../crawl-events'
 import type { ExtractionScope, LiveElement } from '../extraction-scope'
-import type { GotoStep, InputRecipe, PaginateNext, Step } from '../recipe-schema'
+import type { CaptchaSubmitStep, GotoStep, InputRecipe, PaginateNext, Step } from '../recipe-schema'
 import { BlockedError, RunGate } from '../step-flow'
 import type { NextPageResult, StepRunner } from '../step-flow'
-import { renderText } from '../template'
+import { isTruthy, render, renderText } from '../template'
 import { evaluateScript } from './evaluate-script.use-case'
 import { extractFromPage } from './extract-from-page.use-case'
 import { appears, click, fill, press, screenshot, scroll, select, wait } from './interact.use-case'
@@ -54,13 +54,23 @@ export class WebStepRunner implements StepRunner {
     await this.captcha?.check(this.page)
   }
 
-  async runLeaf (step: Step, scope: ExtractionScope): Promise<void> {
+  /** A form captcha's `submit` steps: interactions, each under its `when`, without the automatic captcha check between them. */
+  private async submit (steps: readonly CaptchaSubmitStep[], scope: ExtractionScope): Promise<void> {
+    for (const step of steps) {
+      if (step.when !== undefined && !isTruthy(render(step.when, path => scope.lookup(path)))) continue
+      await this.perform(step, scope)
+      this.trackUrl(scope)
+    }
+  }
+
+  private async perform (step: Step, scope: ExtractionScope): Promise<void> {
     switch (step.type) {
       case 'goto': { await this.visit(step, scope); break
       }
       case 'captcha': {
         if (this.captcha === undefined) throw new Error('a captcha step needs a crawler with captcha solvers')
-        await this.captcha.step(this.page, step)
+        const submit = step.submit
+        await this.captcha.step(this.page, step, submit === undefined ? undefined : () => this.submit(submit, scope))
         break
       }
       case 'click': { await click(step, this.page, scope); break
@@ -73,7 +83,7 @@ export class WebStepRunner implements StepRunner {
       }
       case 'scroll': { await scroll(step, this.page); break
       }
-      case 'wait': { await wait(step, this.page); break
+      case 'wait': { await wait(step, this.page, this.recipe.limits?.timeoutMs); break
       }
       case 'screenshot': { await screenshot(step, this.page, scope); break
       }
@@ -84,6 +94,10 @@ export class WebStepRunner implements StepRunner {
       default: { throw new Error(`"${step.type}" is an api step; this recipe runs in web mode`)
       }
     }
+  }
+
+  async runLeaf (step: Step, scope: ExtractionScope): Promise<void> {
+    await this.perform(step, scope)
     if (CHALLENGING_STEPS.has(step.type)) await this.captcha?.check(this.page)
     this.trackUrl(scope)
   }

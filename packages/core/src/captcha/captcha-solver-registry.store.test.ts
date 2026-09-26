@@ -17,6 +17,24 @@ describe('CaptchaSolverRegistry', () => {
     expect(() => new CaptchaSolverRegistry().resolve('nope')).toThrow('(registered: none)')
   })
 
+  it('has the manual solver built in, replaceable by a solver of that name', () => {
+    expect(new CaptchaSolverRegistry().resolve('manual').timeoutMs).toBe(600_000)
+    expect(new CaptchaSolverRegistry().has('manual')).toBe(true)
+    expect(new CaptchaSolverRegistry([solver('manual')]).resolve('manual').timeoutMs).toBeUndefined()
+    expect(() => new CaptchaSolverRegistry().resolve('nope')).toThrow('built-in solvers: manual')
+  })
+
+  it('closes every solver that holds something, and reports the ones that fail to', async () => {
+    const closed: string[] = []
+    const registry = new CaptchaSolverRegistry([
+      { ...solver('a'), close: () => { closed.push('a') } },
+      solver('b'),
+      { ...solver('c'), close: () => { throw new Error('worker gone') } },
+    ])
+    expect(await registry.close()).toEqual(['captcha solver "c" did not close: worker gone'])
+    expect(closed).toEqual(['a'])
+  })
+
   it('refuses two solvers with one name', () => {
     expect(() => new CaptchaSolverRegistry([solver('a'), solver('a')])).toThrow('two captcha solvers are named "a"')
   })

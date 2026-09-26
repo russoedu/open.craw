@@ -1,5 +1,6 @@
-# Browser end-to-end tests for @opencraw/core, and @opencraw/office-reader's
-# check that its published bundle runs in a browser. Kept out of ci.yml on purpose:
+# Browser end-to-end tests for @opencraw/core, @opencraw/office-reader's
+# check that its published bundle runs in a browser, and
+# @opencraw/captcha-tesseract's reads of rendered captchas. Kept out of ci.yml on purpose:
 # that file is owned and rewritten by `mnci upgrade`, this one is ours.
 name: e2e
 
@@ -21,3 +22,4 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run core:e2e
       - run: npm run office-reader:e2e
+      - run: npm run captcha-tesseract:e2e

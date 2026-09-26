@@ -278,6 +278,15 @@
                 "selector": {
                   "type": "string",
                   "minLength": 1
+                },
+                "failure": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 9007199254740991
                 }
               },
               "additionalProperties": false
@@ -530,6 +539,29 @@
                 "networkidle",
                 "commit"
               ]
+            },
+            "ready": {
+              "type": "object",
+              "properties": {
+                "selector": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "reloads": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10
+                }
+              },
+              "required": [
+                "selector"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -1045,7 +1077,8 @@
               "const": "wait"
             },
             "selector": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "ms": {
               "type": "integer",
@@ -1055,6 +1088,11 @@
             "state": {
               "type": "string",
               "const": "networkidle"
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -1133,6 +1171,13 @@
             "script": {
               "type": "string",
               "minLength": 1
+            },
+            "args": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
             }
           },
           "required": [
@@ -2279,6 +2324,555 @@
               "type": "string",
               "minLength": 1
             },
+            "image": {
+              "type": "string",
+              "minLength": 1
+            },
+            "refresh": {
+              "type": "string",
+              "minLength": 1
+            },
+            "field": {
+              "type": "string",
+              "minLength": 1
+            },
+            "submit": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Z_]\\w*$"
+                      },
+                      "onError": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "fail"
+                              }
+                            },
+                            "required": [
+                              "policy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "skip"
+                              }
+                            },
+                            "required": [
+                              "policy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "retry"
+                              },
+                              "attempts": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 20
+                              },
+                              "backoffMs": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "policy",
+                              "attempts"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "when": {
+                        "type": "string"
+                      },
+                      "selector": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "target": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "type": {
+                        "type": "string",
+                        "const": "click"
+                      },
+                      "optional": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Z_]\\w*$"
+                      },
+                      "onError": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "fail"
+                              }
+                            },
+                            "required": [
+                              "policy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "skip"
+                              }
+                            },
+                            "required": [
+                              "policy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "retry"
+                              },
+                              "attempts": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 20
+                              },
+                              "backoffMs": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "policy",
+                              "attempts"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "when": {
+                        "type": "string"
+                      },
+                      "selector": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "target": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "type": {
+                        "type": "string",
+                        "const": "fill"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Z_]\\w*$"
+                      },
+                      "onError": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "fail"
+                              }
+                            },
+                            "required": [
+                              "policy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "skip"
+                              }
+                            },
+                            "required": [
+                              "policy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "retry"
+                              },
+                              "attempts": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 20
+                              },
+                              "backoffMs": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "policy",
+                              "attempts"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "when": {
+                        "type": "string"
+                      },
+                      "selector": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "target": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "type": {
+                        "type": "string",
+                        "const": "press"
+                      },
+                      "key": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "key"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Z_]\\w*$"
+                      },
+                      "onError": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "fail"
+                              }
+                            },
+                            "required": [
+                              "policy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "skip"
+                              }
+                            },
+                            "required": [
+                              "policy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "retry"
+                              },
+                              "attempts": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 20
+                              },
+                              "backoffMs": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "policy",
+                              "attempts"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "when": {
+                        "type": "string"
+                      },
+                      "selector": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "target": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "type": {
+                        "type": "string",
+                        "const": "select"
+                      },
+                      "value": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Z_]\\w*$"
+                      },
+                      "onError": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "fail"
+                              }
+                            },
+                            "required": [
+                              "policy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "skip"
+                              }
+                            },
+                            "required": [
+                              "policy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "retry"
+                              },
+                              "attempts": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 20
+                              },
+                              "backoffMs": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "policy",
+                              "attempts"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "when": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string",
+                        "const": "wait"
+                      },
+                      "selector": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "state": {
+                        "type": "string",
+                        "const": "networkidle"
+                      },
+                      "timeoutMs": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Z_]\\w*$"
+                      },
+                      "onError": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "fail"
+                              }
+                            },
+                            "required": [
+                              "policy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "skip"
+                              }
+                            },
+                            "required": [
+                              "policy"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "policy": {
+                                "type": "string",
+                                "const": "retry"
+                              },
+                              "attempts": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 20
+                              },
+                              "backoffMs": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "policy",
+                              "attempts"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "when": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string",
+                        "const": "evaluate"
+                      },
+                      "script": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "args": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "script"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
             "verify": {
               "type": "object",
               "properties": {
@@ -2288,6 +2882,15 @@
                 "selector": {
                   "type": "string",
                   "minLength": 1
+                },
+                "failure": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 9007199254740991
                 }
               },
               "additionalProperties": false

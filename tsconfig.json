@@ -14,6 +14,9 @@
     },
     {
       "path": "./packages/office-reader"
+    },
+    {
+      "path": "./packages/captcha-tesseract"
     }
   ],
   "compilerOptions": {}
