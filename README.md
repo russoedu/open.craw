@@ -16,6 +16,7 @@ Several input recipes can feed one output; a run processes them one after anothe
 | [`@opencraw/cli`](./packages/cli) | `opencraw validate` / `run` / `probe` — inspect a site, check a recipe, run a crawl from the terminal. |
 | [`@opencraw/mcp`](./packages/mcp) | The same probe/validate/run/list primitives as an MCP server, for an agent instead of a terminal. |
 | [`@opencraw/office-reader`](./packages/office-reader) | Reads `.xlsx` workbooks and `.pptx` presentations into plain objects, in Node or a browser. Standalone: core uses it, it depends on nothing of OpenCraw. |
+| [`@opencraw/captcha-tesseract`](./packages/captcha-tesseract) | Reads image captchas with Tesseract for form captchas: refreshes the image instead of submitting a doubtful read, fills the answer field, and audits every read with the site's verdict. |
 
 ## Quick start
 

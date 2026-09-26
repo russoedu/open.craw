@@ -1,0 +1,74 @@
+{
+  "name": "@opencraw/captcha-tesseract",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/index.esm.js",
+  "module": "./dist/index.esm.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "default": "./dist/index.esm.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!**/*.tsbuildinfo",
+    "!**/*.d.ts.map",
+    "!**/*.js.map"
+  ],
+  "dependencies": {
+    "@tesseract.js-data/eng": "^1.0.0",
+    "pngjs": "^7.0.0",
+    "tesseract.js": "^7.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "An image-captcha reader for OpenCraw's form captchas: Tesseract (WebAssembly, bundled English model, nothing fetched at run time) reads the code, a read of the wrong length or with an unsure character is refreshed instead of submitted, and every read can be audited with the page's verdict.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/russoedu/open.craw.git",
+    "directory": "packages/captcha-tesseract"
+  },
+  "keywords": [
+    "captcha",
+    "ocr",
+    "tesseract",
+    "crawler",
+    "opencraw",
+    "image-captcha"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "nx": {
+    "targets": {
+      "e2e": {
+        "executor": "nx:run-commands",
+        "dependsOn": [
+          "build",
+          {
+            "projects": [
+              "@opencraw/core"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          "{workspaceRoot}/packages/core/e2e/**"
+        ],
+        "options": {
+          "command": "tsc -p tsconfig.e2e.json && jest --config jest.e2e.config.cts",
+          "cwd": "packages/captcha-tesseract"
+        }
+      }
+    }
+  }
+}

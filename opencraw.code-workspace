@@ -123,6 +123,20 @@
         "script": "office-reader:build",
         "problemMatcher": [],
         "group": "build"
+      },
+      {
+        "label": "captcha-tesseract: qa",
+        "type": "npm",
+        "script": "captcha-tesseract:qa",
+        "problemMatcher": [],
+        "group": "qa"
+      },
+      {
+        "label": "captcha-tesseract: build",
+        "type": "npm",
+        "script": "captcha-tesseract:build",
+        "problemMatcher": [],
+        "group": "build"
       }
     ]
   },

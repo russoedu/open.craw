@@ -18,7 +18,8 @@ export const FORM_CAPTCHA_LENGTH = 6
 /** The code each visitor's current image shows, by the visitor's cookie. */
 const codes = new Map<string, string>()
 
-function newCode (): string {
+/** A new code from the charset. */
+export function newCaptchaCode (): string {
   return Array.from({ length: FORM_CAPTCHA_LENGTH }, () => FORM_CAPTCHA_CHARSET[randomInt(FORM_CAPTCHA_CHARSET.length)]).join('')
 }
 
@@ -27,9 +28,9 @@ function visitorOf (incoming: IncomingMessage): string | undefined {
 }
 
 /** The image: bold green text on white, 140×40 like the real one; clipped, the last character runs off the edge. */
-function imageSvg (code: string, clip: boolean): string {
+export function formCaptchaSvg (code: string, clip: boolean): string {
   return '<svg xmlns="http://www.w3.org/2000/svg" width="140" height="40" viewBox="0 0 140 40"><rect width="140" height="40" fill="#fff"/>' +
-    `<text x="${clip ? 12 : 8}" y="29" font-family="DejaVu Sans, Verdana, sans-serif" font-weight="bold" font-size="${clip ? 24 : 21}" fill="#0a6b0a">${code}</text></svg>`
+    `<text x="${clip ? 9 : 5}" y="30" font-family="DejaVu Sans, Verdana, sans-serif" font-weight="bold" font-size="${clip ? 27 : 25}" fill="#0a6b0a">${code}</text></svg>`
 }
 
 function formHtml (action: string, clip: boolean, values: { q: string }, message?: string): string {
@@ -92,9 +93,9 @@ export function formCaptchaRoute (incoming: IncomingMessage, outgoing: ServerRes
       return true
     }
     case '/form-captcha/image': {
-      const code = newCode()
+      const code = newCaptchaCode()
       if (visitor !== undefined) codes.set(visitor, code)
-      send('image/svg+xml', imageSvg(code, url.searchParams.get('clip') === '1'))
+      send('image/svg+xml', formCaptchaSvg(code, url.searchParams.get('clip') === '1'))
 
       return true
     }

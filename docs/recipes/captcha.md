@@ -85,7 +85,8 @@ and so does this step:
   "attempts": 5 }
 ```
 
-Put it after the steps that fill the form. Each attempt:
+[`@opencraw/captcha-tesseract`](../../packages/captcha-tesseract) is a ready reader for such image codes
+(Tesseract, bundled, nothing downloaded). Put the step after the steps that fill the form. Each attempt:
 
 1. **The solver does its part.** It gets the image (`challenge.selector`), the answer field (`challenge.field`)
    and the refresh control (`challenge.refresh`). A reader reads the image, clicks refresh when it is unsure
