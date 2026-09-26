@@ -37,6 +37,9 @@ a module of its choosing.
 credentials as `{{env.NAME}}` read from the server's environment. The `probe` and `run` tools then take an
 `access` argument naming a profile. The file and the credentials never pass through a tool call.
 
+`OPENCRAW_PROFILES` is the directory of the persistent browser profiles recipes name in
+`session.browserProfile` (default `.opencraw/profiles` in the server's working directory).
+
 ## Tools
 
 ### `probe`

@@ -2,6 +2,7 @@ import { AccessConfigError, redactEndpoint } from '../access'
 import type { AccessBroker, AccessLease } from '../access'
 import { ApiStepRunner } from '../api-steps'
 import { BrowserClient } from '../browser-session'
+import type { BrowserProfiles } from '../browser-session'
 import { CaptchaBudget, CaptchaGuard, CaptchaSolverRegistry, captchaSolverNames, DEFAULT_MAX_SOLVES } from '../captcha'
 import type { EventBus } from '../crawl-events'
 import { ExtractionScope } from '../extraction-scope'
@@ -14,7 +15,7 @@ import { RunGate, runSteps } from '../step-flow'
 import type { HostThrottle } from '../step-flow'
 import type { EmitOutcome, StepRunner } from '../step-flow'
 import { WebStepRunner } from '../web-steps'
-import { accessOptions, readSavedState, resolveStorageState, runBootstrap } from './bootstrap-session.use-case'
+import { accessOptions, openBrowserProfile, readSavedState, resolveStorageState, runBootstrap } from './bootstrap-session.use-case'
 import { RotatingRunner } from './rotating-runner.use-case'
 import type { LeasedRunner } from './rotating-runner.use-case'
 import type { RecipeReport } from './crawl-report.model'
@@ -38,6 +39,8 @@ export interface RecipeRunDependencies {
   captchaSolvers?:    CaptchaSolverRegistry
   /** The crawler's per-site throttle, shared by every recipe. */
   hosts?:             HostThrottle
+  /** The runner's persistent browser profiles, for `session.browserProfile`. */
+  profiles?:          BrowserProfiles
 }
 
 /** What every runner of one recipe run shares. */
@@ -196,7 +199,8 @@ async function openRunner (input: InputRecipe, deps: RecipeRunDependencies, cont
   const { gate } = context
   const captcha = new CaptchaGuard({ recipe: input, events: deps.events, solvers: context.solvers, budget: context.budget, lease })
   if (lease.cdp !== undefined) return openRemoteRunner(input, deps, context, lease, lease.cdp)
-  const storageState = await resolveStorageState(input, deps, lease, captcha)
+  if (input.mode === 'web' && input.session?.browserProfile !== undefined) return openProfileRunner(input, deps, context, lease, captcha)
+  const storageState = await resolveStorageState(input, deps, lease, captcha, context)
   const session = input.session
   const access = accessOptions(lease, session?.headers)
   if (input.mode === 'web') {
@@ -218,6 +222,24 @@ async function openRunner (input: InputRecipe, deps: RecipeRunDependencies, cont
 }
 
 /**
+ * A web runner in a persistent browser profile. The bootstrap runs in the
+ * same browser as the crawl, and what both leave behind (cookies, storage)
+ * stays in the profile for the next run.
+ */
+async function openProfileRunner (input: InputRecipe, deps: RecipeRunDependencies, context: RunContext, lease: AccessLease, captcha: CaptchaGuard): Promise<StepRunner> {
+  const saved = await readSavedState(input, deps)
+  const browserSession = await openBrowserProfile(saved === undefined ? input : { ...input, session: { ...input.session, cookies: [...saved.cookies, ...(input.session?.cookies ?? [])] } }, deps, lease, context)
+  try {
+    if (saved === undefined && input.session?.bootstrap !== undefined) await runBootstrap(input, browserSession, deps, captcha)
+  } catch (error) {
+    await browserSession.close()
+    throw error
+  }
+
+  return new WebStepRunner(browserSession, input, deps.events, context.gate, captcha)
+}
+
+/**
  * A web runner in a remote browser. The bootstrap runs in the same remote
  * session as the crawl: providers tie the IP and fingerprint to the
  * connection, so a login in one connection would not carry to another.
@@ -225,6 +247,7 @@ async function openRunner (input: InputRecipe, deps: RecipeRunDependencies, cont
 async function openRemoteRunner (input: InputRecipe, deps: RecipeRunDependencies, context: RunContext, lease: AccessLease, cdp: NonNullable<AccessLease['cdp']>): Promise<StepRunner> {
   const captcha = new CaptchaGuard({ recipe: input, events: deps.events, solvers: context.solvers, budget: context.budget, lease })
   if (input.mode === 'api') throw new AccessConfigError(`recipe "${input.id}" runs in api mode, but access profile "${lease.profile}" is a remote browser; api recipes need a proxy profile`)
+  if (input.session?.browserProfile !== undefined) throw new AccessConfigError(`recipe "${input.id}" uses browser profile "${input.session.browserProfile}", which needs a local browser, but access profile "${lease.profile}" is a remote browser`)
   const session = input.session
   const storageState = await readSavedState(input, deps)
   const browserSession = await BrowserClient.connectOverCDP(cdp, { storageState, cookies: session?.cookies, viewport: session?.viewport, ...accessOptions(lease, session?.headers) }, input.limits?.timeoutMs)

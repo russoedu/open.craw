@@ -105,6 +105,12 @@ export interface SessionSpec {
   blockedWhen?:      BlockRule
   onBlock?:          BlockRotation
   captcha?:          CaptchaSettings
+  /**
+   * A browser profile of the runner that persists between runs (cookies,
+   * storage, cache): web recipes and bootstraps run in it. A name; the runner
+   * decides where profiles live.
+   */
+  browserProfile?:   string
 }
 
 export interface CrawlLimits {
@@ -204,6 +210,7 @@ export const sessionSpecSchema: z.ZodType<SessionSpec> = z.strictObject({
   blockedWhen:      blockRuleSchema.optional(),
   onBlock:          blockRotationSchema.optional(),
   captcha:          captchaSettingsSchema.optional(),
+  browserProfile:   z.string().regex(/^[\w-]+$/, 'a browser profile name is letters, digits, hyphens and underscores').optional(),
 })
 
 const limitsSchema: z.ZodType<CrawlLimits> = z.strictObject({

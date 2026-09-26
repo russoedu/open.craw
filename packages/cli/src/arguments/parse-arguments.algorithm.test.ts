@@ -15,6 +15,7 @@ describe('parseArguments', () => {
       dryRun:   true,
       only:     ['a', 'b'],
       headed:   false,
+      profiles: undefined,
       throttle: { delayMs: undefined, concurrency: undefined },
       options:  { browserPath: undefined, insecureTls: true, userAgent: undefined, access: undefined, accessProfile: undefined, plugins: undefined },
     })
@@ -30,6 +31,8 @@ describe('parseArguments', () => {
     expect(parseArguments(['probe', 'https://x'], { OPENCRAW_PLUGINS: 'p.mjs', OPENCRAW_HOOKS: 'h.mjs' })).toMatchObject({ options: { plugins: 'p.mjs' } })
     expect(parseArguments(['run', 'r/'], { OPENCRAW_PLUGINS: '', OPENCRAW_HOOKS: '' })).toMatchObject({ options: { plugins: undefined } })
     expect(parseArguments(['run', 'r/', '--host-delay', '500', '--host-concurrency', '2'])).toMatchObject({ throttle: { delayMs: 500, concurrency: 2 } })
+    expect(parseArguments(['run', 'r/'], { OPENCRAW_PROFILES: '/p' })).toMatchObject({ profiles: '/p' })
+    expect(parseArguments(['run', 'r/', '--profiles', 'here'], { OPENCRAW_PROFILES: '/p' })).toMatchObject({ profiles: 'here' })
   })
 
   it('rejects what makes no sense', () => {

@@ -302,6 +302,10 @@
             "solver"
           ],
           "additionalProperties": false
+        },
+        "browserProfile": {
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         }
       },
       "additionalProperties": false

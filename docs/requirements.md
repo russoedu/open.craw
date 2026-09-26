@@ -41,7 +41,7 @@ JavaScript module whose default export is the name -> function map.
 | `mode` | `web` (Playwright browser page) or `api` (Playwright request context, no browser). |
 | `start` | One or more `{ url, vars? }`; each start point runs the whole step list. |
 | `vars` | Recipe-level variables, read in templates as `{{vars.name}}`. |
-| `session` | Headers, cookies, user agent, viewport, a saved `storageStatePath`, a `bootstrap`, `access` (`{ profile?, country?, sticky? }`), `blockedWhen`, `onBlock` and `captcha` (section 2.1). |
+| `session` | Headers, cookies, user agent, viewport, a saved `storageStatePath`, a `bootstrap`, `access` (`{ profile?, country?, sticky? }`), `blockedWhen`, `onBlock`, `captcha` and `browserProfile` (section 2.1). |
 | `limits` | `maxRecords` (exact, whatever is in flight), `delayMs` (minimum interval between request starts across the recipe), `timeoutMs`, `concurrency` (`forEach` iterations in flight, api mode; default `1`). |
 | `onError` | Default step policy: `fail`, `skip`, or `retry { attempts, backoffMs }`. |
 | `steps` | The acquisition recipe (section 2.2). |
@@ -79,6 +79,12 @@ run ends. See `docs/recipes/access.md`.
 the requests in flight per site, shared by every recipe a crawler runs. `domains` rules cover a domain and its
 subdomains, longest match first, and group them into one site. Every navigation, request, bootstrap page and
 `next.selector` click takes the site's turn; a recipe's own `limits` apply on top.
+
+**Browser profiles.** `session.browserProfile: name` runs web recipes and bootstraps in a persistent browser
+profile (`launchPersistentContext` on `<profilesDir>/<name>`; `CrawlOptions.profilesDir`, CLI `--profiles`,
+env `OPENCRAW_PROFILES`, default `.opencraw/profiles`). Api recipes start from the profile's storage state.
+A profile is held by one recipe run at a time: others in the crawler wait, the same run reopening after a
+rotation takes it over, and another process holding it is an error. Remote (`cdp`) access cannot use one.
 
 **Captchas.** `session.captcha: { solver, detect?, verify?, attempts?, timeoutMs?, maxSolves? }` (web mode and
 bootstraps) names a solver the runner registered (`CrawlOptions.captchaSolvers`, or a plugins module's

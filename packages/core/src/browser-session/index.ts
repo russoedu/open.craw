@@ -1,4 +1,5 @@
 export { BrowserClient, BrowserSession } from './browser.client'
+export { BrowserProfiles, BROWSER_PROFILE_NAME } from './browser-profile.store'
 export type { StorageState, SessionOptions } from './browser.client'
 export { DEFAULT_BROWSER_CONFIG } from './browser-session.config'
 export type { BrowserSessionConfig } from './browser-session.config'

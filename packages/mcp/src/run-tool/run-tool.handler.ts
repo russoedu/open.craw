@@ -74,6 +74,7 @@ export async function runTool (args: RunArgs): Promise<CallToolResult> {
       accessPlugins:  plugins?.accessPlugins,
       captchaSolvers: plugins?.captchaSolvers,
       access:         await resolveAccess({ insecureTls: false, access: serverFile('OPENCRAW_ACCESS'), accessProfile: args.access }),
+      profilesDir:    serverFile('OPENCRAW_PROFILES'),
       resume:         args.resume,
       browser:        {
         headless:          args.headed !== true,
@@ -105,7 +106,7 @@ export async function runTool (args: RunArgs): Promise<CallToolResult> {
  * Never a tool argument: a caller picks a profile, never a file, and never
  * names a module for the server to run.
  */
-function serverFile (name: 'OPENCRAW_ACCESS' | 'OPENCRAW_PLUGINS' | 'OPENCRAW_HOOKS'): string | undefined {
+function serverFile (name: 'OPENCRAW_ACCESS' | 'OPENCRAW_PLUGINS' | 'OPENCRAW_HOOKS' | 'OPENCRAW_PROFILES'): string | undefined {
   const file = process.env[name]
 
   return file === undefined || file === '' ? undefined : file

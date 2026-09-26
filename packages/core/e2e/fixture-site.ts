@@ -115,7 +115,7 @@ const CONFIGURATOR = `<!doctype html><html lang="en"><head><title>Configurator</
   })
 </script></body></html>`
 
-const LOGIN_FORM = '<!doctype html><html lang="en"><head><title>Login</title></head><body><form method="post" action="/login"><input id="user" name="user"><input id="pass" name="pass" type="password"><button type="submit">Go</button></form></body></html>'
+const LOGIN_FORM = '<!doctype html><html lang="en"><head><title>Login</title></head><body><form method="post" action="/login"><input id="user" name="user"><input id="pass" name="pass" type="password"><label><input id="remember" name="remember" type="checkbox"> Remember me</label><button type="submit">Go</button></form></body></html>'
 const LOGGED_IN = '<!doctype html><html lang="en"><head><title>Account</title></head><body><p id="logged-in">Welcome</p></body></html>'
 
 /** The token the fake captcha accepts; anything else shows the challenge again. */
@@ -197,7 +197,8 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
     incoming.on('end', () => {
       const form = new URLSearchParams(body)
       if (form.get('user') === 'demo' && form.get('pass') === 'demo') {
-        outgoing.writeHead(302, { 'set-cookie': 'session=ok; Path=/; HttpOnly', 'location': '/account' })
+        // "Remember me" makes the cookie outlive the browser; without it, it is a session cookie.
+        outgoing.writeHead(302, { 'set-cookie': `session=ok; Path=/; HttpOnly${form.get('remember') === 'on' ? '; Max-Age=86400' : ''}`, 'location': '/account' })
         outgoing.end()
       } else {
         html(LOGIN_FORM, 401)

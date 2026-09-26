@@ -1,5 +1,6 @@
 import { AccessBroker } from '../access'
-import { BrowserClient } from '../browser-session'
+import { resolve } from 'node:path'
+import { BrowserClient, BrowserProfiles } from '../browser-session'
 import { CaptchaSolverRegistry } from '../captcha'
 import { EventBus } from '../crawl-events'
 import { HookRegistry } from '../hooks'
@@ -33,6 +34,7 @@ export function createCrawler (options: CrawlOptions = {}): Crawler {
   const hooks = new HookRegistry(options.hooks)
   const captchaSolvers = new CaptchaSolverRegistry(options.captchaSolvers)
   const hosts = new HostThrottle(options.throttle ?? options.access?.throttle)
+  const profiles = new BrowserProfiles(options.profilesDir ?? resolve(options.storageStateDir ?? '.', '.opencraw', 'profiles'), options.browser)
   const events = new EventBus(options.onEvent)
   let browser: Promise<BrowserClient> | undefined
   const launch = (): Promise<BrowserClient> => {
@@ -54,6 +56,7 @@ export function createCrawler (options: CrawlOptions = {}): Crawler {
       access,
       captchaSolvers,
       hosts,
+      profiles,
 
       ignoreHTTPSErrors: options.browser?.ignoreHTTPSErrors,
     }, options.onRecipeError ?? 'continue'),

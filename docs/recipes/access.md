@@ -352,11 +352,50 @@ to be far enough across.
 From the command line, `--host-delay <ms>` and `--host-concurrency <n>` set the top-level defaults (over the
 file's). From code: `createCrawler({ throttle: { delayMs: 500, domains: { … } } })`.
 
-## Not covered yet
+## Persistent browser profiles
 
-Tracked on issue #8:
+A fresh browser context forgets everything when it closes. Some sites judge you by what you have been: a
+login that lasts weeks, a consent choice, a trust score built over visits, a device check passed once.
+`session.browserProfile` runs a recipe in a **profile that persists**: a real browser user-data directory
+(cookies, local storage, IndexedDB, cache, service workers), reopened on every run. The browser version of a
+user who never clears their history.
 
-- **Persistent browser profiles.**
+```json
+"session": {
+  "browserProfile": "shop",
+  "bootstrap": { "keep": ["cookies"], "steps": [ … the login … ] }
+}
+```
 
-A custom CA certificate is not a profile option either. Chromium reads its own certificate store, so use
+- **Web recipes** run in the profile. The bootstrap runs in the same browser as the crawl, and what both leave
+  behind stays for the next run.
+- **Api recipes** take the profile's cookies and storage as their starting state: after the bootstrap when
+  there is one, else as the profile holds them. A login a web recipe made yesterday feeds today's api recipe.
+- **Where:** `profilesDir` (`createCrawler({ profilesDir })`, CLI `--profiles <dir>`, `OPENCRAW_PROFILES`
+  for the CLI and the MCP server), one directory per name. Default: `.opencraw/profiles`. Profile names are
+  letters, digits, hyphens and underscores.
+- **One browser at a time.** A second recipe of the same crawler that wants the profile waits for the first to
+  finish. Another process holding it makes the recipe fail with `browser profile "shop" is open in another
+  browser`.
+- **The access lease still applies:** the profile's browser is launched through the recipe's proxy, and a
+  rotation relaunches it on the new one. A remote browser (`cdp`) cannot use a local profile: that combination
+  is refused.
+
+What a profile keeps is what a real browser keeps. **Session cookies**, those without an expiry, end when the
+browser closes, profile or not. A login that must outlast a run needs the site's "remember me", or a saved
+`storageStatePath`.
+
+A bootstrap that runs every time would log in again every time. To log in only when needed, check first:
+
+```json
+"steps": [
+  { "type": "goto", "url": "https://shop.example/account" },
+  { "type": "extract", "id": "me", "selector": "#logged-in", "kind": "css", "many": true },
+  { "type": "if", "test": "{{ len(me) == 0 }}", "steps": [ … the login … ] }
+]
+```
+
+## Certificates
+
+A custom CA certificate is not a profile option. Chromium reads its own certificate store, so use
 `ignoreHTTPSErrors`, or set `NODE_EXTRA_CA_CERTS` for the HTTP side when a provider gives you a CA.
