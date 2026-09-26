@@ -86,12 +86,15 @@ describe('persistent browser profiles (real chromium)', () => {
   }, 90000)
 
   it('refuses a profile another browser holds open', async () => {
-    const first = createCrawler({ browser: browserConfig(), profilesDir })
+    // The holder signals once its page is open in the profile, then keeps it for three more seconds.
+    let opened: () => void = () => undefined
+    const holderOpen = new Promise<void>((resolve) => { opened = resolve })
+    const first = createCrawler({ browser: browserConfig(), profilesDir, onEvent: (event) => { if (event.type === 'page:visit') opened() } })
     const second = createCrawler({ browser: browserConfig(), profilesDir })
-    const slow = { ...webRecipe('holder', { browserProfile: 'busy' }), steps: [{ type: 'goto', url: '{{start.url}}' }, { type: 'wait', ms: 3000 }, { type: 'extract', id: 'name', selector: '"name":"([^"]+)"', kind: 'regex' }, { type: 'emit' }] }
+    const slow = { ...webRecipe('holder', { browserProfile: 'busy', bootstrap: login }), steps: [{ type: 'goto', url: '{{start.url}}' }, { type: 'wait', ms: 3000 }, { type: 'extract', id: 'name', selector: '"name":"([^"]+)"', kind: 'regex' }, { type: 'emit' }] }
     try {
-      const holding = first.run(await loadRecipes([output, { ...slow, session: { browserProfile: 'busy', bootstrap: login } }]))
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      const holding = first.run(await loadRecipes([output, slow]))
+      await holderOpen
       const refused = await second.run(await loadRecipes([output, webRecipe('intruder', { browserProfile: 'busy' })]))
       expect(refused.recipes[0].error).toContain('browser profile "busy" is open in another browser')
       expect(outcomes(await holding)).toEqual([['holder', 1, undefined]])

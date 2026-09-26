@@ -7,13 +7,15 @@ import { deckText } from '../deck-document'
 import { pdfText } from '../pdf-document'
 import { workbookText } from '../workbook-document'
 import { renderDeep, renderText } from '../template'
-import { BlockedError, detectBlock } from '../step-flow'
+import { BlockedError, detectBlock, resolveRetryRule, transientError, withTransportRetry } from '../step-flow'
+import type { Transient } from '../step-flow'
 import type { RunGate } from '../step-flow'
 
 /**
  * Sends a `request` step: renders its templates, waits for the gate's throttle,
- * sends, checks the response against the recipe's block rule, then binds it as
- * the scope's current document (and under the step id).
+ * sends (again, after a pause, while it fails in passing: `limits.retry`),
+ * checks the response against the recipe's block rule, then binds it as the
+ * scope's current document (and under the step id).
  *
  * @param step - The request step.
  * @param scope - The scope to render in and bind into.
@@ -26,27 +28,26 @@ import type { RunGate } from '../step-flow'
 export async function sendRequest (step: RequestStep, scope: ExtractionScope, client: HttpSender, recipe: InputRecipe, gate: RunGate, events: EventBus): Promise<void> {
   const lookup = (path: string): unknown => scope.lookup(path)
   const url = resolveUrl(renderText(step.url, lookup), scope.pageState?.url)
-  const release = await gate.request(url)
+  const request = {
+    method:    step.method,
+    url,
+    query:     step.query === undefined ? undefined : renderMap(step.query, lookup),
+    headers:   step.headers === undefined ? undefined : renderMap(step.headers, lookup),
+    body:      renderDeep(step.body, lookup),
+    as:        step.as,
+    encoding:  step.encoding,
+    delimiter: step.delimiter,
+    scalars:   step.scalars,
+    timeoutMs: recipe.limits?.timeoutMs,
+  }
+  const rule = resolveRetryRule(recipe.limits?.retry)
   let response: HttpResponse
   try {
-    response = await client.send({
-      method:    step.method,
-      url,
-      query:     step.query === undefined ? undefined : renderMap(step.query, lookup),
-      headers:   step.headers === undefined ? undefined : renderMap(step.headers, lookup),
-      body:      renderDeep(step.body, lookup),
-      as:        step.as,
-      encoding:  step.encoding,
-      delimiter: step.delimiter,
-      scalars:   step.scalars,
-      timeoutMs: recipe.limits?.timeoutMs,
-    })
+    response = await withTransportRetry(url, { run: () => client.send(request), problem: outcome => ('error' in outcome ? problemOf(outcome.error, rule.statuses) : undefined) }, { recipeId: recipe.id, gate, events, rule })
   } catch (error) {
     if (!(error instanceof HttpError)) throw error
     events.emit({ type: 'page:visit', recipeId: recipe.id, url: error.url, number: scope.pageState?.number ?? 1, status: error.status })
     throw await detectBlock({ url: error.url, status: error.status, headers: error.headers, text: async () => bodyText(error.body) }, recipe.session?.blockedWhen) ?? error
-  } finally {
-    release()
   }
   events.emit({ type: 'page:visit', recipeId: recipe.id, url: response.url, number: scope.pageState?.number ?? 1, status: response.status })
   const warnings = response.warnings ?? []
@@ -58,6 +59,13 @@ export async function sendRequest (step: RequestStep, scope: ExtractionScope, cl
   }
   scope.setPage({ url: response.url, document: response.body })
   if (step.id !== undefined) scope.set(step.id, documentValue(response.body))
+}
+
+/** A retry status (with the server's `Retry-After`), or a connection that failed. */
+function problemOf (error: unknown, statuses: readonly number[]): Transient | undefined {
+  if (error instanceof HttpError) return statuses.includes(error.status) ? { reason: `HTTP ${error.status}`, retryAfter: error.headers['retry-after'] } : undefined
+
+  return transientError(error)
 }
 
 /** The class names of the widgets `session.captcha` solves. Checked only when a recipe declares it. */

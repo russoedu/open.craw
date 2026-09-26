@@ -48,6 +48,7 @@ export async function runRecipes (command: Extract<Command, { name: 'run' }>, te
     access,
     throttle:       throttleFor(command, access?.throttle),
     profilesDir:    command.profiles,
+    retry:          command.retries === undefined ? undefined : { attempts: command.retries },
     hooks:          plugins?.hooks,
     accessPlugins:  plugins?.accessPlugins,
     captchaSolvers: plugins?.captchaSolvers,

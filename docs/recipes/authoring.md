@@ -144,7 +144,7 @@ fields is never de-duplicated. Duplicates are reported (`record:duplicate`) and 
 | `start` | One or more start points `{ url, vars? }`. Each runs the whole step list from a fresh scope with `start.url` and its `vars`. |
 | `vars` | Values templates read as `{{vars.name}}`. Start-point `vars` override recipe `vars`. |
 | `session` | §2.2. |
-| `limits` | `maxRecords` stops the walk after that many records, exactly, whatever runs in parallel. `delayMs` is the minimum interval between two request starts across the recipe. `timeoutMs` bounds navigations and requests. `concurrency` (default `1`) is how many `forEach` iterations may run at once in `api` mode (§3.9). |
+| `limits` | `maxRecords` stops the walk after that many records, exactly, whatever runs in parallel. `delayMs` is the minimum interval between two request starts across the recipe. `timeoutMs` bounds navigations and requests. `concurrency` (default `1`) is how many `forEach` iterations may run at once in `api` mode (§3.9). `retry` sends a request that fails in passing again (§7; on by default). |
 | `onError` | The default policy for every step. §7. |
 | `steps` | The acquisition recipe. §3. |
 | `mapping` | Output field → mapping rule. §5. |
@@ -964,6 +964,32 @@ CapSolver, the costs, and when not to.
 | `skip` | The id stays unset, the walk continues, a `step:skip` event is reported. |
 | `retry` | The step is re-run up to `attempts` times with linear `backoffMs`, then treated as `fail`. |
 
+**A request fails in passing** (a dropped connection, a timeout, a 503, a 429). Before any of the above, the
+engine sends the same request again: that is `limits.retry`, and it is **on by default**.
+
+```json
+"limits": { "retry": { "attempts": 4, "backoffMs": 500, "maxDelayMs": 20000, "statuses": [429, 502, 503, 504] } }
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `attempts` | `3` | Tries per request, the first included. `1` turns it off. |
+| `backoffMs` | `1000` | The first pause. It doubles on each retry, give or take 25% so parallel requests do not retry in step. |
+| `maxDelayMs` | `30000` | The longest pause. A server whose `Retry-After` asks for longer is not retried: it means "come back much later". |
+| `statuses` | `[408, 425, 429, 500, 502, 503, 504]` | Answers retried. Connection failures always are: resets, refusals, timeouts, a DNS lookup that could not run, a proxy that dropped the tunnel. A host that does not exist is not. |
+
+- It covers every `goto`, `request` and `next.url` page. A `Retry-After` (seconds or a date) is honoured, and it
+  holds back **every** request to that site, not only the one that got it.
+- A retry is the same request again, on the same access lease. It does not spend the step's `onError` retries,
+  and each one is a `request:retry` event (`↺` in the trace).
+- When the tries run out, the last answer counts. A 429 or 403 that is still there becomes a block
+  (`session.blockedWhen`), so `onBlock.rotate` takes over; a 503 fails the step, and the step's `onError` applies.
+- The crawler sets the default for every recipe: `createCrawler({ retry: { attempts: 5 } })`, CLI `--retries <n>`.
+  A recipe's `limits.retry` wins over it.
+
+Like redialling a busy number: wait a moment, dial again, give up after a few tries. If the other end said "call
+back in a minute", wait that minute.
+
 **A mapped value is missing** (`undefined`, `null`, `""`; an empty list is a value). The policy is the
 mapping rule's `onMissing`, else the field's, else `default` when the field has a `default`, else the
 recipe's, else `fail` for required fields and `null` otherwise:
@@ -1034,7 +1060,7 @@ a resumed run costs the requests but not the duplicates. Any sink can support th
 ### 8.1 Events and the trace
 
 Everything the engine does is an event: `recipe:start` / `recipe:finish`, `page:visit` (with the HTTP status),
-`access:lease` / `access:blocked` / `access:rotate`, `captcha:detected` / `captcha:solve` / `captcha:solved` /
+`access:lease` / `access:blocked` / `access:rotate`, `request:retry`, `captcha:detected` / `captcha:solve` / `captcha:solved` /
 `captcha:failed` / `captcha:budget`, `step:start` /
 `step:finish` / `step:retry` / `step:skip` (with the step type, its id and its path such as
 `steps.8.steps.2`), `step:branch`, `record:emit` / `record:reject` / `record:duplicate` / `record:skipped`,

@@ -4,6 +4,7 @@ import type { CaptchaSolver } from '../captcha'
 import type { CrawlListener } from '../crawl-events'
 import type { HookMap } from '../hooks'
 import type { ThrottleConfig } from '../step-flow'
+import type { RetryRule } from '../recipe-schema'
 import type { DedupeScope, RecordSink } from '../record-sink'
 
 /** How a crawler is created. Everything is optional. */
@@ -46,6 +47,13 @@ export interface CrawlOptions {
    * `access.throttle`; without either, only each recipe's `limits` apply.
    */
   throttle?:        ThrottleConfig
+  /**
+   * How a request that fails in passing (a dropped connection, a timeout, a
+   * 503, a 429) is sent again, for recipes whose `limits.retry` says
+   * nothing: `{ attempts?, backoffMs?, maxDelayMs?, statuses? }`. Default:
+   * three tries, one then two seconds apart, `Retry-After` honoured.
+   */
+  retry?:           RetryRule
   /** Plugins `{ kind: 'plugin', name }` profiles refer to. */
   accessPlugins?:   AccessPlugin[]
   /** Solvers recipes name in `session.captcha.solver` and `captcha` steps. */

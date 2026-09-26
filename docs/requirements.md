@@ -80,6 +80,14 @@ the requests in flight per site, shared by every recipe a crawler runs. `domains
 subdomains, longest match first, and group them into one site. Every navigation, request, bootstrap page and
 `next.selector` click takes the site's turn; a recipe's own `limits` apply on top.
 
+**Retries.** A request that fails in passing is sent again before the step's error policy sees it:
+`limits.retry: { attempts?, backoffMs?, maxDelayMs?, statuses? }`, over `CrawlOptions.retry` (CLI `--retries`),
+over the default of 3 tries, 1 s doubling with ±25 % jitter, capped at 30 s, statuses 408, 425, 429, 500, 502,
+503, 504, plus connection failures and timeouts (not unknown hosts). `Retry-After` is honoured when within
+`maxDelayMs` and pauses the whole site in the per-site throttle; a longer one is not retried. It covers `goto`,
+`request` and `next.url`; each retry is a `request:retry` event. After the last try the outcome goes on as
+before: block detection, then the step's `onError`.
+
 **Browser profiles.** `session.browserProfile: name` runs web recipes and bootstraps in a persistent browser
 profile (`launchPersistentContext` on `<profilesDir>/<name>`; `CrawlOptions.profilesDir`, CLI `--profiles`,
 env `OPENCRAW_PROFILES`, default `.opencraw/profiles`). Api recipes start from the profile's storage state.

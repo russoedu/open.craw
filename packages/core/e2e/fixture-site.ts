@@ -171,6 +171,34 @@ function captchaRoute (incoming: IncomingMessage, outgoing: ServerResponse, url:
   }
 }
 
+/** Hits per `/flaky` key, so each test gets its own failure count. */
+const flakyHits = new Map<string, number>()
+
+/**
+ * Fails its first `fail` hits per `key`, the way a struggling server does:
+ * `mode=reset` drops the connection, `status` answers 503, `retry-after`
+ * answers 429 asking for one second. Then it answers normally.
+ */
+function flakyRoute (incoming: IncomingMessage, outgoing: ServerResponse, url: URL): void {
+  const key = url.searchParams.get('key') ?? ''
+  const hits = (flakyHits.get(key) ?? 0) + 1
+  flakyHits.set(key, hits)
+  if (hits <= Number(url.searchParams.get('fail') ?? '0')) {
+    const mode = url.searchParams.get('mode')
+    if (mode === 'reset') {
+      incoming.socket.destroy()
+
+      return
+    }
+    outgoing.writeHead(mode === 'retry-after' ? 429 : 503, { 'content-type': 'text/plain', ...(mode === 'retry-after' && { 'retry-after': '1' }) })
+    outgoing.end('try later')
+
+    return
+  }
+  outgoing.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+  outgoing.end(`<!doctype html><html lang="en"><body><p id="ok">ok after ${hits}</p></body></html>`)
+}
+
 function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
   const url = new URL(incoming.url ?? '/', FIXTURE_BASE)
   const html = (body: string, status = 200): void => {
@@ -189,6 +217,7 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
     return html(productHtml(product(id)))
   }
   if (url.pathname.startsWith('/captcha/') && captchaRoute(incoming, outgoing, url, html)) return
+  if (url.pathname === '/flaky') return flakyRoute(incoming, outgoing, url)
   if (url.pathname === '/configurator') return html(CONFIGURATOR)
   if (url.pathname === '/login' && incoming.method === 'GET') return html(LOGIN_FORM)
   if (url.pathname === '/login' && incoming.method === 'POST') {

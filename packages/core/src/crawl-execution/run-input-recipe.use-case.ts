@@ -9,9 +9,9 @@ import { ExtractionScope } from '../extraction-scope'
 import type { HookRegistry } from '../hooks'
 import { HttpClient } from '../http-session'
 import { mapRecord, RecordRejectedError } from '../output-mapping'
-import type { InputRecipe, OutputRecipe } from '../recipe-schema'
+import type { InputRecipe, OutputRecipe, RetryRule } from '../recipe-schema'
 import type { DedupePolicy, RecordSink } from '../record-sink'
-import { RunGate, runSteps } from '../step-flow'
+import { resolveRetryRule, RunGate, runSteps } from '../step-flow'
 import type { HostThrottle } from '../step-flow'
 import type { EmitOutcome, StepRunner } from '../step-flow'
 import { WebStepRunner } from '../web-steps'
@@ -41,6 +41,8 @@ export interface RecipeRunDependencies {
   hosts?:             HostThrottle
   /** The runner's persistent browser profiles, for `session.browserProfile`. */
   profiles?:          BrowserProfiles
+  /** The crawler's retry rule, under each recipe's `limits.retry`. */
+  retry?:             RetryRule
 }
 
 /** What every runner of one recipe run shares. */
@@ -60,12 +62,13 @@ interface RunContext {
  * the sink sees one record at a time and `maxRecords` is exact: once reached,
  * every later emit returns `stop` before mapping.
  *
- * @param input - The input recipe.
+ * @param recipe - The input recipe.
  * @param output - The output recipe it feeds.
  * @param deps - Shared browser, hooks, events, sink and de-duplication.
  * @returns What happened.
  */
-export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, deps: RecipeRunDependencies): Promise<RecipeReport> {
+export async function runInputRecipe (recipe: InputRecipe, output: OutputRecipe, deps: RecipeRunDependencies): Promise<RecipeReport> {
+  const input: InputRecipe = { ...recipe, limits: { ...recipe.limits, retry: resolveRetryRule(recipe.limits?.retry, deps.retry) } }
   const started = Date.now()
   const report: RecipeReport = { recipeId: input.id, mode: input.mode, emitted: 0, rejected: 0, duplicates: 0, skipped: 0, stepsSkipped: 0, pages: 0, durationMs: 0 }
   const captchas = { detected: 0, solved: 0, failed: 0 }

@@ -57,6 +57,7 @@ export function createCrawler (options: CrawlOptions = {}): Crawler {
       captchaSolvers,
       hosts,
       profiles,
+      retry:           options.retry,
 
       ignoreHTTPSErrors: options.browser?.ignoreHTTPSErrors,
     }, options.onRecipeError ?? 'continue'),

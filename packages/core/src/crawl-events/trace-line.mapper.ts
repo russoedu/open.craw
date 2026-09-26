@@ -21,6 +21,8 @@ export function traceLine (event: CrawlEvent): string | undefined {
     }
     case 'access:rotate': { return `${indent(1)}↻ new access lease (attempt ${event.attempt})`
     }
+    case 'request:retry': { return `${indent(1)}↺ ${event.url}: ${event.reason}, try ${event.attempt} in ${event.delayMs} ms`
+    }
     case 'captcha:detected': { return `${indent(1)}⚿ captcha ${event.kind} on ${event.url}`
     }
     case 'captcha:solve': { return undefined
