@@ -17,10 +17,11 @@ const DOCUMENT = /^\s*(?:<!doctype|<html)/i
  *
  * @param html - The markup (a whole document or a fragment).
  * @param selector - A CSS selector.
+ * @param xml - Read the markup as XML: names keep their case, `take: "html"` gives XML.
  * @returns Every match, in document order.
  */
-export function selectHtml (html: string, selector: string): HtmlMatch[] {
-  const api = DOCUMENT.test(html) ? load(html) : load(html, undefined, false)
+export function selectHtml (html: string, selector: string, xml = false): HtmlMatch[] {
+  const api = xml ? load(html, { xml: true }) : (DOCUMENT.test(html) ? load(html) : load(html, undefined, false))
 
   return api(selector).map((_, element) => ({ api, element: api(element) })).toArray()
 }

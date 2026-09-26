@@ -10,6 +10,7 @@ import type { BodyKind } from '../recipe-schema'
 import { csvWorkbook, readXlsxWorkbook, sheetNameOf } from '../workbook-document'
 import { parseJsonLike, parseJsonLines } from '../selection'
 import { readYaml } from '../yaml-document'
+import { gunzipIfNeeded, parseXml } from '../xml-document'
 import { HttpError } from './http-response.contract'
 import type { HttpBody, HttpRequest, HttpResponse, HttpSender } from './http-response.contract'
 import { charsetOf, decodeText } from './text-decoding.algorithm'
@@ -91,7 +92,7 @@ interface ReadBody {
 
 async function readBody (response: APIResponse, httpRequest: HttpRequest): Promise<ReadBody> {
   const contentType = response.headers()['content-type'] ?? ''
-  const format = httpRequest.as ?? formatFromContentType(contentType)
+  const format = httpRequest.as ?? formatFromContentType(contentType, response.url())
 
   return parseBody(format, await response.body(), response.url(), { ...httpRequest, charset: charsetOf(contentType) })
 }
@@ -104,7 +105,7 @@ async function readBody (response: APIResponse, httpRequest: HttpRequest): Promi
 async function readLocalFile (httpRequest: HttpRequest): Promise<HttpResponse> {
   const path = fileURLToPath(httpRequest.url)
   const bytes = await readFile(path)
-  const { body, warnings, format } = await parseBody(httpRequest.as ?? formatFromExtension(extname(path)), bytes, httpRequest.url, httpRequest)
+  const { body, warnings, format } = await parseBody(httpRequest.as ?? formatFromExtension(path), bytes, httpRequest.url, httpRequest)
 
   return { status: 200, url: httpRequest.url, headers: {}, body, format, ...(warnings.length > 0 && { warnings }) }
 }
@@ -115,6 +116,17 @@ async function parseBody (format: BodyKind, bytes: Uint8Array, url: string, read
     const { data, warnings } = await readYaml(text, url, reading.scalars)
 
     return { body: { kind: 'json', data }, warnings, format }
+  }
+  if (format === 'xml') {
+    // A sitemap is often served gzipped as a file (`sitemap.xml.gz`), not as a compressed response.
+    const { text } = decodeText(gunzipIfNeeded(bytes), reading)
+    try {
+      parseXml(text, url)
+    } catch (error) {
+      throw new Error(`${(error as Error).message}${/^\s*(?:<!doctype html|<html)/i.test(text) ? '; the body is HTML: read it with "as": "html"' : ''}`, { cause: error })
+    }
+
+    return { body: { kind: 'xml', xml: text }, warnings: [], format }
   }
   if (format === 'markdown') {
     const { text } = decodeText(bytes, reading)
@@ -152,8 +164,10 @@ function looksLikeJsonLines (text: string): boolean {
   return 'value' in first
 }
 
-function formatFromContentType (contentType: string): BodyKind {
+function formatFromContentType (contentType: string, url: string): BodyKind {
   const type = contentType.toLowerCase().split(';', 1)[0].trim()
+  // A gzipped sitemap is served as an archive; its name says what is inside.
+  if (GZIP_TYPES.has(type) && /\.xml\.gz$/i.test(new URL(url).pathname)) return 'xml'
   if (CSV_TYPES.has(type)) return 'csv'
   if (JSON_LINES_TYPES.has(type)) return 'jsonl'
   // A legacy .xls or .ppt goes to the Office reader too, which says what to do with it.
@@ -163,17 +177,21 @@ function formatFromContentType (contentType: string): BodyKind {
   if (type === 'text/markdown' || type === 'text/x-markdown') return 'markdown'
   if (type.includes('json')) return 'json'
   if (type.includes('pdf')) return 'pdf'
-  if (type.includes('html') || type.includes('xml')) return 'html'
+  if (type.includes('html')) return 'html'
+  if (type.includes('xml')) return 'xml'
 
   return 'text'
 }
 
 const JSON_LINES_TYPES = new Set(['application/x-ndjson', 'application/ndjson', 'application/jsonl', 'application/x-jsonlines', 'application/jsonlines'])
 const YAML_TYPES = new Set(['application/yaml', 'application/x-yaml', 'text/yaml', 'text/x-yaml'])
+const GZIP_TYPES = new Set(['application/gzip', 'application/x-gzip', 'application/octet-stream'])
 const CSV_TYPES = new Set(['text/csv', 'application/csv', 'text/x-csv', 'application/x-csv', 'text/comma-separated-values', 'text/tab-separated-values'])
 
-function formatFromExtension (extension: string): BodyKind {
-  const formats: Record<string, BodyKind> = { '.json': 'json', '.jsonl': 'jsonl', '.ndjson': 'jsonl', '.pdf': 'pdf', '.csv': 'csv', '.tsv': 'csv', '.xlsx': 'xlsx', '.xlsm': 'xlsx', '.xls': 'xlsx', '.pptx': 'pptx', '.pptm': 'pptx', '.ppsx': 'pptx', '.ppt': 'pptx', '.yaml': 'yaml', '.yml': 'yaml', '.md': 'markdown', '.markdown': 'markdown', '.html': 'html', '.htm': 'html', '.xml': 'html' }
+function formatFromExtension (path: string): BodyKind {
+  if (/\.xml\.gz$/i.test(path)) return 'xml'
+  const extension = extname(path)
+  const formats: Record<string, BodyKind> = { '.json': 'json', '.jsonl': 'jsonl', '.ndjson': 'jsonl', '.pdf': 'pdf', '.csv': 'csv', '.tsv': 'csv', '.xlsx': 'xlsx', '.xlsm': 'xlsx', '.xls': 'xlsx', '.pptx': 'pptx', '.pptm': 'pptx', '.ppsx': 'pptx', '.ppt': 'pptx', '.yaml': 'yaml', '.yml': 'yaml', '.md': 'markdown', '.markdown': 'markdown', '.html': 'html', '.htm': 'html', '.xml': 'xml', '.rss': 'xml', '.atom': 'xml', '.kml': 'xml', '.gpx': 'xml' }
 
   return formats[extension.toLowerCase()] ?? 'text'
 }

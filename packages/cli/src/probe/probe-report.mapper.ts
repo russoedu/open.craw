@@ -2,6 +2,7 @@ import type { ProbeFindings } from './find-data.algorithm'
 import type { DeckFindings } from './deck-findings.mapper'
 import type { HtmlFindings } from './html-findings.mapper'
 import type { JsonFindings } from './json-findings.mapper'
+import type { XmlFindings } from './xml-findings.mapper'
 import type { PdfFindings } from './pdf-findings.mapper'
 import type { WorkbookFindings } from './workbook-findings.mapper'
 
@@ -104,6 +105,30 @@ export function jsonReport (url: string, json: JsonFindings): string {
     '',
     section('Record lists (a "jsonpath" selector for each, largest first)', json.lists.map(list => `  ${list.path}  ${list.length} entries\n        keys: ${list.keys.join(', ')}`)),
     section('Structure', json.tree.map(line => `  ${line}`)),
+  ].filter(line => line !== '').join('\n')
+}
+
+/**
+ * Formats what a probe found in an XML document: its namespaces and the
+ * `namespaces` an `xpath` extract needs, the elements that repeat, and its structure.
+ *
+ * @param url - The document's URL.
+ * @param xml - The findings.
+ * @returns The report.
+ */
+export function xmlReport (url: string, xml: XmlFindings): string {
+  const defaultNamespace = xml.namespaces['']
+  const namespaceRows = Object.entries(xml.namespaces).map(([prefix, uri]) => `  ${prefix === '' ? '(default)' : prefix}  ${uri}`)
+  const hint = defaultNamespace === undefined
+    ? []
+    : ['', `  The elements are in a default namespace: query with "namespaces": { "x": "${defaultNamespace}" } and //x:${xml.root},`, '  or with "ignoreNamespaces": true and plain names, as below.']
+
+  return [
+    `${url} (XML: ${xml.root}${xml.sitemap === undefined ? '' : `, a sitemap of ${xml.sitemap.locations} ${xml.sitemap.kind === 'urlset' ? 'pages' : 'sitemaps'}`})`,
+    '',
+    section('Namespaces', [...namespaceRows, ...hint]),
+    section('Repeated elements (an "xpath" selector for each, largest first)', xml.lists.map(list => `  ${list.path}  ${list.count} entries${list.children.length > 0 ? `\n        children: ${list.children.join(', ')}` : ''}`)),
+    section('Structure', xml.tree.map(line => `  ${line}`)),
   ].filter(line => line !== '').join('\n')
 }
 

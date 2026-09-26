@@ -72,7 +72,9 @@ rows, and every row that looks like a table header, with the `selector` a `table
 also names the encoding and the delimiter it detected; for a presentation, its charts and the slides whose
 text boxes look like a table. JSON, JSON Lines and YAML show their structure instead, and every list of
 records with the `jsonpath` that walks it. An HTML page also lists its tables' header rows, and Markdown
-(a `.md` URL is read as Markdown even when served as `text/plain`) its sections and front matter keys.
+(a `.md` URL is read as Markdown even when served as `text/plain`) its sections and front matter keys. XML
+(a feed, a sitemap, an export) shows its namespaces with the `namespaces` line an `xpath` extract needs, the
+elements that repeat (its records), and its structure; a sitemap says how many pages it lists.
 
 ```sh
 opencraw probe https://example.com/price-list.pdf

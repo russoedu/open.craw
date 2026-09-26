@@ -1334,7 +1334,8 @@
                 "xlsx",
                 "pptx",
                 "yaml",
-                "markdown"
+                "markdown",
+                "xml"
               ]
             },
             "encoding": {
@@ -1513,6 +1514,20 @@
               "minLength": 1
             },
             "shapes": {
+              "type": "boolean"
+            },
+            "namespaces": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "pattern": "^[A-Z_][\\w.-]*$"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "ignoreNamespaces": {
               "type": "boolean"
             }
           },

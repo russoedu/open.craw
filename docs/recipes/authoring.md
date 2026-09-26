@@ -222,7 +222,7 @@ Clicks and key presses can navigate; the engine re-reads the page URL after ever
 
 | Step | Fields | Notes |
 |---|---|---|
-| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `jsonl`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`, `yaml`, `markdown`), `encoding?`, `delimiter?`, `scalars?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck, `application/yaml` YAML, `application/x-ndjson` JSON Lines, `text/markdown` Markdown). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`, `.yaml`, `.yml`, `.jsonl`, `.ndjson`, `.md`). 4xx/5xx fail the step. |
+| `request` | `url` (template), `method?`, `query?`, `headers?`, `body?`, `as?` (`json`, `jsonl`, `html`, `text`, `pdf`, `csv`, `xlsx`, `pptx`, `yaml`, `markdown`, `xml`), `encoding?`, `delimiter?`, `scalars?` | The response becomes the current document and, if `id` is set, the id holds the parsed JSON, the read PDF, workbook or deck, the markup or the text. Relative URLs resolve against the current page. Without `as`, the content type decides (`application/pdf` is a PDF, `text/csv` a CSV, a spreadsheet type a workbook, a presentation type a deck, `application/yaml` YAML, `application/x-ndjson` JSON Lines, `text/markdown` Markdown, an XML type XML: §4.12). A `file:` URL reads a local file, its kind from `as` or the extension (`.csv`, `.tsv`, `.xlsx`, `.xlsm`, `.pptx`, `.yaml`, `.yml`, `.jsonl`, `.ndjson`, `.md`, `.xml`, `.rss`, `.atom`, `.xml.gz`). 4xx/5xx fail the step. |
 
 Text bodies are decoded from, in order: a byte-order mark, `encoding` (any WHATWG label: `windows-1252`,
 `iso-8859-15`, `shift_jis`), the charset the server declares, UTF-8, and Windows-1252 for text that is not
@@ -242,7 +242,7 @@ body is sent as JSON:
 
 | Step | Fields | Notes |
 |---|---|---|
-| `extract` | `selector`, `kind` (`css`, `xpath`, `jsonpath`), `take?`, `many?`, `from?` | §4. |
+| `extract` | `selector`, `kind` (`css`, `xpath`, `jsonpath`, `regex`, `table`), `take?`, `many?`, `from?`; `namespaces?`, `ignoreNamespaces?` (`xpath` on XML) | §4. |
 | `set` | `value` | A literal, or a template when it is a string. |
 | `collect` | `into` (an id), `value` | Appends `value` (a literal, or a template when it is a string) to the list `into` holds, in whichever enclosing scope binds it; a list value is appended item by item, a missing one adds nothing. `into` must be bound first, usually `{ "type": "set", "id": "all", "value": [] }` before the loop: the binding validator checks. The way to carry values out of `forEach` iterations or `paginate` pages (§3.6). |
 | `forEach` | `over` (a list id) **or** `selector` (web), `as` (variable), `steps`, `emit?` | Runs `steps` once per item in a fresh child scope with the item bound as `as`. `emit: true` produces one record per iteration. `over` may name a single value; it is treated as a one-item list. `selector` iterates the live elements it matches (§3.7). |
@@ -492,7 +492,7 @@ fails: read it with `regex`, or a hook. The common JSON-LD pattern, both sites i
 | `kind` | Works on | Notes |
 |---|---|---|
 | `css` | live page, fetched HTML, HTML fragments | Standard CSS through Playwright (live) or cheerio (static). |
-| `xpath` | live page only | Use `css` on fetched HTML. |
+| `xpath` | live page, fetched XML, fetched HTML, XML or HTML fragments | XPath 1.0. Fetched HTML is parsed the way a browser parses it (`<tbody>` added), so a query that works in the browser works on the fetched page. On namespaced XML, see §4.12. |
 | `jsonpath` | JSON data, JSON text, lists of JSON texts | jsonpath-plus syntax: `$.items[*].url`, `$[?(@.actors)]`, `$[?(@['@type']=='Movie')].name`. |
 | `regex` | any document as text: markup, text, JSON re-serialised, a list of texts joined by newlines | A JavaScript regular expression (flags `gs`); group 1 is taken when the pattern has one, else the whole match. For values that live in inline scripts (`"carPath":"([^"]+)"`), attributes, or table prose (`Boot capacity</td>\\s*<td>([^<]+)`). |
 
@@ -770,6 +770,38 @@ the `selector` matches the header row, merged cells are filled, `headerRows` joi
 A model merged down its versions (`rowspan`) reads on every row, and *Consumption* over *Urban · Mixed*
 (`colspan`) names both columns. It replaces a `css` extract per `tr` and a `take` per `td`. `probe` lists
 every table's header row with a ready `selector`.
+
+### 4.12 XML: feeds, sitemaps, open data
+
+`application/xml`, `text/xml`, any `+xml` type (`application/atom+xml`, `application/rss+xml`), `.xml`, `.rss`,
+`.atom` files and gzipped `.xml.gz` sitemaps are read as XML (`as: "xml"` forces it). Query them with `xpath`:
+
+```json
+{ "type": "request", "url": "https://shop.example/feed.xml" },
+{ "type": "extract", "id": "entries", "selector": "//a:entry", "kind": "xpath", "namespaces": { "a": "http://www.w3.org/2005/Atom" }, "take": "json", "many": true },
+{ "type": "forEach", "over": "entries", "as": "entry", "emit": true, "steps": [
+  { "type": "extract", "id": "title", "from": "entry", "selector": "/a:entry/a:title", "kind": "xpath", "namespaces": { "a": "http://www.w3.org/2005/Atom" } },
+  { "type": "extract", "id": "link", "from": "entry", "selector": "/entry/link/@href", "kind": "xpath", "ignoreNamespaces": true, "take": "value" }
+] }
+```
+
+- **Namespaces.** An element in a namespace only matches a prefixed name. Prefixes the root element declares
+  (`xmlns:media="…"`) are known already. A **default** namespace (`<feed xmlns="http://www.w3.org/2005/Atom">`) has
+  no prefix, so give it one in `namespaces`, or set `ignoreNamespaces: true` and write plain names. `probe` prints
+  the namespaces and the line to paste. `//*[local-name()='entry']` also works, but reads worse.
+- **Take.** `text` collapses whitespace, `value` keeps a node's text as is (an attribute: `@href` with `take:
+  "value"`), `attr:<name>` reads an element's attribute, `html` is the element's inner markup, `json` its outer
+  markup: an entry to query again with `from`, its namespace declarations included. A function result
+  (`count(//a:entry)`, `string(/a:feed/a:title)`) is taken as it is.
+- **CDATA and entities.** `<![CDATA[600e <La Prima>]]>` and `&amp;` read as text. Entities a DOCTYPE declares are
+  never expanded and nothing external is fetched: an XML bomb or an XXE stays inert text.
+- **Sitemaps.** `//loc` with `ignoreNamespaces: true` lists a sitemap's pages; a `forEach` over them fetches each.
+  A sitemap index lists sitemaps: nest a second `forEach`.
+- **Other kinds on XML.** `css` works too (tag names keep their case; escape a prefix: `media\\:thumbnail`),
+  `regex` reads the markup; `jsonpath` and `table` do not.
+
+`xpath` also reads **fetched HTML** in api mode, parsed like a browser does: `//table[@class='variants']/tbody/tr`
+matches a page whose markup has no `<tbody>`.
 
 ## 5. Mapping
 

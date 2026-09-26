@@ -131,7 +131,7 @@ optional `when` template that must render truthy for the step to run.
 | `evaluate` | web | value | `script`, JavaScript run in the page. Trusted recipes only. |
 | `screenshot` | web | – | `path` |
 | `captcha` | web | – | `solver?`, `selector?`, `verify?`, `attempts?`, `timeoutMs?`; defaults from `session.captcha` |
-| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'jsonl' \| 'html' \| 'text' \| 'pdf' \| 'csv' \| 'xlsx' \| 'pptx' \| 'yaml' \| 'markdown'`, `encoding?`, `delimiter?` (CSV), `scalars?` (YAML) |
+| `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'jsonl' \| 'html' \| 'text' \| 'pdf' \| 'csv' \| 'xlsx' \| 'pptx' \| 'yaml' \| 'markdown' \| 'xml'`, `encoding?`, `delimiter?` (CSV), `scalars?` (YAML) |
 | `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex' \| 'table'`, `take`, `many?`, `from?`; `table` also `columns?`, `until?`, `align?` (PDF), `fillDown?`, `sheet?`, `headerRows?`, `includeHidden?` (workbook), `slide?`, `shapes?` (deck) |
 | `set` | both | value | `value` (template or literal) |
 | `collect` | both | – | `into` (a list id bound in an enclosing scope), `value` (template or literal); appends, so values outlive the `forEach` iteration or `paginate` page that found them |
@@ -188,8 +188,11 @@ data-front-matter>` in the head, raw HTML kept (parsed, never run). `table` read
 `<table>`s (fetched, rendered Markdown, or the live page in web mode) as grids — rows in order, `th`/`td`
 alike, `colspan`/`rowspan` as merged ranges, nested tables on their own — through the grid table reader.
 
-`take` is `text` (default), `html`, `value`, `json` or `attr:<name>`. `xpath` works on live pages only; on
-fetched HTML use `css`; on JSON use `jsonpath`. A `jsonpath` extract whose `from` is text parses it as JSON; a list of
+`take` is `text` (default), `html`, `value`, `json` or `attr:<name>`. `xpath` (XPath 1.0, `xpath` +
+`@xmldom/xmldom`) reads live pages, fetched XML and fetched HTML (parsed with the HTML5 parser, then queried
+without namespaces); on XML `namespaces` maps prefixes to URIs (the root's declared prefixes are known) and
+`ignoreNamespaces` drops them. XML (`as: 'xml'`, `*/xml`, `*+xml`, `.xml`, `.rss`, `.atom`, gzipped `.xml.gz`)
+is parsed strictly; DOCTYPE entities are never expanded and nothing external is fetched. On JSON use `jsonpath`. A `jsonpath` extract whose `from` is text parses it as JSON; a list of
 texts becomes the array of its parsable entries (the JSON-LD blocks of a page), and the path runs over that array.
 
 **Templates** are `{{ }}` placeholders resolved against the scope: a path (any id, the current `forEach`

@@ -76,6 +76,7 @@ function bodyText (body: HttpBody): string {
   if (body.kind === 'pdf') return pdfText(body)
   if (body.kind === 'workbook') return workbookText(body)
   if (body.kind === 'deck') return deckText(body)
+  if (body.kind === 'xml') return body.xml
 
   return body.kind === 'html' ? body.html : body.text
 }
