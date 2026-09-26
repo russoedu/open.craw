@@ -241,13 +241,15 @@ the `omit` fields, with each `set` field (a template) replacing or adding one. T
 read, never rendered. A report endpoint paged with a cursor:
 
 ```json
-{ "type": "paginate", "next": { "jsonpath": "$.next", "as": "cursor" }, "steps": [
-  { "type": "request", "url": "/report/rows", "method": "POST",
+{ "type": "paginate", "next": { "jsonpath": "$.next", "as": "cursor" }, "until": "{{ !page_rows.hasMore }}", "steps": [
+  { "type": "request", "id": "page_rows", "url": "/report/rows", "method": "POST",
     "form": { "selector": "#reportForm", "omit": ["captcha"], "set": { "pageSize": "25", "after": "{{ default(cursor, '') }}" } } },
   { "type": "extract", "id": "rows", "selector": "$.rows[*]", "kind": "jsonpath", "take": "json", "many": true },
   { "type": "forEach", "over": "rows", "as": "row", "emit": true, "steps": [] }
 ] }
 ```
+
+`until` stops on the endpoint's own "no more" flag: some keep returning a cursor on the last page.
 
 In web mode, a `jsonpath` extract reads the JSON the last `request` fetched (the live page is read by `css` and
 `xpath`), and `next.jsonpath` pages on it.
