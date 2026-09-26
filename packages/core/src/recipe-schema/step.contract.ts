@@ -25,7 +25,19 @@ export interface StepBaseFields {
   when?:    string
 }
 
-export interface GotoStep extends StepBaseFields { type: 'goto', url: string, waitUntil?: WaitUntil }
+/**
+ * When a page counts as loaded: an element that must show. A site that
+ * sometimes serves a page without its content (a slow backend, a half-rendered
+ * shell) is loaded again, up to `reloads` times.
+ */
+export interface GotoReady {
+  selector:   string
+  /** How long to wait for it on each load; `limits.timeoutMs`, else 30 s. */
+  timeoutMs?: number
+  /** Loads after the first. Default 2. */
+  reloads?:   number
+}
+export interface GotoStep extends StepBaseFields { type: 'goto', url: string, waitUntil?: WaitUntil, ready?: GotoReady }
 /** Where an interaction lands: a selector, or a `target` template that renders to a live element (a `forEach` over `selector`) or to a selector string. */
 export interface TargetFields { selector?: string, target?: string }
 export interface ClickStep extends StepBaseFields, TargetFields { type: 'click', optional?: boolean }
@@ -160,7 +172,8 @@ const plainSelector = z.string().min(1).refine(selector => !selector.includes('{
 const target = { selector: plainSelector.optional(), target: z.string().min(1).optional() }
 const ONE_TARGET = 'give exactly one of selector or target'
 const oneTarget = (step: { selector?: string, target?: string }): boolean => (step.selector === undefined) !== (step.target === undefined)
-const gotoStep = z.strictObject({ ...base, type: z.literal('goto'), url: z.string().min(1), waitUntil: z.enum(WAIT_UNTIL).optional() })
+const gotoReady = z.strictObject({ selector: plainSelector, timeoutMs: z.int().min(1).optional(), reloads: z.int().min(0).max(10).optional() })
+const gotoStep = z.strictObject({ ...base, type: z.literal('goto'), url: z.string().min(1), waitUntil: z.enum(WAIT_UNTIL).optional(), ready: gotoReady.optional() })
 const clickStep = z.strictObject({ ...base, ...target, type: z.literal('click'), optional: z.boolean().optional() }).refine(oneTarget, ONE_TARGET)
 const fillStep = z.strictObject({ ...base, ...target, type: z.literal('fill'), value: z.string() }).refine(oneTarget, ONE_TARGET)
 const pressStep = z.strictObject({ ...base, ...target, type: z.literal('press'), key: z.string().min(1) })

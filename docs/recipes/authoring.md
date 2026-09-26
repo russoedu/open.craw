@@ -202,7 +202,7 @@ Every step has `type`, and may have:
 
 | Step | Fields | Notes |
 |---|---|---|
-| `goto` | `url` (template), `waitUntil?` (`load`, `domcontentloaded`, `networkidle`, `commit`) | Relative URLs resolve against the current page. Records `page.url`. |
+| `goto` | `url` (template), `waitUntil?` (`load`, `domcontentloaded`, `networkidle`, `commit`), `ready?` | Relative URLs resolve against the current page. Records `page.url`. `ready: { selector, timeoutMs?, reloads? }` is an element the page must show: a site that sometimes serves its shell without the content is loaded again, up to `reloads` times (default 2), each reload reported as `request:retry`. |
 | `click` | `selector` or `target`, `optional?` | First match. With `optional: true` a missing element is skipped after a 2 s wait. |
 | `fill` | `selector` or `target`, `value` (template) | |
 | `press` | `key`, `selector?` or `target?` | A key on an element, or on the page. |

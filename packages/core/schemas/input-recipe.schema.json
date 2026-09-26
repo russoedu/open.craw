@@ -530,6 +530,29 @@
                 "networkidle",
                 "commit"
               ]
+            },
+            "ready": {
+              "type": "object",
+              "properties": {
+                "selector": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "reloads": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10
+                }
+              },
+              "required": [
+                "selector"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [

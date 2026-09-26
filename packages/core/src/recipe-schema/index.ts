@@ -4,7 +4,7 @@ export type { FieldSpec, OutputRecipe } from './output-recipe.contract'
 export { stepSchema, errorPolicySchema, paginateNextSchema } from './step.contract'
 export type {
   Step, StepType, StepBaseFields, TargetFields, ErrorPolicy, PaginateNext, TakeKind,
-  GotoStep, ClickStep, FillStep, PressStep, SelectStep, ScrollStep, WaitStep, EvaluateStep, ScreenshotStep,
+  GotoStep, GotoReady, ClickStep, FillStep, PressStep, SelectStep, ScrollStep, WaitStep, EvaluateStep, ScreenshotStep,
   RequestStep, ExtractStep, SetStep, CollectStep, ForEachStep, IfStep, PaginateStep, EmitStep, HookStep, CaptchaStep, CaptchaCheck,
 } from './step.contract'
 export { transformRuleSchema, mappingRuleSchema } from './transform-rule.contract'

@@ -159,11 +159,13 @@ describe('recipeKindOf', () => {
     expect(parseInputRecipe(recipe([{ type: 'click', target: '#item-{{id}}' }])).steps[0]).toMatchObject({ target: '#item-{{id}}' })
   })
 
-  it('takes a wait timeout and evaluate args', () => {
+  it('takes a goto ready element, a wait timeout and evaluate args', () => {
     const parsed = parseInputRecipe(recipe([
+      { type: 'goto', url: '{{start.url}}', ready: { selector: '#yAxis', timeoutMs: 20_000, reloads: 3 } },
       { type: 'wait', selector: '#report', timeoutMs: 600_000 },
       { type: 'evaluate', id: 'x', script: '(a) => a.state', args: { state: '{{vars.state}}', codes: ['{{vars.code}}'] } },
     ]))
-    expect(parsed.steps).toMatchObject([{ timeoutMs: 600_000 }, { args: { state: '{{vars.state}}' } }])
+    expect(parsed.steps).toMatchObject([{ ready: { selector: '#yAxis', reloads: 3 } }, { timeoutMs: 600_000 }, { args: { state: '{{vars.state}}' } }])
+    expect(() => parseInputRecipe(recipe([{ type: 'goto', url: 'x', ready: { selector: '#{{id}}' } }]))).toThrow('a selector is not a template')
   })
 })

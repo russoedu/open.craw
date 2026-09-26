@@ -206,6 +206,13 @@ function flakyRoute (incoming: IncomingMessage, outgoing: ServerResponse, url: U
 
       return
     }
+    if (mode === 'shell') {
+      // A 200 without the content: the page's shell, as a struggling backend serves it.
+      outgoing.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+      outgoing.end('<!doctype html><html lang="en"><body><p id="shell">loading</p></body></html>')
+
+      return
+    }
     outgoing.writeHead(mode === 'retry-after' ? 429 : 503, { 'content-type': 'text/plain', ...(mode === 'retry-after' && { 'retry-after': '1' }) })
     outgoing.end('try later')
 
