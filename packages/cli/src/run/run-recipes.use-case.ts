@@ -46,11 +46,12 @@ export async function runRecipes (command: Extract<Command, { name: 'run' }>, te
   const crawler = createCrawler({
     sink,
     access,
-    hooks:         plugins?.hooks,
-    accessPlugins: plugins?.accessPlugins,
-    resume:        command.resume,
-    debug:         command.dryRun,
-    browser:       {
+    hooks:          plugins?.hooks,
+    accessPlugins:  plugins?.accessPlugins,
+    captchaSolvers: plugins?.captchaSolvers,
+    resume:         command.resume,
+    debug:          command.dryRun,
+    browser:        {
       headless:          !command.headed,
       executablePath:    command.options.browserPath,
       ignoreHTTPSErrors: command.options.insecureTls,

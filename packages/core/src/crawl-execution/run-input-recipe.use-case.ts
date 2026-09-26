@@ -2,6 +2,7 @@ import { AccessConfigError, redactEndpoint } from '../access'
 import type { AccessBroker, AccessLease } from '../access'
 import { ApiStepRunner } from '../api-steps'
 import { BrowserClient } from '../browser-session'
+import { CaptchaBudget, CaptchaGuard, CaptchaSolverRegistry, captchaSolverNames, DEFAULT_MAX_SOLVES } from '../captcha'
 import type { EventBus } from '../crawl-events'
 import { ExtractionScope } from '../extraction-scope'
 import type { HookRegistry } from '../hooks'
@@ -32,6 +33,15 @@ export interface RecipeRunDependencies {
   debug?:             boolean
   /** Leases each recipe run its network access. */
   access:             AccessBroker
+  /** The solvers recipes name; none when omitted. */
+  captchaSolvers?:    CaptchaSolverRegistry
+}
+
+/** What every runner of one recipe run shares. */
+interface RunContext {
+  gate:    RunGate
+  solvers: CaptchaSolverRegistry
+  budget:  CaptchaBudget
 }
 
 /**
@@ -52,6 +62,7 @@ export interface RecipeRunDependencies {
 export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, deps: RecipeRunDependencies): Promise<RecipeReport> {
   const started = Date.now()
   const report: RecipeReport = { recipeId: input.id, mode: input.mode, emitted: 0, rejected: 0, duplicates: 0, skipped: 0, stepsSkipped: 0, pages: 0, durationMs: 0 }
+  const captchas = { detected: 0, solved: 0, failed: 0 }
   const limits = input.limits ?? {}
   // A web recipe drives one page, so only api mode runs iterations in parallel.
   const gate = new RunGate(input.mode === 'web' ? 1 : (limits.concurrency ?? 1), limits.delayMs ?? 0)
@@ -60,17 +71,23 @@ export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, 
   const unsubscribe = deps.events.subscribe((event) => {
     if (event.type === 'page:visit' && event.recipeId === input.id) report.pages += 1
     if (event.type === 'step:skip' && event.recipeId === input.id) report.stepsSkipped += 1
+    if (event.type === 'captcha:detected' && event.recipeId === input.id) captchas.detected += 1
+    if (event.type === 'captcha:solved' && event.recipeId === input.id) captchas.solved += 1
+    if (event.type === 'captcha:failed' && event.recipeId === input.id) captchas.failed += 1
   })
   deps.events.emit({ type: 'recipe:start', recipeId: input.id, mode: input.mode })
   deps.dedupe.startRecipe()
   let runner: StepRunner | undefined
   try {
     const onBlock = input.session?.onBlock
+    const solvers = deps.captchaSolvers ?? new CaptchaSolverRegistry()
+    for (const name of captchaSolverNames(input)) solvers.resolve(name)
+    const context: RunContext = { gate, solvers, budget: new CaptchaBudget(input.session?.captcha?.maxSolves ?? DEFAULT_MAX_SOLVES) }
     runner = await RotatingRunner.open({
       recipe:       input,
       events:       deps.events,
       maxRotations: onBlock?.rotate === true ? (onBlock.attempts ?? 2) : 0,
-      open:         attempt => openLeased(input, deps, gate, attempt),
+      open:         attempt => openLeased(input, deps, context, attempt),
     })
     for (const point of input.start) {
       const scope = new ExtractionScope()
@@ -93,6 +110,7 @@ export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, 
   } finally {
     await runner?.dispose()
     unsubscribe()
+    if (captchas.detected > 0) report.captchas = captchas
     report.durationMs = Date.now() - started
     deps.events.emit({ type: 'recipe:finish', recipeId: input.id, emitted: report.emitted, rejected: report.rejected, duplicates: report.duplicates, skipped: report.skipped, stepsSkipped: report.stepsSkipped, pages: report.pages, durationMs: report.durationMs, error: report.error })
   }
@@ -161,26 +179,28 @@ async function leaseAccess (input: InputRecipe, deps: RecipeRunDependencies, att
 }
 
 /** A lease and a runner opened on it; the lease is released again when opening fails. */
-async function openLeased (input: InputRecipe, deps: RecipeRunDependencies, gate: RunGate, attempt: number): Promise<LeasedRunner> {
+async function openLeased (input: InputRecipe, deps: RecipeRunDependencies, context: RunContext, attempt: number): Promise<LeasedRunner> {
   const lease = await leaseAccess(input, deps, attempt)
   try {
-    return { runner: await openRunner(input, deps, gate, lease), lease }
+    return { runner: await openRunner(input, deps, context, lease), lease }
   } catch (error) {
     await lease.release?.()
     throw error
   }
 }
 
-async function openRunner (input: InputRecipe, deps: RecipeRunDependencies, gate: RunGate, lease: AccessLease): Promise<StepRunner> {
-  if (lease.cdp !== undefined) return openRemoteRunner(input, deps, gate, lease, lease.cdp)
-  const storageState = await resolveStorageState(input, deps, lease)
+async function openRunner (input: InputRecipe, deps: RecipeRunDependencies, context: RunContext, lease: AccessLease): Promise<StepRunner> {
+  const { gate } = context
+  const captcha = new CaptchaGuard({ recipe: input, events: deps.events, solvers: context.solvers, budget: context.budget, lease })
+  if (lease.cdp !== undefined) return openRemoteRunner(input, deps, context, lease, lease.cdp)
+  const storageState = await resolveStorageState(input, deps, lease, captcha)
   const session = input.session
   const access = accessOptions(lease, session?.headers)
   if (input.mode === 'web') {
     const browser = await deps.browser()
     const browserSession = await browser.newSession({ storageState, cookies: session?.cookies, userAgent: session?.userAgent, viewport: session?.viewport, ...access })
 
-    return new WebStepRunner(browserSession, input, deps.events, gate)
+    return new WebStepRunner(browserSession, input, deps.events, gate, captcha)
   }
   const client = await HttpClient.open({
     storageState,
@@ -199,17 +219,18 @@ async function openRunner (input: InputRecipe, deps: RecipeRunDependencies, gate
  * session as the crawl: providers tie the IP and fingerprint to the
  * connection, so a login in one connection would not carry to another.
  */
-async function openRemoteRunner (input: InputRecipe, deps: RecipeRunDependencies, gate: RunGate, lease: AccessLease, cdp: NonNullable<AccessLease['cdp']>): Promise<StepRunner> {
+async function openRemoteRunner (input: InputRecipe, deps: RecipeRunDependencies, context: RunContext, lease: AccessLease, cdp: NonNullable<AccessLease['cdp']>): Promise<StepRunner> {
+  const captcha = new CaptchaGuard({ recipe: input, events: deps.events, solvers: context.solvers, budget: context.budget, lease })
   if (input.mode === 'api') throw new AccessConfigError(`recipe "${input.id}" runs in api mode, but access profile "${lease.profile}" is a remote browser; api recipes need a proxy profile`)
   const session = input.session
   const storageState = await readSavedState(input, deps)
   const browserSession = await BrowserClient.connectOverCDP(cdp, { storageState, cookies: session?.cookies, viewport: session?.viewport, ...accessOptions(lease, session?.headers) }, input.limits?.timeoutMs)
   try {
-    if (storageState === undefined && session?.bootstrap !== undefined) await runBootstrap(input, browserSession, deps)
+    if (storageState === undefined && session?.bootstrap !== undefined) await runBootstrap(input, browserSession, deps, captcha)
   } catch (error) {
     await browserSession.close()
     throw error
   }
 
-  return new WebStepRunner(browserSession, input, deps.events, gate)
+  return new WebStepRunner(browserSession, input, deps.events, context.gate, captcha)
 }

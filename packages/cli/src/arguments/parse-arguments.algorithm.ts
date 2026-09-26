@@ -27,9 +27,10 @@ Options for both
   --access <file>     An access config: proxy profiles, credentials as {{env.NAME}} (or OPENCRAW_ACCESS).
   --access-profile <name>
                       The access profile to use when a recipe names none.
-  --plugins <file>    A JavaScript module exporting hooks (the recipes' hook steps and transforms)
-                      and accessPlugins (for { kind: "plugin" } access profiles); --hooks, or
-                      OPENCRAW_PLUGINS / OPENCRAW_HOOKS. It runs as your code: trust it.
+  --plugins <file>    A JavaScript module exporting hooks (the recipes' hook steps and transforms),
+                      accessPlugins (for { kind: "plugin" } access profiles) and captchaSolvers
+                      (for session.captcha and captcha steps); --hooks, or OPENCRAW_PLUGINS /
+                      OPENCRAW_HOOKS. It runs as your code: trust it.
   --help, --version`
 
 const OPTIONS = {

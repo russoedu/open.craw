@@ -238,14 +238,68 @@
             "rotate": {
               "type": "boolean"
             },
+            "solve": {
+              "type": "boolean"
+            },
             "attempts": {
               "type": "integer",
               "minimum": 1,
               "maximum": 10
             }
           },
+          "additionalProperties": false
+        },
+        "captcha": {
+          "type": "object",
+          "properties": {
+            "solver": {
+              "type": "string",
+              "minLength": 1
+            },
+            "detect": {
+              "type": "object",
+              "properties": {
+                "selector": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "selector"
+              ],
+              "additionalProperties": false
+            },
+            "verify": {
+              "type": "object",
+              "properties": {
+                "gone": {
+                  "type": "boolean"
+                },
+                "selector": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "attempts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 9007199254740991
+            },
+            "maxSolves": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
           "required": [
-            "rotate"
+            "solver"
           ],
           "additionalProperties": false
         }
@@ -2097,6 +2151,111 @@
             "type",
             "next",
             "steps"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Z_]\\w*$"
+            },
+            "onError": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "policy": {
+                      "type": "string",
+                      "const": "fail"
+                    }
+                  },
+                  "required": [
+                    "policy"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "policy": {
+                      "type": "string",
+                      "const": "skip"
+                    }
+                  },
+                  "required": [
+                    "policy"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "policy": {
+                      "type": "string",
+                      "const": "retry"
+                    },
+                    "attempts": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 20
+                    },
+                    "backoffMs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "policy",
+                    "attempts"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "when": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "captcha"
+            },
+            "solver": {
+              "type": "string",
+              "minLength": 1
+            },
+            "selector": {
+              "type": "string",
+              "minLength": 1
+            },
+            "verify": {
+              "type": "object",
+              "properties": {
+                "gone": {
+                  "type": "boolean"
+                },
+                "selector": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false
+            },
+            "attempts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "type"
           ],
           "additionalProperties": false
         }

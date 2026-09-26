@@ -1,25 +1,29 @@
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import type { AccessPlugin, Hook, HookMap } from '@opencraw/core'
+import type { AccessPlugin, CaptchaSolver, Hook, HookMap } from '@opencraw/core'
 
 /** What a plugins module provides: hooks for `hook` steps and transforms, and plugins the engine calls. */
 export interface PluginModule {
-  hooks:         HookMap
+  hooks:          HookMap
   /** Access plugins: `{ kind: "plugin", name }` profiles in the access config use them. */
-  accessPlugins: AccessPlugin[]
+  accessPlugins:  AccessPlugin[]
+  /** Captcha solvers: recipes name them in `session.captcha.solver` and `captcha` steps. */
+  captchaSolvers: CaptchaSolver[]
 }
 
 /** The named exports that mark a module as a plugins module rather than a bare hooks module. */
-const PLUGIN_EXPORTS = ['hooks', 'accessPlugins'] as const
+const PLUGIN_EXPORTS = ['hooks', 'accessPlugins', 'captchaSolvers'] as const
 
 /**
  * Loads a plugins module: a JavaScript module whose named exports `hooks`
- * (`{ name: function }`) and `accessPlugins` (`[{ name, lease }]`) give what
- * recipes and access profiles refer to by name:
+ * (`{ name: function }`), `accessPlugins` (`[{ name, lease }]`) and
+ * `captchaSolvers` (`[{ name, solve }]`) give what recipes and access profiles
+ * refer to by name:
  *
  * ```js
  * export const hooks = { positive: v => v > 0 }
  * export const accessPlugins = [{ name: 'browserbase', lease: async () => ({ cdp: { endpoint } }) }]
+ * export const captchaSolvers = [{ name: 'capsolver', solve: async (challenge, { page }) => ({ status: 'solved' }) }]
  * ```
  *
  * A module with none of those names is a bare hooks module, as before: its
@@ -45,14 +49,15 @@ export async function loadPlugins (path: string, importModule: ModuleImporter = 
   }
   if (PLUGIN_EXPORTS.every(name => !Object.hasOwn(exported, name))) {
     const hooks = hooksOf(hookExports(exported), path)
-    if (Object.keys(hooks).length === 0) throw new Error(`${path}: exports no hooks (export default { name: function } or named functions) and no plugins (export const hooks, accessPlugins)`)
+    if (Object.keys(hooks).length === 0) throw new Error(`${path}: exports no hooks (export default { name: function } or named functions) and no plugins (export const hooks, accessPlugins, captchaSolvers)`)
 
-    return { hooks, accessPlugins: [] }
+    return { hooks, accessPlugins: [], captchaSolvers: [] }
   }
 
   return {
-    hooks:         hooksOf(objectExport(exported.hooks, 'hooks', path), path),
-    accessPlugins: pluginsOf(exported.accessPlugins, 'accessPlugins', 'lease', path) as AccessPlugin[],
+    hooks:          hooksOf(objectExport(exported.hooks, 'hooks', path), path),
+    accessPlugins:  pluginsOf(exported.accessPlugins, 'accessPlugins', 'lease', path) as AccessPlugin[],
+    captchaSolvers: pluginsOf(exported.captchaSolvers, 'captchaSolvers', 'solve', path) as CaptchaSolver[],
   }
 }
 

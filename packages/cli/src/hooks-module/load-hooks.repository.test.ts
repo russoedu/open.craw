@@ -50,12 +50,14 @@ describe('loadPlugins', () => {
   it('takes a plugins module with plugins and no hooks, and a bare hooks module as before', async () => {
     expect(await loadPlugins('p.mjs', importing({ accessPlugins: [{ name: 'a', lease }] }))).toMatchObject({ hooks: {}, accessPlugins: [{ name: 'a' }] })
     expect(await loadPlugins('h.mjs', importing({ default: { positive: () => true } }))).toMatchObject({ hooks: { positive: expect.any(Function) }, accessPlugins: [] })
+    expect(await loadPlugins('c.mjs', importing({ captchaSolvers: [{ name: 'fake', solve: () => ({ status: 'solved' }) }] }))).toMatchObject({ hooks: {}, accessPlugins: [], captchaSolvers: [{ name: 'fake' }] })
   })
 
   it('says what is wrong with a plugin', async () => {
     await expect(loadPlugins('p.mjs', importing({ accessPlugins: { name: 'a', lease } }))).rejects.toThrow('p.mjs: "accessPlugins" must be an array of { name, lease }')
     await expect(loadPlugins('p.mjs', importing({ accessPlugins: [{ name: 'a' }] }))).rejects.toThrow('p.mjs: accessPlugins[0] must be { name: string, lease: function }')
     await expect(loadPlugins('p.mjs', importing({ accessPlugins: [{ name: 'a', lease }, { name: 'a', lease }] }))).rejects.toThrow('p.mjs: accessPlugins names "a" twice')
+    await expect(loadPlugins('p.mjs', importing({ captchaSolvers: [{ name: 'a', lease }] }))).rejects.toThrow('p.mjs: captchaSolvers[0] must be { name: string, solve: function }')
     await expect(loadPlugins('p.mjs', importing({ hooks: [() => true] }))).rejects.toThrow('p.mjs: "hooks" must be an object of functions')
   })
 })

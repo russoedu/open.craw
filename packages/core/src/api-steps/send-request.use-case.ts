@@ -7,7 +7,7 @@ import { deckText } from '../deck-document'
 import { pdfText } from '../pdf-document'
 import { workbookText } from '../workbook-document'
 import { renderDeep, renderText } from '../template'
-import { detectBlock } from '../step-flow'
+import { BlockedError, detectBlock } from '../step-flow'
 import type { RunGate } from '../step-flow'
 
 /**
@@ -21,7 +21,7 @@ import type { RunGate } from '../step-flow'
  * @param recipe - The recipe: its limits, block rule and id.
  * @param gate - Spaces request starts by `delayMs`.
  * @param events - Where to report the visit.
- * @throws BlockedError when the response is a block; HttpError for any other 4xx/5xx.
+ * @throws BlockedError when the response is a block, or a captcha page under `session.captcha`; HttpError for any other 4xx/5xx.
  */
 export async function sendRequest (step: RequestStep, scope: ExtractionScope, client: HttpSender, recipe: InputRecipe, gate: RunGate, events: EventBus): Promise<void> {
   const lookup = (path: string): unknown => scope.lookup(path)
@@ -51,9 +51,15 @@ export async function sendRequest (step: RequestStep, scope: ExtractionScope, cl
   for (const warning of warnings) events.emit({ type: 'warning', recipeId: recipe.id, message: `${response.url}: ${warning}`, meta: { url: response.url } })
   const blocked = await detectBlock({ url: response.url, status: response.status, headers: response.headers, text: async () => bodyText(response.body) }, recipe.session?.blockedWhen)
   if (blocked !== undefined) throw blocked
+  if (recipe.session?.captcha !== undefined && response.body.kind === 'html' && CAPTCHA_MARKUP.test(response.body.html)) {
+    throw new BlockedError(response.url, response.status, 'the page shows a captcha, which is solved on a live page: run this recipe in web mode, or get past it in session.bootstrap')
+  }
   scope.setPage({ url: response.url, document: response.body })
   if (step.id !== undefined) scope.set(step.id, documentValue(response.body))
 }
+
+/** The class names of the widgets `session.captcha` solves. Checked only when a recipe declares it. */
+const CAPTCHA_MARKUP = /\b(?:g-recaptcha|h-captcha|cf-turnstile)\b/
 
 function bodyText (body: HttpBody): string {
   if (body.kind === 'json') return JSON.stringify(body.data)

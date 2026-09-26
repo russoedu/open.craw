@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import type { AccessLease } from '../access'
 import type { BrowserClient, BrowserSession, SessionOptions, StorageState } from '../browser-session'
+import type { CaptchaGuard } from '../captcha'
 import type { EventBus } from '../crawl-events'
 import { ExtractionScope } from '../extraction-scope'
 import type { HookRegistry } from '../hooks'
@@ -42,9 +43,10 @@ export function accessOptions (lease: AccessLease | undefined, headers: Record<s
  * @param recipe - The input recipe.
  * @param deps - Browser, hooks, events.
  * @param lease - The recipe run's access; direct when omitted.
+ * @param captcha - Solves the bootstrap's captchas (a login form's).
  * @returns The state, or `undefined` when the recipe declares none.
  */
-export async function resolveStorageState (recipe: InputRecipe, deps: BootstrapDependencies, lease?: AccessLease): Promise<StorageState | undefined> {
+export async function resolveStorageState (recipe: InputRecipe, deps: BootstrapDependencies, lease?: AccessLease, captcha?: CaptchaGuard): Promise<StorageState | undefined> {
   const saved = await readSavedState(recipe, deps)
   const session = recipe.session
   if (saved !== undefined || session?.bootstrap === undefined) return saved
@@ -52,7 +54,7 @@ export async function resolveStorageState (recipe: InputRecipe, deps: BootstrapD
   const browser = await deps.browser()
   const browserSession = await browser.newSession({ cookies: session.cookies, userAgent: session.userAgent, viewport: session.viewport, ...accessOptions(lease, session.headers) })
   try {
-    return await runBootstrap(recipe, browserSession, deps)
+    return await runBootstrap(recipe, browserSession, deps, captcha)
   } finally {
     await browserSession.close()
   }
@@ -80,12 +82,13 @@ export async function readSavedState (recipe: InputRecipe, deps: Pick<BootstrapD
  * @param recipe - An input recipe with `session.bootstrap`.
  * @param browserSession - Where the steps run.
  * @param deps - Hooks, events, `storageStateDir`.
+ * @param captcha - Solves the bootstrap's captchas.
  * @returns The kept state.
  */
-export async function runBootstrap (recipe: InputRecipe, browserSession: BrowserSession, deps: Omit<BootstrapDependencies, 'browser'>): Promise<StorageState> {
+export async function runBootstrap (recipe: InputRecipe, browserSession: BrowserSession, deps: Omit<BootstrapDependencies, 'browser'>, captcha?: CaptchaGuard): Promise<StorageState> {
   const bootstrap = recipe.session?.bootstrap
   if (bootstrap === undefined) return { cookies: [], origins: [] }
-  const runner = new WebStepRunner(browserSession, recipe, deps.events)
+  const runner = new WebStepRunner(browserSession, recipe, deps.events, undefined, captcha)
   const scope = new ExtractionScope()
   scope.set('vars', recipe.vars ?? {})
   scope.set('start', { url: recipe.start[0].url })

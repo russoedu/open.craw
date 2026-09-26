@@ -17,6 +17,16 @@ export type CrawlEvent =
   (Base & { type: 'access:blocked', url: string, status: number, reason: string }) |
   /** The run gave up its access lease after a block and is taking a new one. */
   (Base & { type: 'access:rotate', attempt: number, reason: string }) |
+  /** A captcha challenge is on the page. */
+  (Base & { type: 'captcha:detected', url: string, kind: string, siteKey?: string }) |
+  /** A solver is trying (`attempt` counts from 1 per challenge). */
+  (Base & { type: 'captcha:solve', url: string, kind: string, solver: string, attempt: number }) |
+  /** The page confirmed the solve. */
+  (Base & { type: 'captcha:solved', url: string, kind: string, solver: string, attempt: number, durationMs: number }) |
+  /** The solver failed, timed out, or the page still shows the challenge. */
+  (Base & { type: 'captcha:failed', url: string, kind: string, solver: string, attempt: number, reason: string }) |
+  /** A challenge was left unsolved: the run spent its `maxSolves`. */
+  (Base & { type: 'captcha:budget', url: string, kind: string, max: number }) |
   (Base & { type: 'step:start', stepType: string, stepId?: string, path: string }) |
   (Base & { type: 'step:finish', stepType: string, stepId?: string, path: string, durationMs: number }) |
   (Base & { type: 'step:retry', stepType: string, stepId?: string, path: string, attempt: number, error: string }) |

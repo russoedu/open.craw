@@ -94,9 +94,36 @@ export interface PaginateStep extends StepBaseFields { type: 'paginate', next: P
 export interface EmitStep extends StepBaseFields { type: 'emit', output?: string }
 export interface HookStep extends StepBaseFields { type: 'hook', name: string, args?: Record<string, unknown> }
 
+/**
+ * How the engine confirms a captcha was solved (it never takes the solver's
+ * word): the challenge is gone, and/or an element appears.
+ */
+export interface CaptchaCheck {
+  /** The detected challenge must be off the page. Default `true`. */
+  gone?:     boolean
+  /** An element that must appear once solved. */
+  selector?: string
+}
+
+/**
+ * Solves the captcha on the live page, if there is one (none is not an error):
+ * a challenge known to sit at one point of the crawl, a login form. The solver
+ * and the defaults come from `session.captcha`, unless the step names its own.
+ */
+export interface CaptchaStep extends StepBaseFields {
+  type:       'captcha'
+  /** A captcha solver the runner registered; `session.captcha.solver` when omitted. */
+  solver?:    string
+  /** Where the challenge is (a Playwright selector); the common widgets when omitted. */
+  selector?:  string
+  verify?:    CaptchaCheck
+  attempts?:  number
+  timeoutMs?: number
+}
+
 export type Step =
   | GotoStep | ClickStep | FillStep | PressStep | SelectStep | ScrollStep | WaitStep | EvaluateStep | ScreenshotStep |
-  RequestStep | ExtractStep | SetStep | CollectStep | ForEachStep | IfStep | PaginateStep | EmitStep | HookStep
+  RequestStep | ExtractStep | SetStep | CollectStep | ForEachStep | IfStep | PaginateStep | EmitStep | HookStep | CaptchaStep
 
 export type StepType = Step['type']
 
@@ -177,6 +204,17 @@ const collectStep = z.strictObject({ ...base, type: z.literal('collect'), into: 
 const emitStep = z.strictObject({ ...base, type: z.literal('emit'), output: z.string().optional() })
 const hookStep = z.strictObject({ ...base, type: z.literal('hook'), name: z.string().min(1), args: z.record(z.string(), z.unknown()).optional() })
 
+export const captchaCheckSchema: z.ZodType<CaptchaCheck> = z.strictObject({ gone: z.boolean().optional(), selector: z.string().min(1).optional() })
+const captchaStep = z.strictObject({
+  ...base,
+  type:      z.literal('captcha'),
+  solver:    z.string().min(1).optional(),
+  selector:  z.string().min(1).optional(),
+  verify:    captchaCheckSchema.optional(),
+  attempts:  z.int().min(1).max(10).optional(),
+  timeoutMs: z.int().min(1000).optional(),
+})
+
 const emitFlag = z.union([z.literal(true), z.strictObject({ output: z.string().min(1) })])
 
 const steps = z.lazy(() => z.array(stepSchema))
@@ -194,5 +232,5 @@ const paginateStep = z.strictObject({
 
 export const stepSchema: z.ZodType<Step> = z.discriminatedUnion('type', [
   gotoStep, clickStep, fillStep, pressStep, selectStep, scrollStep, waitStep, evaluateStep, screenshotStep,
-  requestStep, extractStep, assignStep, collectStep, emitStep, hookStep, forEachStep, ifStep, paginateStep,
+  requestStep, extractStep, assignStep, collectStep, emitStep, hookStep, forEachStep, ifStep, paginateStep, captchaStep,
 ])

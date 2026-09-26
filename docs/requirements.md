@@ -41,7 +41,7 @@ JavaScript module whose default export is the name -> function map.
 | `mode` | `web` (Playwright browser page) or `api` (Playwright request context, no browser). |
 | `start` | One or more `{ url, vars? }`; each start point runs the whole step list. |
 | `vars` | Recipe-level variables, read in templates as `{{vars.name}}`. |
-| `session` | Headers, cookies, user agent, viewport, a saved `storageStatePath`, a `bootstrap`, `access` (`{ profile?, country?, sticky? }`), `blockedWhen` and `onBlock` (section 2.1). |
+| `session` | Headers, cookies, user agent, viewport, a saved `storageStatePath`, a `bootstrap`, `access` (`{ profile?, country?, sticky? }`), `blockedWhen`, `onBlock` and `captcha` (section 2.1). |
 | `limits` | `maxRecords` (exact, whatever is in flight), `delayMs` (minimum interval between request starts across the recipe), `timeoutMs`, `concurrency` (`forEach` iterations in flight, api mode; default `1`). |
 | `onError` | Default step policy: `fail`, `skip`, or `retry { attempts, backoffMs }`. |
 | `steps` | The acquisition recipe (section 2.2). |
@@ -74,6 +74,19 @@ attempts. It rotates at most `attempts` times (default 2), and a block seen by s
 one lease rotates once. Otherwise the block fails the step like any error. Replaced runners are disposed when the
 run ends. See `docs/recipes/access.md`.
 
+**Captchas.** `session.captcha: { solver, detect?, verify?, attempts?, timeoutMs?, maxSolves? }` (web mode and
+bootstraps) names a solver the runner registered (`CrawlOptions.captchaSolvers`, or a plugins module's
+`captchaSolvers`); an unknown name fails the recipe before its first page. After every navigation, click and key
+press, a visible challenge (reCAPTCHA v2, hCaptcha, Turnstile by default, or `detect.selector`) is handed to the
+solver with its kind, site key and selector, the live page, the access lease and an abort signal. The engine then
+waits up to 10 s for the page to confirm (`verify`: the challenge is gone, default, and/or a selector is visible),
+retries up to `attempts` (default 3), and gives up with a `CaptchaError`, a `BlockedError`, so `onBlock.rotate`
+applies. Every attempt spends one of the run's `maxSolves` (default 10, shared by rotations and the bootstrap).
+`onBlock.solve: true` solves the challenge a block page shows before the block counts. A `captcha` step solves at
+one point, reCAPTCHA v3 included. Api recipes with `session.captcha` fail on a page that shows a widget. Events:
+`captcha:detected`, `captcha:solve`, `captcha:solved`, `captcha:failed`, `captcha:budget`; the recipe report
+counts them under `captchas`. See `docs/recipes/captcha.md`.
+
 ### 2.2 Steps
 
 Every step has `type`, an optional `id` (the name of the value it produces), an optional `onError` and an
@@ -90,6 +103,7 @@ optional `when` template that must render truthy for the step to run.
 | `wait` | web | – | one of `selector`, `ms`, `state: 'networkidle'` |
 | `evaluate` | web | value | `script`, JavaScript run in the page. Trusted recipes only. |
 | `screenshot` | web | – | `path` |
+| `captcha` | web | – | `solver?`, `selector?`, `verify?`, `attempts?`, `timeoutMs?`; defaults from `session.captcha` |
 | `request` | api | document | `method?`, `url` (`http(s):` or a local `file:`), `query?`, `headers?`, `body?` (templated at every depth), `as: 'json' \| 'jsonl' \| 'html' \| 'text' \| 'pdf' \| 'csv' \| 'xlsx' \| 'pptx' \| 'yaml' \| 'markdown'`, `encoding?`, `delimiter?` (CSV), `scalars?` (YAML) |
 | `extract` | both | value or list | `selector` (a template), `kind: 'css' \| 'xpath' \| 'jsonpath' \| 'regex' \| 'table'`, `take`, `many?`, `from?`; `table` also `columns?`, `until?`, `align?` (PDF), `fillDown?`, `sheet?`, `headerRows?`, `includeHidden?` (workbook), `slide?`, `shapes?` (deck) |
 | `set` | both | value | `value` (template or literal) |

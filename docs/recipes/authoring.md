@@ -170,7 +170,8 @@ steps in its bootstrap** to obtain a session (§2.2).
 | `bootstrap` | `{ steps, keep, saveTo? }`. Runs `steps` in a browser **before** the crawl, then captures what `keep` lists (`cookies`, `localStorage`). A `web` recipe starts its page from that state; an `api` recipe sends those cookies with every request. Bootstrap steps are web steps only and never emit. |
 | `access` | `{ profile?, country?, sticky? }`: what the site needs from the network. `profile` names a profile of the runner's access config (its default when omitted), `country` is a two-letter code for profiles that target by country, `sticky: false` lets the provider change IP per request. Never credentials: those live in the access config. See [access.md](./access.md). |
 | `blockedWhen` | `{ status?, header?, text? }`: what counts as the site refusing the crawl, checked on every navigation and request. Default: 403, 429, or an AWS WAF challenge header. A block fails the step with the URL and reason instead of a later selector miss. |
-| `onBlock` | `{ rotate: true, attempts? }`: on a block, take a new access lease (a new IP), reopen the session (re-running the bootstrap) and retry the step, up to `attempts` times per run (default 2). |
+| `onBlock` | `{ rotate?, solve?, attempts? }`. `rotate: true`: on a block, take a new access lease (a new IP), reopen the session (re-running the bootstrap) and retry the step, up to `attempts` times per run (default 2). `solve: true` (web mode, needs `captcha`): a block page showing a captcha is solved on the spot; rotation, if on, applies only when solving fails. |
+| `captcha` | `{ solver, detect?, verify?, attempts?, timeoutMs?, maxSolves? }`, web mode and bootstraps: after every navigation, click and key press, a visible challenge is solved by the named solver before the next step runs. §6.1. |
 
 A login looks like this and works for both modes:
 
@@ -209,6 +210,7 @@ Every step has `type`, and may have:
 | `wait` | one of `selector`, `ms`, `state: "networkidle"` | `selector` waits for visibility. Put a `wait` after `goto` on script-heavy pages before extracting. |
 | `evaluate` | `script` | JavaScript evaluated in the page; the result is bound under `id`. **Trusted recipes only.** |
 | `screenshot` | `path` (template) | Full page. A debugging aid. |
+| `captcha` | `solver?`, `selector?`, `verify?`, `attempts?`, `timeoutMs?` | Solves the challenge on the page, if there is one (none is fine), reCAPTCHA v3 included. Missing fields come from `session.captcha`. §6.1. |
 
 Clicks and key presses can navigate; the engine re-reads the page URL after every web step.
 
@@ -881,11 +883,70 @@ option under their own name.
 // plugins.mjs
 export const hooks = { positive: input => Number(input) > 0 }
 export const accessPlugins = [myProxyList]
+export const captchaSolvers = [capsolver({ apiKey: process.env.CAPSOLVER_KEY })]
 ```
 
 The MCP server reads `OPENCRAW_PLUGINS` / `OPENCRAW_HOOKS` from its own environment, never from a tool call: an agent can run
 recipes that call your hooks but cannot make the server load a module of its choosing. The module runs as
 your code, with your privileges, like anything you `import`: load only files you trust.
+
+### 6.1 Captcha solvers
+
+A captcha solver gets past one challenge on the live page. The engine does the rest: finding challenges,
+checking the page afterwards, retrying, rotating, and capping what a run spends.
+
+```ts
+import type { CaptchaSolver } from '@opencraw/core'
+
+const solver: CaptchaSolver = {
+  name:  'my-solver',
+  solve: async (challenge, { page, lease, attempt, signal, log }) => {
+    // challenge: { kind, url, siteKey?, action?, selector? }
+    const token = await myService.solve(challenge.kind, challenge.siteKey, challenge.url, { signal })
+    await page.locator('[name="g-recaptcha-response"]').evaluate((field, value) => { field.value = value }, token)
+    await page.locator('form').first().evaluate(form => form.submit())
+    return { status: 'solved' }            // or { status: 'failed', reason: 'balance is zero' }
+  },
+}
+const crawler = createCrawler({ captchaSolvers: [solver] })
+```
+
+A recipe names it in `session.captcha` (checked after every navigation, click and key press) or in a
+`captcha` step (one known point, such as a login form):
+
+```json
+"session": { "captcha": { "solver": "my-solver", "verify": { "selector": "#results" }, "maxSolves": 5 },
+             "onBlock": { "solve": true, "rotate": true } }
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `solver` | | A registered solver's name. An unknown name fails the recipe before its first page. |
+| `detect.selector` | the common widgets | Where challenges are: visible `.g-recaptcha`, `.h-captcha`, `.cf-turnstile`, or their iframes. |
+| `verify` | `{ gone: true }` | How a solve is confirmed: the challenge is `gone` and/or an element (`selector`) appears. The solver's `solved` is only a claim. |
+| `attempts` | 3 | Solves tried per challenge. |
+| `timeoutMs` | 120000 | Time one solve may take; then `signal` aborts and the attempt fails. |
+| `maxSolves` | 10 | Solves the whole run may spend, rotations and bootstrap included. `0` detects without paying. |
+
+What happens:
+
+1. **Detect.** The first visible match gives `kind` (`recaptcha-v2`, `hcaptcha`, `turnstile`, `image`,
+   `unknown`; `recaptcha-v3` in a `captcha` step only), the `siteKey` (`data-sitekey`, or the iframe's `k` /
+   `sitekey`) and a `selector` for the widget.
+2. **Solve.** Each attempt spends one solve of `maxSolves`. The solver applies its answer on the page
+   (injects a token and submits, types a text). A throw or a timeout is a failed attempt.
+3. **Verify.** Up to 10 s for the page to confirm. A failed attempt re-detects (a widget re-renders after a
+   wrong answer), or reloads when the widget is gone without confirming.
+4. **Give up.** After `attempts`, or when `maxSolves` is spent, the step fails with a `CaptchaError`. It is a
+   block, so `onBlock.rotate` retries the step on a new IP (often an easier challenge, or none), then the step's
+   `onError` applies.
+
+Solvers get the access `lease`: token services solve faster, and more often correctly, through the same proxy
+as the browser. Api recipes cannot solve (there is no page): with `session.captcha`, a fetched page showing a
+widget fails as a block that says so. Solve it in `session.bootstrap` and keep the cookies.
+
+Solving captchas can break a site's terms of service. [captcha.md](captcha.md) has a working solver for
+CapSolver, the costs, and when not to.
 
 ---
 
@@ -970,7 +1031,8 @@ a resumed run costs the requests but not the duplicates. Any sink can support th
 ### 8.1 Events and the trace
 
 Everything the engine does is an event: `recipe:start` / `recipe:finish`, `page:visit` (with the HTTP status),
-`access:lease` / `access:blocked` / `access:rotate`, `step:start` /
+`access:lease` / `access:blocked` / `access:rotate`, `captcha:detected` / `captcha:solve` / `captcha:solved` /
+`captcha:failed` / `captcha:budget`, `step:start` /
 `step:finish` / `step:retry` / `step:skip` (with the step type, its id and its path such as
 `steps.8.steps.2`), `step:branch`, `record:emit` / `record:reject` / `record:duplicate` / `record:skipped`,
 `warning`, `error`. `traceLine`

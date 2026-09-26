@@ -32,6 +32,16 @@ describe('validateBinding', () => {
     ]))
   })
 
+  it('needs a solver for a captcha step and for onBlock.solve, and a live page for the latter', () => {
+    const captchaStep = { type: 'captcha' } as const
+    expect(messages({ ...web, steps: [...web.steps, captchaStep] })).toContain(`steps.${web.steps.length}: a captcha step needs a solver: name one ("solver") or add session.captcha`)
+    expect(messages({ ...web, steps: [...web.steps, { ...captchaStep, solver: 'capsolver' }] })).toEqual([])
+    expect(messages({ ...web, session: { ...web.session, captcha: { solver: 'capsolver' } }, steps: [...web.steps, captchaStep] })).toEqual([])
+    expect(messages({ ...web, session: { onBlock: { solve: true } } })).toEqual(['session.onBlock.solve: solving a block needs a solver: add session.captcha'])
+    expect(messages({ ...api, session: { ...api.session, captcha: { solver: 'capsolver' }, onBlock: { solve: true } } })).toEqual(['session.onBlock.solve: captchas are solved on a live page; this recipe runs in api mode (solve them in session.bootstrap)'])
+    expect(messages({ ...api, steps: [...api.steps, { ...captchaStep, solver: 'capsolver' }] })[0]).toContain('"captcha" needs a browser')
+  })
+
   it('reports a required field that is never mapped', () => {
     const { title: _title, ...rest } = api.mapping
     expect(messages({ ...api, mapping: rest })).toContain('mapping: required output field "title" is not mapped')

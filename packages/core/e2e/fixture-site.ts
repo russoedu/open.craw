@@ -118,6 +118,59 @@ const CONFIGURATOR = `<!doctype html><html lang="en"><head><title>Configurator</
 const LOGIN_FORM = '<!doctype html><html lang="en"><head><title>Login</title></head><body><form method="post" action="/login"><input id="user" name="user"><input id="pass" name="pass" type="password"><button type="submit">Go</button></form></body></html>'
 const LOGGED_IN = '<!doctype html><html lang="en"><head><title>Account</title></head><body><p id="logged-in">Welcome</p></body></html>'
 
+/** The token the fake captcha accepts; anything else shows the challenge again. */
+export const CAPTCHA_TOKEN = 'token-ok'
+export const CAPTCHA_SITE_KEY = 'test-site-key'
+
+/** A page that leads to the gate by a link, so the challenge appears after a click. */
+const CAPTCHA_START = '<!doctype html><html lang="en"><head><title>Search</title></head><body><a id="go" href="/captcha/gate">Search</a></body></html>'
+
+/**
+ * A reCAPTCHA-shaped challenge: a visible `.g-recaptcha` with a site key and
+ * the hidden `g-recaptcha-response` field a solver fills, in a form that posts
+ * the token back.
+ */
+function challengeHtml (back: string): string {
+  return `<!doctype html><html lang="en"><head><title>Check</title></head><body><h1>Are you human?</h1>
+<form id="challenge" method="post" action="/captcha/verify"><div class="g-recaptcha" data-sitekey="${CAPTCHA_SITE_KEY}" style="width:300px;height:78px;border:1px solid #999">I'm not a robot</div>
+<textarea id="g-recaptcha-response" name="g-recaptcha-response" style="display:none"></textarea><input type="hidden" name="back" value="${back}"></form></body></html>`
+}
+
+const CAPTCHA_RESULTS = '<!doctype html><html lang="en"><head><title>Results</title></head><body><ul id="results"><li class="item">Pandina</li><li class="item">600e</li></ul></body></html>'
+
+/** The captcha scenarios: a gate after a click, and a WAF that answers 403 with the challenge. Passing sets a cookie. */
+function captchaRoute (incoming: IncomingMessage, outgoing: ServerResponse, url: URL, html: (body: string, status?: number) => void): boolean {
+  const passed = (incoming.headers.cookie ?? '').includes('captcha=passed')
+  switch (url.pathname) {
+    case '/captcha/start': { html(CAPTCHA_START)
+
+      return true
+    }
+    case '/captcha/gate': { html(passed ? CAPTCHA_RESULTS : challengeHtml(url.pathname))
+
+      return true
+    }
+    case '/captcha/waf': { html(passed ? CAPTCHA_RESULTS : challengeHtml(url.pathname), passed ? 200 : 403)
+
+      return true
+    }
+    case '/captcha/verify': {
+      let body = ''
+      incoming.on('data', (chunk: Buffer) => { body += chunk.toString() })
+      incoming.on('end', () => {
+        const form = new URLSearchParams(body)
+        const back = form.get('back') ?? '/captcha/gate'
+        outgoing.writeHead(302, { location: back, ...(form.get('g-recaptcha-response') === CAPTCHA_TOKEN && { 'set-cookie': 'captcha=passed; Path=/' }) })
+        outgoing.end()
+      })
+
+      return true
+    }
+    default: { return false
+    }
+  }
+}
+
 function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
   const url = new URL(incoming.url ?? '/', FIXTURE_BASE)
   const html = (body: string, status = 200): void => {
@@ -135,6 +188,7 @@ function handle (incoming: IncomingMessage, outgoing: ServerResponse): void {
 
     return html(productHtml(product(id)))
   }
+  if (url.pathname.startsWith('/captcha/') && captchaRoute(incoming, outgoing, url, html)) return
   if (url.pathname === '/configurator') return html(CONFIGURATOR)
   if (url.pathname === '/login' && incoming.method === 'GET') return html(LOGIN_FORM)
   if (url.pathname === '/login' && incoming.method === 'POST') {

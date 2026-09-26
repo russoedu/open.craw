@@ -70,11 +70,12 @@ export async function runTool (args: RunArgs): Promise<CallToolResult> {
     const plugins = pluginsFile === undefined ? undefined : await loadPlugins(pluginsFile)
     crawler = createCrawler({
       sink,
-      hooks:         plugins?.hooks,
-      accessPlugins: plugins?.accessPlugins,
-      access:        await resolveAccess({ insecureTls: false, access: serverFile('OPENCRAW_ACCESS'), accessProfile: args.access }),
-      resume:        args.resume,
-      browser:       {
+      hooks:          plugins?.hooks,
+      accessPlugins:  plugins?.accessPlugins,
+      captchaSolvers: plugins?.captchaSolvers,
+      access:         await resolveAccess({ insecureTls: false, access: serverFile('OPENCRAW_ACCESS'), accessProfile: args.access }),
+      resume:         args.resume,
+      browser:        {
         headless:          args.headed !== true,
         executablePath:    args.browserPath ?? process.env.OPENCRAW_CHROMIUM,
         ignoreHTTPSErrors: args.insecureTls === true || process.env.OPENCRAW_INSECURE_TLS === '1',

@@ -184,6 +184,13 @@ describe('ApiStepRunner', () => {
     await expect(crawl({ ...one, session: { blockedWhen: { text: 'verify you are human' } } }, custom)).rejects.toThrow('body matches')
   })
 
+  it('refuses a captcha page under session.captcha, which only a live page can solve', async () => {
+    const widget: HttpSender = { send: async request => ({ status: 200, url: request.url, headers: {}, body: { kind: 'html', html: '<div class="g-recaptcha" data-sitekey="k"></div>' } }) }
+    const one: InputRecipe = { ...recipe, steps: [{ type: 'request', id: 'list', url: '{{page.url}}' }] }
+    await expect(crawl({ ...one, session: { captcha: { solver: 'x' } } }, widget)).rejects.toThrow('the page shows a captcha, which is solved on a live page')
+    await expect(crawl(one, widget)).resolves.toEqual([])
+  })
+
   it('renders templates in every string of an object body, keeping a lone placeholder\'s type', async () => {
     const sender = fakeSender()
     const withBody: InputRecipe = {

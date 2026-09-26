@@ -1,8 +1,8 @@
 import { z } from 'zod'
 import { CRAWL_MODES, KEEP_KINDS } from './recipe-kind.enum'
 import type { CrawlMode, KeepKind } from './recipe-kind.enum'
-import { errorPolicySchema, stepSchema } from './step.contract'
-import type { ErrorPolicy, Step } from './step.contract'
+import { captchaCheckSchema, errorPolicySchema, stepSchema } from './step.contract'
+import type { CaptchaCheck, ErrorPolicy, Step } from './step.contract'
 import { mappingRuleSchema } from './transform-rule.contract'
 import type { MappingRule } from './transform-rule.contract'
 
@@ -58,11 +58,39 @@ export interface BlockRule {
   text?:   string
 }
 
-/** What to do when blocked: take a new access lease (a new IP), reopen the session, and retry the step. */
+/**
+ * What to do when blocked. `solve`: when the block page shows a captcha, the
+ * `session.captcha` solver solves it on the spot. `rotate`: take a new access
+ * lease (a new IP), reopen the session, and retry the step; with `solve`, only
+ * once solving failed.
+ */
 export interface BlockRotation {
-  rotate:    boolean
+  rotate?:   boolean
+  solve?:    boolean
   /** How many rotations a recipe run may use. Default 2. */
   attempts?: number
+}
+
+/**
+ * How a web recipe gets past captchas: a solver the runner registered (a
+ * plugin's `captchaSolvers`), where to look for challenges, how to confirm
+ * one is solved, and what the run may spend. With it, the engine checks for a
+ * challenge after each navigation, click and key press, and solves it before
+ * the next step runs.
+ */
+export interface CaptchaSettings {
+  /** The name of a registered captcha solver. */
+  solver:     string
+  /** Where challenges are (a Playwright selector); the common widgets when omitted. */
+  detect?:    { selector: string }
+  /** How a solve is confirmed. Default: the challenge is gone. */
+  verify?:    CaptchaCheck
+  /** Solves tried per challenge before it counts as a block. Default 3. */
+  attempts?:  number
+  /** How long one solve may take. Default 120000. */
+  timeoutMs?: number
+  /** Solves the whole run may spend (a paid solver bills each). Default 10; 0 detects without solving. */
+  maxSolves?: number
 }
 
 export interface SessionSpec {
@@ -76,6 +104,7 @@ export interface SessionSpec {
   access?:           SessionAccess
   blockedWhen?:      BlockRule
   onBlock?:          BlockRotation
+  captcha?:          CaptchaSettings
 }
 
 export interface CrawlLimits {
@@ -150,8 +179,18 @@ const blockRuleSchema: z.ZodType<BlockRule> = z.strictObject({
 })
 
 const blockRotationSchema: z.ZodType<BlockRotation> = z.strictObject({
-  rotate:   z.boolean(),
+  rotate:   z.boolean().optional(),
+  solve:    z.boolean().optional(),
   attempts: z.int().min(1).max(10).optional(),
+})
+
+const captchaSettingsSchema: z.ZodType<CaptchaSettings> = z.strictObject({
+  solver:    z.string().min(1),
+  detect:    z.strictObject({ selector: z.string().min(1) }).optional(),
+  verify:    captchaCheckSchema.optional(),
+  attempts:  z.int().min(1).max(10).optional(),
+  timeoutMs: z.int().min(1000).optional(),
+  maxSolves: z.int().nonnegative().optional(),
 })
 
 export const sessionSpecSchema: z.ZodType<SessionSpec> = z.strictObject({
@@ -164,6 +203,7 @@ export const sessionSpecSchema: z.ZodType<SessionSpec> = z.strictObject({
   access:           sessionAccessSchema.optional(),
   blockedWhen:      blockRuleSchema.optional(),
   onBlock:          blockRotationSchema.optional(),
+  captcha:          captchaSettingsSchema.optional(),
 })
 
 const limitsSchema: z.ZodType<CrawlLimits> = z.strictObject({
