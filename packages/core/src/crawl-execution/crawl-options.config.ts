@@ -3,6 +3,7 @@ import type { BrowserSessionConfig } from '../browser-session'
 import type { CaptchaSolver } from '../captcha'
 import type { CrawlListener } from '../crawl-events'
 import type { HookMap } from '../hooks'
+import type { ThrottleConfig } from '../step-flow'
 import type { DedupeScope, RecordSink } from '../record-sink'
 
 /** How a crawler is created. Everything is optional. */
@@ -33,6 +34,13 @@ export interface CrawlOptions {
    * with `session.access.profile`. Without it every recipe goes direct.
    */
   access?:          AccessConfig
+  /**
+   * How gently each site is crawled, across every recipe this crawler runs:
+   * `delayMs` between request starts and `concurrency` requests in flight,
+   * per site, with `domains` for site-specific rules. Defaults to
+   * `access.throttle`; without either, only each recipe's `limits` apply.
+   */
+  throttle?:        ThrottleConfig
   /** Plugins `{ kind: 'plugin', name }` profiles refer to. */
   accessPlugins?:   AccessPlugin[]
   /** Solvers recipes name in `session.captcha.solver` and `captcha` steps. */

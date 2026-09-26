@@ -104,8 +104,13 @@ export class WebStepRunner implements StepRunner {
     const link = this.page.locator(next.selector).first()
     if (!await appears(link, NEXT_LINK_TIMEOUT_MS)) return null
     const before = this.page.url()
-    await link.click()
-    await this.page.waitForLoadState()
+    const release = await this.gate.request(before)
+    try {
+      await link.click()
+      await this.page.waitForLoadState()
+    } finally {
+      release()
+    }
     if (this.page.url() === before) await this.page.waitForTimeout(NEXT_LINK_TIMEOUT_MS / 4)
     this.events.emit({ type: 'page:visit', recipeId: this.recipe.id, url: this.page.url(), number: (scope.pageState?.number ?? 1) + 1 })
     await this.captcha?.check(this.page)

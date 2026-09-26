@@ -16,8 +16,13 @@ import { renderText } from '../template'
 export async function navigate (step: GotoStep, page: Page, scope: ExtractionScope, recipe: InputRecipe, gate: RunGate, events: EventBus): Promise<void> {
   const target = renderText(step.url, path => scope.lookup(path))
   const url = new URL(target, scope.pageState?.url ?? page.url()).href
-  await gate.throttle()
-  const response = await page.goto(url, { waitUntil: step.waitUntil, timeout: recipe.limits?.timeoutMs })
+  const release = await gate.request(url)
+  let response
+  try {
+    response = await page.goto(url, { waitUntil: step.waitUntil, timeout: recipe.limits?.timeoutMs })
+  } finally {
+    release()
+  }
   scope.setPage({ url: page.url() })
   events.emit({ type: 'page:visit', recipeId: recipe.id, url: page.url(), number: scope.pageState?.number ?? 1, status: response?.status() })
   if (response === null) return

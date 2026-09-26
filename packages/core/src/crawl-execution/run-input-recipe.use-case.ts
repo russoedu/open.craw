@@ -11,6 +11,7 @@ import { mapRecord, RecordRejectedError } from '../output-mapping'
 import type { InputRecipe, OutputRecipe } from '../recipe-schema'
 import type { DedupePolicy, RecordSink } from '../record-sink'
 import { RunGate, runSteps } from '../step-flow'
+import type { HostThrottle } from '../step-flow'
 import type { EmitOutcome, StepRunner } from '../step-flow'
 import { WebStepRunner } from '../web-steps'
 import { accessOptions, readSavedState, resolveStorageState, runBootstrap } from './bootstrap-session.use-case'
@@ -35,6 +36,8 @@ export interface RecipeRunDependencies {
   access:             AccessBroker
   /** The solvers recipes name; none when omitted. */
   captchaSolvers?:    CaptchaSolverRegistry
+  /** The crawler's per-site throttle, shared by every recipe. */
+  hosts?:             HostThrottle
 }
 
 /** What every runner of one recipe run shares. */
@@ -65,7 +68,7 @@ export async function runInputRecipe (input: InputRecipe, output: OutputRecipe, 
   const captchas = { detected: 0, solved: 0, failed: 0 }
   const limits = input.limits ?? {}
   // A web recipe drives one page, so only api mode runs iterations in parallel.
-  const gate = new RunGate(input.mode === 'web' ? 1 : (limits.concurrency ?? 1), limits.delayMs ?? 0)
+  const gate = new RunGate(input.mode === 'web' ? 1 : (limits.concurrency ?? 1), limits.delayMs ?? 0, deps.hosts)
   let stopped = false
   let chain: Promise<unknown> = Promise.resolve()
   const unsubscribe = deps.events.subscribe((event) => {

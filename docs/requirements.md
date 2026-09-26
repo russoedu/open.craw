@@ -74,6 +74,12 @@ attempts. It rotates at most `attempts` times (default 2), and a block seen by s
 one lease rotates once. Otherwise the block fails the step like any error. Replaced runners are disposed when the
 run ends. See `docs/recipes/access.md`.
 
+**Per-site throttle.** `CrawlOptions.throttle` (or the access config's `throttle`, or CLI `--host-delay` /
+`--host-concurrency`) is `{ delayMs?, concurrency?, domains? }`: the minimum interval between request starts and
+the requests in flight per site, shared by every recipe a crawler runs. `domains` rules cover a domain and its
+subdomains, longest match first, and group them into one site. Every navigation, request, bootstrap page and
+`next.selector` click takes the site's turn; a recipe's own `limits` apply on top.
+
 **Captchas.** `session.captcha: { solver, detect?, verify?, attempts?, timeoutMs?, maxSolves? }` (web mode and
 bootstraps) names a solver the runner registered (`CrawlOptions.captchaSolvers`, or a plugins module's
 `captchaSolvers`); an unknown name fails the recipe before its first page. After every navigation, click and key

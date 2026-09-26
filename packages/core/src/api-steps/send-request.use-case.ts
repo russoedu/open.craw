@@ -26,7 +26,7 @@ import type { RunGate } from '../step-flow'
 export async function sendRequest (step: RequestStep, scope: ExtractionScope, client: HttpSender, recipe: InputRecipe, gate: RunGate, events: EventBus): Promise<void> {
   const lookup = (path: string): unknown => scope.lookup(path)
   const url = resolveUrl(renderText(step.url, lookup), scope.pageState?.url)
-  await gate.throttle()
+  const release = await gate.request(url)
   let response: HttpResponse
   try {
     response = await client.send({
@@ -45,6 +45,8 @@ export async function sendRequest (step: RequestStep, scope: ExtractionScope, cl
     if (!(error instanceof HttpError)) throw error
     events.emit({ type: 'page:visit', recipeId: recipe.id, url: error.url, number: scope.pageState?.number ?? 1, status: error.status })
     throw await detectBlock({ url: error.url, status: error.status, headers: error.headers, text: async () => bodyText(error.body) }, recipe.session?.blockedWhen) ?? error
+  } finally {
+    release()
   }
   events.emit({ type: 'page:visit', recipeId: recipe.id, url: response.url, number: scope.pageState?.number ?? 1, status: response.status })
   const warnings = response.warnings ?? []

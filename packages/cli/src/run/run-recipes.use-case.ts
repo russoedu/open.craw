@@ -1,5 +1,5 @@
 import { RecipeBindingError, RecipeSet, RecipeValidationError, createCrawler, jsonLinesSink, memorySink, traceLine } from '@opencraw/core'
-import type { CrawlEvent } from '@opencraw/core'
+import type { CrawlEvent, ThrottleConfig } from '@opencraw/core'
 import { resolveAccess } from '../access'
 import { loadPlugins } from '../hooks-module'
 import type { Command } from '../arguments'
@@ -46,6 +46,7 @@ export async function runRecipes (command: Extract<Command, { name: 'run' }>, te
   const crawler = createCrawler({
     sink,
     access,
+    throttle:       throttleFor(command, access?.throttle),
     hooks:          plugins?.hooks,
     accessPlugins:  plugins?.accessPlugins,
     captchaSolvers: plugins?.captchaSolvers,
@@ -71,6 +72,14 @@ export async function runRecipes (command: Extract<Command, { name: 'run' }>, te
   } finally {
     await crawler.close()
   }
+}
+
+/** The access config's throttle, with `--host-delay` / `--host-concurrency` over its defaults. */
+function throttleFor (command: Extract<Command, { name: 'run' }>, fromConfig: ThrottleConfig | undefined): ThrottleConfig | undefined {
+  const { delayMs, concurrency } = command.throttle
+  if (delayMs === undefined && concurrency === undefined) return fromConfig
+
+  return { ...fromConfig, ...(delayMs !== undefined && { delayMs }), ...(concurrency !== undefined && { concurrency }) }
 }
 
 function onEvent (event: CrawlEvent, command: Extract<Command, { name: 'run' }>, terminal: Terminal): void {

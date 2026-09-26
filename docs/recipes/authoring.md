@@ -425,6 +425,8 @@ order. Rules:
 - `delayMs` is a **rate**, not a per-request pause: the minimum time between two request starts across
   every iteration. `concurrency: 4, delayMs: 250` means at most four requests per second, in flight or not.
 - `maxRecords` is exact: once reached, iterations still in flight finish but emit nothing more.
+- Politeness towards a **site** across recipes is the runner's `throttle` ([access.md](access.md#throttling-per-site)),
+  on top of these per-recipe limits.
 - A failing step under the `fail` policy stops new iterations; the ones in flight settle, then the recipe
   fails as usual.
 

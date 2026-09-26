@@ -1,3 +1,4 @@
+import type { HostThrottle } from './host-throttle.policy'
 import { sleep } from './retry.policy'
 
 /**
@@ -17,9 +18,10 @@ export class RunGate {
   /**
    * @param permits - Iterations allowed in flight; 1 is sequential.
    * @param minIntervalMs - Minimum time between two request starts across the run.
+   * @param hosts - The crawler's per-site throttle, shared with every other recipe.
    * @param shared - The throttle state to share (internal: `nested` gates keep their parent's).
    */
-  constructor (readonly permits: number, readonly minIntervalMs: number, private readonly shared?: RunGate) {}
+  constructor (readonly permits: number, readonly minIntervalMs: number, readonly hosts?: HostThrottle, private readonly shared?: RunGate) {}
 
   /** Whether this gate lets more than one iteration run at once. */
   get concurrent (): boolean {
@@ -57,8 +59,23 @@ export class RunGate {
     await sleep(at - now)
   }
 
+  /**
+   * Waits until a request to `url` may start: the recipe's interval, then its
+   * site's turn in the crawler's per-site throttle.
+   *
+   * @param url - Where the request goes.
+   * @returns The release of the site's lane: call it once the response arrived or the request failed.
+   */
+  async request (url: string): Promise<() => void> {
+    await this.throttle()
+
+    return this.hosts === undefined ? noop : this.hosts.slot(url)
+  }
+
   /** The gate for a body running inside an iteration that holds a permit: sequential, same throttle. */
   nested (): RunGate {
-    return new RunGate(1, this.minIntervalMs, this.shared ?? this)
+    return new RunGate(1, this.minIntervalMs, this.hosts, this.shared ?? this)
   }
 }
+
+function noop (): void {}

@@ -19,19 +19,21 @@ export type Command =
   { name: 'version' } |
   { name: 'validate', paths: string[] } |
   {
-    name:    'run'
-    paths:   string[]
+    name:     'run'
+    paths:    string[]
     /** A JSON Lines file; records go to stdout without it. */
-    out?:    string
-    append:  boolean
-    resume:  boolean
-    trace:   boolean
+    out?:     string
+    append:   boolean
+    resume:   boolean
+    trace:    boolean
     /** One record per input, with the scope it was mapped from. */
-    dryRun:  boolean
+    dryRun:   boolean
     /** Run only the input recipes with these ids. */
-    only:    string[]
-    headed:  boolean
-    options: CommonOptions
+    only:     string[]
+    headed:   boolean
+    /** Per-site politeness across every recipe: overrides the access config's `throttle` defaults. */
+    throttle: { delayMs?: number, concurrency?: number }
+    options:  CommonOptions
   } |
   {
     name:    'probe'

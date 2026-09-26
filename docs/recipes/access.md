@@ -317,11 +317,45 @@ opencraw run recipes/ --plugins plugins.mjs --access access.json   # or OPENCRAW
 (or `OPENCRAW_HOOKS`) from its own environment, never from a tool call. A profile naming a plugin the module
 does not provide fails before the crawl starts.
 
+## Throttling per site
+
+`limits.delayMs` and `limits.concurrency` belong to one recipe. Two recipes that crawl the same site each
+keep their own pace, so together they hit it twice as hard. The access config's `throttle` is the crawler's
+politeness towards each **site**, across every recipe and run it executes:
+
+```json
+{
+  "profiles": {},
+  "throttle": {
+    "delayMs": 500,
+    "concurrency": 2,
+    "domains": {
+      "example.com":     { "delayMs": 2000, "concurrency": 1 },
+      "api.example.com": { "delayMs": 0 }
+    }
+  }
+}
+```
+
+- `delayMs`: at least this long between two request starts to one site. `concurrency`: at most this many of
+  its requests in flight. At the top level they apply to every site; under `domains`, to that domain and its
+  subdomains (`example.com` covers `www.example.com`), the longest match winning.
+- A site is its host name unless a `domains` entry groups it: `www.example.com` and `shop.example.com` share
+  one lane under the `example.com` rule above, and have one each without it.
+- It counts every navigation, request, bootstrap page and `next.selector` click the engine starts. Requests
+  a page makes by itself (its images, its scripts, its XHRs) are not counted.
+- A recipe's own `limits` still apply on top: the stricter of the two wins.
+
+Like a single-lane bridge with a traffic light: however many recipes arrive, each car waits for the one ahead
+to be far enough across.
+
+From the command line, `--host-delay <ms>` and `--host-concurrency <n>` set the top-level defaults (over the
+file's). From code: `createCrawler({ throttle: { delayMs: 500, domains: { … } } })`.
+
 ## Not covered yet
 
 Tracked on issue #8:
 
-- **Per-domain throttling** across recipes.
 - **Persistent browser profiles.**
 
 A custom CA certificate is not a profile option either. Chromium reads its own certificate store, so use

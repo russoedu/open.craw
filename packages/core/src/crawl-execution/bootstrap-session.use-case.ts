@@ -7,7 +7,8 @@ import type { EventBus } from '../crawl-events'
 import { ExtractionScope } from '../extraction-scope'
 import type { HookRegistry } from '../hooks'
 import type { InputRecipe } from '../recipe-schema'
-import { runSteps } from '../step-flow'
+import { RunGate, runSteps } from '../step-flow'
+import type { HostThrottle } from '../step-flow'
 import { WebStepRunner } from '../web-steps'
 
 export interface BootstrapDependencies {
@@ -16,6 +17,8 @@ export interface BootstrapDependencies {
   hooks:            HookRegistry
   events:           EventBus
   storageStateDir?: string
+  /** The crawler's per-site throttle: the bootstrap's pages count too. */
+  hosts?:           HostThrottle
 }
 
 /**
@@ -88,7 +91,7 @@ export async function readSavedState (recipe: InputRecipe, deps: Pick<BootstrapD
 export async function runBootstrap (recipe: InputRecipe, browserSession: BrowserSession, deps: Omit<BootstrapDependencies, 'browser'>, captcha?: CaptchaGuard): Promise<StorageState> {
   const bootstrap = recipe.session?.bootstrap
   if (bootstrap === undefined) return { cookies: [], origins: [] }
-  const runner = new WebStepRunner(browserSession, recipe, deps.events, undefined, captcha)
+  const runner = new WebStepRunner(browserSession, recipe, deps.events, new RunGate(1, recipe.limits?.delayMs ?? 0, deps.hosts), captcha)
   const scope = new ExtractionScope()
   scope.set('vars', recipe.vars ?? {})
   scope.set('start', { url: recipe.start[0].url })

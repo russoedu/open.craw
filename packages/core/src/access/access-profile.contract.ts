@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { HostRule, ThrottleConfig } from '../step-flow'
 
 /**
  * Where a crawl's traffic goes. Profiles live in the runner's access config,
@@ -90,9 +91,11 @@ export type AccessProfile = DirectProfile | ProxyProfile | PoolProfile | CdpProf
 
 /** The runner's access config: named profiles and the one used when a recipe names none. */
 export interface AccessConfig {
-  $schema?: string
-  profiles: Record<string, AccessProfile>
-  default?: string
+  $schema?:  string
+  profiles:  Record<string, AccessProfile>
+  default?:  string
+  /** How gently each site is crawled, across every recipe: `{ delayMs?, concurrency?, domains? }`. */
+  throttle?: ThrottleConfig
 }
 
 const templated = z.string()
@@ -143,8 +146,20 @@ const pluginSchema = z.strictObject({ kind: z.literal('plugin'), name: z.string(
 
 export const accessProfileSchema: z.ZodType<AccessProfile> = z.union([directSchema, proxySchema, poolSchema, cdpSchema, pluginSchema])
 
+const hostRuleSchema: z.ZodType<HostRule> = z.strictObject({
+  delayMs:     z.int().nonnegative().optional(),
+  concurrency: z.int().min(1).max(256).optional(),
+})
+
+export const throttleConfigSchema: z.ZodType<ThrottleConfig> = z.strictObject({
+  delayMs:     z.int().nonnegative().optional(),
+  concurrency: z.int().min(1).max(256).optional(),
+  domains:     z.record(z.string().regex(/^[\w.-]+$/, 'a domain such as example.com'), hostRuleSchema).optional(),
+})
+
 export const accessConfigSchema: z.ZodType<AccessConfig> = z.strictObject({
   $schema:  z.string().optional(),
   profiles: z.record(z.string().regex(/^[\w-]+$/, 'a profile name is letters, digits, hyphens and underscores'), accessProfileSchema),
   default:  z.string().optional(),
+  throttle: throttleConfigSchema.optional(),
 }).refine(config => config.default === undefined || Object.hasOwn(config.profiles, config.default), { message: 'default names a profile that does not exist', path: ['default'] })
