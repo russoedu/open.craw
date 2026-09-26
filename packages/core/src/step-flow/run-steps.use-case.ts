@@ -2,7 +2,7 @@ import type { EventBus } from '../crawl-events'
 import type { ExtractionScope } from '../extraction-scope'
 import type { HookRegistry } from '../hooks'
 import type { InputRecipe, Step } from '../recipe-schema'
-import { isTruthy, render } from '../template'
+import { isTruthy, render, renderDeep } from '../template'
 import { runForEach } from './for-each.use-case'
 import { runPaginate } from './paginate.use-case'
 import { backoffFor, resolveErrorPolicy, sleep } from './retry.policy'
@@ -106,12 +106,13 @@ async function runOne (step: Step, scope: ExtractionScope, walk: StepWalk): Prom
     case 'emit': { return walk.onEmit(scope, step.output)
     }
     case 'set': {
-      if (step.id !== undefined) scope.set(step.id, typeof step.value === 'string' ? render(step.value, lookupIn(scope)) : step.value)
+      // Rendered all the way down, like a request body: every string inside an object or list is a template.
+      if (step.id !== undefined) scope.set(step.id, renderDeep(step.value, lookupIn(scope)))
 
       return 'continue'
     }
     case 'collect': {
-      const value = typeof step.value === 'string' ? render(step.value, lookupIn(scope)) : step.value
+      const value = renderDeep(step.value, lookupIn(scope))
       if (value !== undefined) scope.append(step.into, Array.isArray(value) ? value : [value])
 
       return 'continue'
@@ -136,7 +137,7 @@ function lookupIn (scope: ExtractionScope): (path: string) => unknown {
 }
 
 function renderArgs (args: Record<string, unknown>, scope: ExtractionScope): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(args).map(([name, value]) => [name, typeof value === 'string' ? render(value, lookupIn(scope)) : value]))
+  return renderDeep(args, lookupIn(scope)) as Record<string, unknown>
 }
 
 function logThrough (walk: StepWalk): (level: 'debug' | 'info' | 'warn' | 'error', message: string, meta?: Record<string, unknown>) => void {

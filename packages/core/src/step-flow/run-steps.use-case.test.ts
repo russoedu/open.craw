@@ -104,6 +104,20 @@ describe('runSteps', () => {
     expect(emitted[0].links).toEqual(['/a', '/b'])
   })
 
+  it('renders set and collect values all the way down, a lone placeholder keeping its type', async () => {
+    const runner = fakeRunner({ 'http://x/1': ['/a'] })
+    const steps: Step[] = [
+      { type: 'set', id: 'n', value: 3 },
+      { type: 'set', id: 'filters', value: { state: 'in {{n}}', list: ['{{n}}', { deep: '{{n}}' }], flag: true, none: null } },
+      { type: 'set', id: 'seen', value: [] },
+      { type: 'collect', into: 'seen', value: { at: '{{n}}' } },
+      { type: 'emit' },
+    ]
+    const { emitted } = await run(steps, runner)
+    expect(emitted[0].filters).toEqual({ state: 'in 3', list: [3, { deep: 3 }], flag: true, none: null })
+    expect(emitted[0].seen).toEqual([{ at: 3 }])
+  })
+
   it('stops the whole walk when the emit callback says so', async () => {
     const runner = fakeRunner({ 'http://x/1': ['/a', '/b', '/c'] })
     const steps: Step[] = [
