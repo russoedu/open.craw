@@ -46,7 +46,7 @@
     "@swc/helpers": "0.5.18",
     "@swc/jest": "~0.2.38",
     "@types/jest": "~30.0.0",
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.6.2",
     "@types/pngjs": "^6.0.5",
     "@typescript/native": "npm:typescript@^7.0.2",
     "eslint": "^10.8.0",
