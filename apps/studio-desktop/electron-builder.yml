@@ -1,0 +1,23 @@
+# Packs apps/studio-desktop/dist-app (see packaging/stage-app.mjs). Unsigned for now: signing, notarisation
+# and the update feed are the rest of issue #96.
+appId: com.opencraw.studio
+productName: OpenCraw Studio
+directories:
+  app: dist-app
+  output: release
+# Playwright runs its CLI and reads its own files from disk; keeping the files outside an archive is the
+# simplest thing that works.
+asar: false
+npmRebuild: false
+win:
+  target:
+    - nsis
+mac:
+  target:
+    - dmg
+  category: public.app-category.developer-tools
+linux:
+  target:
+    - AppImage
+  category: Development
+publish: null

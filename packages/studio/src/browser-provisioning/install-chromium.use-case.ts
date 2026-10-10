@@ -12,8 +12,21 @@ function playwrightCliPath (): string {
   return join(dirname(require.resolve('playwright/package.json')), 'cli.js')
 }
 
+/**
+ * How the install is run: the current executable as a Node, on Playwright's own CLI. Inside the desktop app
+ * the executable is Electron, which runs as plain Node only with `ELECTRON_RUN_AS_NODE` (otherwise it would
+ * start a second copy of the app); under Node the variable does nothing.
+ *
+ * @param cliPath - Playwright's `cli.js`.
+ * @returns What to hand to `execFile`.
+ */
+export function installInvocation (cliPath: string): { file: string, args: string[], env: NodeJS.ProcessEnv } {
+  return { file: process.execPath, args: [cliPath, 'install', 'chromium'], env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }
+}
+
 async function runPlaywrightInstall (): Promise<void> {
-  await execFileAsync(process.execPath, [playwrightCliPath(), 'install', 'chromium'])
+  const { file, args, env } = installInvocation(playwrightCliPath())
+  await execFileAsync(file, args, { env })
 }
 
 let installing: Promise<void> | undefined

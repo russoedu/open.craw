@@ -34,3 +34,14 @@ describe('installChromiumOnce', () => {
     await expect(installChromiumOnce(succeedingInstall)).resolves.toBeUndefined()
   })
 })
+
+describe('installInvocation', () => {
+  it('runs Playwright\'s CLI with the current executable as a Node, also when that executable is Electron', async () => {
+    const { installInvocation } = await import('./install-chromium.use-case')
+    const { file, args, env } = installInvocation('/app/node_modules/playwright/cli.js')
+
+    expect(file).toBe(process.execPath)
+    expect(args).toEqual(['/app/node_modules/playwright/cli.js', 'install', 'chromium'])
+    expect(env.ELECTRON_RUN_AS_NODE).toBe('1')
+  })
+})

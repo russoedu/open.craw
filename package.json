@@ -53,7 +53,9 @@
     "studio-desktop:qa": "nx run studio-desktop:lint && nx run studio-desktop:test",
     "studio-desktop:build": "nx run studio-desktop:build",
     "studio-desktop:start": "nx run studio-desktop:start",
-    "studio-desktop:e2e": "nx run studio-desktop:e2e"
+    "studio-desktop:e2e": "nx run studio-desktop:e2e",
+    "studio-desktop:package": "nx run studio-desktop:package",
+    "studio-desktop:package:dir": "nx run studio-desktop:package -- --dir"
   },
   "private": true,
   "devDependencies": {
