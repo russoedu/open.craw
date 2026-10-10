@@ -68,3 +68,7 @@ vite.config.*.timestamp*
 # .pytest_cache, .ruff_cache) write their own .gitignore; CPython does not.
 __pycache__/
 *.py[cod]
+
+# Desktop app packaging output
+apps/studio-desktop/dist-app
+apps/studio-desktop/release

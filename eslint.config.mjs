@@ -39,6 +39,9 @@ export default [
     ignores: [
       '**/vite.config.*.timestamp*',
       '.claude/worktrees/**',
+      // The desktop app's packaging output: a staged copy of dependencies and the unpacked app.
+      'apps/studio-desktop/dist-app/**',
+      'apps/studio-desktop/release/**',
     ],
   },
 ]

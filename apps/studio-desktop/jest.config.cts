@@ -13,6 +13,8 @@ module.exports = {
   displayName: '@opencraw/studio-desktop',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
+  // Unit tests only: the e2e suite has its own config, and dist-app/release hold whole node_modules trees.
+  roots: ['<rootDir>/src'],
   transform: {
     '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig]
   },

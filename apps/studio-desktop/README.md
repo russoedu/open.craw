@@ -14,6 +14,22 @@ npm run studio-desktop:e2e           # launches the built app and drives its win
 
 Chromium for samples and snapshots is installed on first use, as for `opencraw-studio`.
 
+## Package it
+
+```sh
+npm run studio-desktop:package        # builds everything, then the installer for this platform in apps/studio-desktop/release
+npm run studio-desktop:package:dir    # the unpacked app only (quick, to try it)
+```
+
+`packaging/stage-app.mjs` makes `dist-app/`: the bundled main process, the preload and the production
+dependencies installed from tarballs of the workspace packages (the app carries exactly what is built here).
+`electron-builder.yml` packs that folder: NSIS on Windows, dmg on macOS, AppImage on Linux. **Unsigned**: Windows
+will warn and macOS will refuse to open it without a right-click. Files stay outside an archive (`asar: false`)
+because Playwright runs its own CLI and reads its own files from disk.
+
+The `desktop-package` workflow builds the three installers when the app changes and starts the unpacked
+Linux build once (`e2e/packaged.e2e.test.ts`). It publishes nothing.
+
 ## What it does
 
 - **Opens a recipe folder.** `File > Open Folder…` (Ctrl/Cmd+O), `File > Open Recent`, or a folder on the
@@ -47,5 +63,6 @@ Chromium for samples and snapshots is installed on first use, as for `opencraw-s
 
 Tracked in issue #96:
 
-- **The live site view**: open the site inside the window and pick on it, instead of on a snapshot.
-- **Installers**: electron-builder packages, signing and notarisation, and the auto-update feed.
+- **An embedded live site view** is deliberately not built: Record opens a headed Chromium with its own
+  persistent profile (logins in place), and a pick on the snapshot is what the engine will reproduce.
+- **Signing and notarisation**, and the **auto-update feed** (installers build unsigned today).

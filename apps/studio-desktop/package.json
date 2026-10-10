@@ -68,6 +68,20 @@
           "cwd": "apps/studio-desktop"
         }
       },
+      "package": {
+        "executor": "nx:run-commands",
+        "dependsOn": [
+          "build",
+          "@opencraw/cli:build",
+          "@opencraw/studio:build",
+          "@opencraw/studio-ui:build"
+        ],
+        "cache": false,
+        "options": {
+          "command": "node packaging/package-app.mjs",
+          "cwd": "apps/studio-desktop"
+        }
+      },
       "e2e": {
         "executor": "nx:run-commands",
         "dependsOn": [
@@ -92,6 +106,7 @@
   "main": "dist/main.js",
   "description": "OpenCraw Studio as a desktop app: an Electron window around the local Studio server.",
   "devDependencies": {
-    "electron": "^44.7.0"
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3"
   }
 }
