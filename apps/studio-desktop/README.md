@@ -27,6 +27,15 @@ dependencies installed from tarballs of the workspace packages (the app carries 
 will warn and macOS will refuse to open it without a right-click. Files stay outside an archive (`asar: false`)
 because Playwright runs its own CLI and reads its own files from disk.
 
+### Opening an unsigned build
+
+- **macOS**: right-click the app and choose Open (once), or run
+  `xattr -dr com.apple.quarantine "/Applications/OpenCraw Studio.app"`. There is no Apple signature, so macOS
+  will not let the app update itself either; check the releases page for a newer version.
+- **Windows**: SmartScreen says the publisher is unknown: choose More info, then Run anyway. A signed build
+  waits on the free signing route (issue #96).
+- **Linux**: `chmod +x` the AppImage and run it.
+
 The `desktop-package` workflow builds the three installers when the app changes and starts the unpacked
 Linux build once (`e2e/packaged.e2e.test.ts`). It publishes nothing.
 
